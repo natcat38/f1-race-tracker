@@ -1,0 +1,28 @@
+# --- Go ---
+/gateway
+/gateway.exe
+*.exe
+*.test
+*.out
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+# FastF1 downloads cache (large; never commit)
+cache/
+.fastf1/
+
+# --- Node / React ---
+node_modules/
+web/dist/
+web/.vite/
+
+# --- OS / IDE ---
+.DS_Store
+Thumbs.db
+.idea/
+
+# Note: data/replays/*.jsonl ARE committed (curated demo clips) — do not ignore them.
