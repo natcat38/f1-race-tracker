@@ -13,18 +13,18 @@ export function connectRace(
   let ws: WebSocket | null = null;
   let closed = false;
   let backoff = 500;
-  let everLive = false;
 
   const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
 
   function open() {
+    let live = false; // per-connection: emit 'live' on the first message of THIS connection
     onStatus?.('connecting');
     ws = new WebSocket(url);
     ws.onopen = () => { backoff = 500; };
     ws.onmessage = (ev) => {
       state = applyMessage(state, JSON.parse(ev.data));
-      if (!everLive) {
-        everLive = true;
+      if (!live) {
+        live = true;
         onStatus?.('live');
       }
       onState(state);
