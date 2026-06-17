@@ -18,6 +18,7 @@ cache/
 # --- Node / React ---
 node_modules/
 web/dist/
+!web/dist/.gitkeep
 web/.vite/
 
 # --- OS / IDE ---
