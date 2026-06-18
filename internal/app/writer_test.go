@@ -70,3 +70,36 @@ func TestWriter_PublishesSnapshotWithLatestRevAndTrack(t *testing.T) {
 		}
 	}
 }
+
+func TestWriter_RevContinuesAboveStoredSnapshot(t *testing.T) {
+	b := testBus(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// A previous run left a snapshot at rev 1000 on this session key.
+	seed := model.NewSnapshot("demo", "replay", "old")
+	seed.Rev = 1000
+	if err := b.Publish(ctx, seed, model.Frame{SessionKey: "demo", Rev: 1000}); err != nil {
+		t.Fatal(err)
+	}
+
+	// The writer's source restarts at rev 1 — it must NOT publish rev <= 1000.
+	src := &fakeSource{frames: []model.Frame{
+		{Rev: 1, Cars: []model.CarState{{DriverNum: 1, Code: "VER"}}},
+		{Rev: 2, Cars: []model.CarState{{DriverNum: 1, Code: "VER"}}},
+	}}
+	go NewWriter(b, src, slog.New(slog.NewTextHandler(io.Discard, nil))).Run(ctx, "demo")
+
+	deadline := time.After(2 * time.Second)
+	for {
+		snap, _ := b.GetSnapshot(context.Background(), "demo")
+		if snap != nil && snap.Rev >= 1002 { // 1000 (base) + 2 frames
+			return
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("rev did not continue above stored snapshot: %+v", snap)
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
+}
