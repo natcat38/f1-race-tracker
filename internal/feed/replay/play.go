@@ -82,12 +82,13 @@ func (s *Source) Mode() string         { return "replay" }
 // (offset by loop*maxRev); T is stamped to emit-time (Tech §2.9).
 func (s *Source) Events(ctx context.Context) (<-chan model.Frame, error) {
 	out := make(chan model.Frame)
+	base := s.lines[0].TimeMs // clips may store absolute session time; play relative to the first frame
 	go func() {
 		defer close(out)
 		for loop := int64(0); ; loop++ {
 			start := time.Now()
 			for _, ln := range s.lines {
-				target := time.Duration(float64(ln.TimeMs) * float64(time.Millisecond) / s.speed)
+				target := time.Duration(float64(ln.TimeMs-base) * float64(time.Millisecond) / s.speed)
 				if wait := target - time.Since(start); wait > 0 {
 					select {
 					case <-ctx.Done():
