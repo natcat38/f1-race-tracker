@@ -16,7 +16,7 @@ func Load() Config {
 		Role:     env("ROLE", "gateway"),
 		RedisURL: env("REDIS_URL", "redis://localhost:6379"),
 		Session:  env("SESSION_KEY", "demo"),
-		ClipFile: env("CLIP_FILE", "data/replays/synthetic.jsonl"),
+		ClipFile: env("CLIP_FILE", "data/replays/monza-2024-race.jsonl"),
 		Speed:    1,
 		Addr:     env("ADDR", ":8080"),
 	}

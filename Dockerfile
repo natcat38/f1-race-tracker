@@ -19,6 +19,6 @@ RUN CGO_ENABLED=0 go build -o /server ./cmd/server
 FROM gcr.io/distroless/static-debian12
 COPY --from=build /server /server
 COPY --from=build /src/data /data
-ENV CLIP_FILE=/data/replays/synthetic.jsonl
+ENV CLIP_FILE=/data/replays/monza-2024-race.jsonl
 EXPOSE 8080
 ENTRYPOINT ["/server"]
