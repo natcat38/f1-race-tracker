@@ -39,7 +39,8 @@ func main() {
 			logger.Error("load clip", "err", err)
 			os.Exit(1)
 		}
-		logger.Info("replay writer starting", "session", cfg.Session, "label", src.Label())
+		src.SetWallclockPhase(cfg.PhaseWallclock)
+		logger.Info("replay writer starting", "session", cfg.Session, "label", src.Label(), "wallclock", cfg.PhaseWallclock)
 		if err := app.NewWriter(b, src, logger).Run(ctx, cfg.Session); err != nil && ctx.Err() == nil {
 			logger.Error("writer stopped", "err", err)
 			os.Exit(1)
