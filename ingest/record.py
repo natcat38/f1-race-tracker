@@ -10,9 +10,13 @@ CONTRACT (must match internal/model/model.go + web/src/state/race.ts):
                   "p":{"x":float,"y":float},"status":"OnTrack"}]}}
 
 Usage:
-  .venv/Scripts/python.exe ingest/record.py [output_path]
+  .venv/Scripts/python.exe ingest/record.py [out] [--year YEAR] [--gp GP] [--session S] [--label LABEL]
 
 Default output: data/replays/monza-2024-race.jsonl
+
+Note: WINDOW_START_S/WINDOW_END_S define a mid-race window that works well for most
+circuits but may need tuning per circuit (e.g. if the window falls under a safety car
+or a long pit phase for a particular GP).
 """
 
 import fastf1
@@ -20,18 +24,34 @@ import numpy as np
 import json
 import sys
 import os
+import argparse
 from pathlib import Path
+
+# ---------------------------------------------------------------------------
+# Args
+# ---------------------------------------------------------------------------
+
+_ap = argparse.ArgumentParser(description="Bake a FastF1 session into a JSONL clip.")
+_ap.add_argument("out", nargs="?", default="data/replays/monza-2024-race.jsonl")
+_ap.add_argument("--year", type=int, default=2024)
+_ap.add_argument("--gp", default="Monza")
+_ap.add_argument("--session", default="R")
+_ap.add_argument("--label", default=None, help="defaults to '<gp> <year> · Race'")
+_args = _ap.parse_args()
+
+OUTPUT_PATH = _args.out
+GP_LABEL = _args.label or f"{_args.gp} {_args.year} · Race"
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 
-OUTPUT_PATH = sys.argv[1] if len(sys.argv) > 1 else "data/replays/monza-2024-race.jsonl"
 HZ = 10          # target sample rate (frames per second)
 TRACK_POINTS = 150  # number of track outline points
 
 # Window: 15:00 - 17:30 into session (green-flag mid-race racing at Monza).
 # Monza race is ~1:20:00 total. We pick a ~2.5-min window in the middle of lap ~30-35.
+# Note: this window is generic enough for a full race; may need tuning per circuit.
 WINDOW_START_S = 3600   # 60 min into session
 WINDOW_END_S   = 3750   # 60 + 2.5 min = 62.5 min
 
@@ -58,8 +78,8 @@ cache_dir = Path(__file__).parent.parent / "cache"
 cache_dir.mkdir(exist_ok=True)
 fastf1.Cache.enable_cache(str(cache_dir))
 
-print("Loading Monza 2024 Race session (cached if already downloaded)...")
-session = fastf1.get_session(2024, 'Monza', 'R')
+print(f"Loading {_args.gp} {_args.year} session '{_args.session}' (cached if already downloaded)...")
+session = fastf1.get_session(_args.year, _args.gp, _args.session)
 session.load(telemetry=True, laps=True, weather=False)
 print(f"Loaded. Drivers: {session.drivers}")
 
@@ -284,7 +304,7 @@ with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
     # --- Header ---
     header = {
         "track": track_points,
-        "label": "Monza 2024 · Race",  # · character
+        "label": GP_LABEL,
         "maxRev": max_rev,
     }
     f.write(json.dumps(header, separators=(',', ':')) + '\n')
