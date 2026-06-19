@@ -6,11 +6,13 @@ const SOURCES = [
   { key: 'live', label: '● Live' },
 ] as const;
 
-// The active source is whatever the current snapshot's mode says — the gateway
-// broadcasts a fresh snapshot (mode "live"|"replay") the instant it switches.
+// The active source is the session key the gateway is currently fanning out
+// ("replay"|"live") — it broadcasts a fresh snapshot the instant it switches.
+// We key off session (the lane) rather than mode (the data's provenance) so the
+// highlight is correct even when both lanes happen to be replay-sourced.
 export function SourceToggle({ state }: { state: RaceState }) {
   const [busy, setBusy] = useState(false);
-  const active = state.mode;
+  const active = state.session;
 
   async function pick(source: string) {
     if (busy || source === active) return;
