@@ -4,6 +4,7 @@ import { emptyState, type RaceState } from './state/race';
 import { Map } from './components/Map';
 import { Standings } from './components/Standings';
 import { StatusBadge } from './components/StatusBadge';
+import { SourceToggle } from './components/SourceToggle';
 
 const SIZE = 600;
 
@@ -35,6 +36,7 @@ export default function App() {
         <h2 style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '0 0 12px' }}>
           <StatusBadge status={status} state={state} />
           {state.label ? <span style={{ color: '#aaa', fontWeight: 400, fontSize: 16 }}>{state.label}</span> : null}
+          <SourceToggle state={state} />
         </h2>
         {status === 'reconnecting' && !showSkeleton && (
           <div style={{
