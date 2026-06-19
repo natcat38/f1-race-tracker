@@ -33,8 +33,17 @@ func (wr *Writer) Run(ctx context.Context, session string) error {
 	if err != nil {
 		return err
 	}
+	// Continue Rev above any snapshot a previous run (or a different source on this
+	// session key) left in Redis, so a restart never emits a Rev the gateway/clients
+	// already passed — which Apply would silently drop, freezing the board.
+	var base int64
+	if existing, err := wr.bus.GetSnapshot(ctx, session); err == nil && existing != nil {
+		base = existing.Rev
+	}
 	snap := model.NewSnapshot(session, wr.src.Mode(), wr.src.Label())
 	snap.Track = wr.src.Track()
+	snap.Rev = base
+	rev := base
 	for {
 		select {
 		case <-ctx.Done():
@@ -43,6 +52,8 @@ func (wr *Writer) Run(ctx context.Context, session string) error {
 			if !ok {
 				return nil
 			}
+			rev++
+			fr.Rev = rev // the writer owns Rev; the source's own Rev is ignored
 			fr.SessionKey = session
 			if _, applied := model.Apply(snap, fr); !applied {
 				continue

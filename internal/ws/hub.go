@@ -55,3 +55,20 @@ func (h *Hub) Unregister(c *Client) {
 	delete(h.clients, c)
 	h.mu.Unlock()
 }
+
+// Reset swaps the hub's authoritative snapshot wholesale (the operator switched the
+// gateway to a different source/session) and broadcasts it to every client so they
+// full-replace their state. Unlike ApplyFrame this is NOT Rev-gated: the new
+// snapshot may carry a lower Rev than the one clients currently hold.
+func (h *Hub) Reset(snap *model.Snapshot) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.snapshot = snap
+	b, err := encodeSnapshot(snap)
+	if err != nil {
+		return
+	}
+	for c := range h.clients {
+		c.send(b)
+	}
+}

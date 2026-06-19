@@ -27,3 +27,8 @@ Thumbs.db
 .idea/
 
 # Note: data/replays/*.jsonl ARE committed (curated demo clips) — do not ignore them.
+
+# local verification artifacts
+.playwright-mcp/
+m3a-live-lane-silverstone.png
+m3b-python-live-lane.png
