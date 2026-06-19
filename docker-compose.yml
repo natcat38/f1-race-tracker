@@ -2,16 +2,29 @@ services:
   redis:
     image: redis:7-alpine
     ports: ["6379:6379"]
-  replay:
+
+  replay:                      # REPLAY lane → session "replay" (Monza, the default clip)
     build: .
     environment:
       ROLE: replay
       REDIS_URL: redis://redis:6379
+      SESSION_KEY: replay
     depends_on: [redis]
+
+  replay-live:                 # LIVE lane (M3a stand-in) → session "live" (Silverstone)
+    build: .
+    environment:
+      ROLE: replay
+      REDIS_URL: redis://redis:6379
+      SESSION_KEY: live
+      CLIP_FILE: /data/replays/silverstone-2024-race.jsonl
+    depends_on: [redis]
+
   gateway:
     build: .
     environment:
       ROLE: gateway
       REDIS_URL: redis://redis:6379
+      SESSION_KEY: replay       # initial source the gateway fans out
     ports: ["8080:8080"]
-    depends_on: [redis, replay]
+    depends_on: [redis, replay, replay-live]
