@@ -12,6 +12,10 @@ Open [http://localhost:8080](http://localhost:8080).
 
 The default view shows the Monza 2024 race clip (replay lane). Use the toggle at the top of the page to switch to the Silverstone 2024 clip streaming on the live lane.
 
+### Cross-year comparison
+
+Open <http://localhost:8080/#compare> for the side-by-side **Monza 2023 vs 2024** view — two maps fed by two `compare-*` lanes through the same gateway via `/ws?session=<key>`, kept in phase by the replay lanes' wall-clock-phased loop. Use the "Compare years →" link on the main board.
+
 ## Architecture — two lanes, one seam
 
 ```

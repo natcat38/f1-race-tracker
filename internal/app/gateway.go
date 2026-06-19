@@ -28,12 +28,15 @@ type Gateway struct {
 	mu      sync.Mutex
 	session string
 	cancel  context.CancelFunc // cancels the active consume goroutine
+
+	regMu    sync.Mutex         // guards registry
+	registry map[string]*ws.Hub // read-only per-session hubs for /ws?session=<key>
 }
 
 // NewGateway subscribes BEFORE reading the snapshot (Tech §2.5 ordering), seeds the
 // hub, and starts forwarding frames for the initial session.
 func NewGateway(ctx context.Context, b *bus.Bus, session string, logger *slog.Logger) (*Gateway, error) {
-	g := &Gateway{bus: b, logger: logger, baseCtx: ctx}
+	g := &Gateway{bus: b, logger: logger, baseCtx: ctx, registry: make(map[string]*ws.Hub)}
 	snap, pubsub, err := g.subscribeAndSnapshot(ctx, session)
 	if err != nil {
 		return nil, err
@@ -42,7 +45,7 @@ func NewGateway(ctx context.Context, b *bus.Bus, session string, logger *slog.Lo
 	g.session = session
 	cctx, cancel := context.WithCancel(ctx)
 	g.cancel = cancel
-	go g.consume(cctx, pubsub)
+	go g.consume(cctx, g.hub, pubsub)
 	return g, nil
 }
 
@@ -83,11 +86,11 @@ func (g *Gateway) SwitchTo(session string) error {
 	cctx, cancel := context.WithCancel(g.baseCtx)
 	g.cancel = cancel
 	g.session = session
-	go g.consume(cctx, pubsub)
+	go g.consume(cctx, g.hub, pubsub)
 	return nil
 }
 
-func (g *Gateway) consume(ctx context.Context, pubsub *redis.PubSub) {
+func (g *Gateway) consume(ctx context.Context, hub *ws.Hub, pubsub *redis.PubSub) {
 	defer pubsub.Close()
 	ch := pubsub.Channel()
 	for {
@@ -103,14 +106,52 @@ func (g *Gateway) consume(ctx context.Context, pubsub *redis.PubSub) {
 				g.logger.Warn("bad frame", "err", err)
 				continue
 			}
-			g.hub.ApplyFrame(fr)
+			hub.ApplyFrame(fr)
 		}
 	}
 }
 
+// getOrCreateHub returns a lazily-created read-only hub fanning out one session.
+// Registry hubs live for the gateway's lifetime (baseCtx); they are never switched.
+func (g *Gateway) getOrCreateHub(session string) (*ws.Hub, error) {
+	g.regMu.Lock()
+	defer g.regMu.Unlock()
+	if h, ok := g.registry[session]; ok {
+		return h, nil
+	}
+	snap, pubsub, err := g.subscribeAndSnapshot(g.baseCtx, session)
+	if err != nil {
+		return nil, err
+	}
+	hub := ws.NewHub(snap)
+	g.registry[session] = hub
+	go g.consume(g.baseCtx, hub, pubsub)
+	return hub, nil
+}
+
+// wsHandler routes /ws to the active hub (M3 toggle path) or, when ?session=<key>
+// is present, to that session's registry hub.
+func (g *Gateway) wsHandler(w http.ResponseWriter, r *http.Request) {
+	session := r.URL.Query().Get("session")
+	if session == "" {
+		g.mu.Lock()
+		hub := g.hub
+		g.mu.Unlock()
+		hub.ServeWS(w, r)
+		return
+	}
+	hub, err := g.getOrCreateHub(session)
+	if err != nil {
+		g.logger.Error("session subscribe failed", "session", session, "err", err)
+		http.Error(w, "session unavailable", http.StatusBadGateway)
+		return
+	}
+	hub.ServeWS(w, r)
+}
+
 // Mount registers the gateway routes on mux. staticHandler serves the SPA (Task 9).
 func (g *Gateway) Mount(mux *http.ServeMux, staticHandler http.Handler) {
-	mux.Handle("/ws", g.hub.Handler())
+	mux.HandleFunc("/ws", g.wsHandler)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	mux.HandleFunc("/control/source", g.handleControl)
 	if staticHandler != nil {

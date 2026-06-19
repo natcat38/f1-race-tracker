@@ -8,6 +8,39 @@ import (
 	"time"
 )
 
+func TestFrameAtWallclock_DeterministicAndAligned(t *testing.T) {
+	rels := []int64{0, 100, 200} // 3 frames, 100ms apart
+	loopLen := int64(300)
+
+	cases := []struct {
+		now     int64
+		wantI   int
+		wantTgt int64
+	}{
+		{now: 0, wantI: 0, wantTgt: 0},     // start of loop
+		{now: 150, wantI: 2, wantTgt: 200}, // next frame at/after phase 150 is rel=200
+		{now: 250, wantI: 0, wantTgt: 300}, // past last frame -> wrap to next loop's frame 0
+		{now: 300, wantI: 0, wantTgt: 300}, // exact loop boundary
+		{now: 305, wantI: 1, wantTgt: 400}, // loop 1, phase 5 -> rel=100 at 300+100
+	}
+	for _, c := range cases {
+		i, tgt := frameAtWallclock(rels, loopLen, c.now)
+		if i != c.wantI || tgt != c.wantTgt {
+			t.Errorf("frameAtWallclock(now=%d) = (i=%d,tgt=%d), want (i=%d,tgt=%d)",
+				c.now, i, tgt, c.wantI, c.wantTgt)
+		}
+	}
+
+	// Alignment: two lanes asking at the same instant get the same answer.
+	for _, now := range []int64{7, 123, 299, 1000, 1234567} {
+		i1, t1 := frameAtWallclock(rels, loopLen, now)
+		i2, t2 := frameAtWallclock(rels, loopLen, now)
+		if i1 != i2 || t1 != t2 {
+			t.Errorf("not deterministic at now=%d", now)
+		}
+	}
+}
+
 func writeTemp(t *testing.T, body string) string {
 	t.Helper()
 	p := filepath.Join(t.TempDir(), "c.jsonl")
