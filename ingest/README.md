@@ -1,6 +1,6 @@
-# ingest/ — FastF1 Recorder
+# ingest/ — FastF1 Recorder and Live Ingester
 
-Bakes real F1 session data into the `.jsonl` clip format read by the Go replay player.
+Bakes real F1 session data into the `.jsonl` clip format read by the Go replay player, and streams baked clips (or a true-live SignalR feed) to Redis so the gateway can fan them out.
 
 ## Setup
 
@@ -9,13 +9,41 @@ python -m venv .venv
 .venv/Scripts/python -m pip install -r ingest/requirements.txt
 ```
 
-## Bake a clip
+## Stream a clip to Redis (`live.py --replay-clip`)
+
+This is the primary demoable path — works any time, no live session needed:
 
 ```bash
-.venv/Scripts/python ingest/record.py [output_path]
+.venv/Scripts/python ingest/live.py \
+  --replay-clip data/replays/silverstone-2024-race.jsonl \
+  --session live
+```
+
+`live.py` reads the stored Redis snapshot's `rev` at startup and emits strictly above it, so a restart never re-emits a Rev the gateway already passed.
+
+Optional flags:
+- `--label "British GP 2024"` — override the clip's label shown in the UI
+- `--redis-url redis://localhost:6379` — default; override to point at a remote Redis
+- `--session live` — the Redis session key to publish to (must match the gateway's active source)
+
+The Docker `live` service runs this automatically using the Silverstone 2024 clip.
+
+## Bake a clip (`record.py`)
+
+```bash
+.venv/Scripts/python ingest/record.py [out] [--gp GP] [--year YEAR]
 ```
 
 Default output: `data/replays/monza-2024-race.jsonl`
+
+To bake a different circuit:
+
+```bash
+.venv/Scripts/python ingest/record.py data/replays/silverstone-2024-race.jsonl \
+  --gp Silverstone --year 2024
+```
+
+The output path, `--gp`, and `--year` are the only arguments you normally need to change. `--label` overrides the display label if the default (`"<GP> <year> · Race"`) is not what you want.
 
 On first run, FastF1 downloads ~50 MB of session data and caches it under `cache/` (gitignored). Subsequent runs are fast.
 
