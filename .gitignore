@@ -31,3 +31,4 @@ Thumbs.db
 # local verification artifacts
 .playwright-mcp/
 m3a-live-lane-silverstone.png
+m3b-python-live-lane.png

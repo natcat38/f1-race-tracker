@@ -11,13 +11,16 @@ services:
       SESSION_KEY: replay
     depends_on: [redis]
 
-  replay-live:                 # LIVE lane (M3a stand-in) → session "live" (Silverstone)
-    build: .
+  live:                        # LIVE lane → session "live", now published by Python
+    build:
+      context: .
+      dockerfile: ingest/Dockerfile.live
     environment:
-      ROLE: replay
       REDIS_URL: redis://redis:6379
       SESSION_KEY: live
-      CLIP_FILE: /data/replays/silverstone-2024-race.jsonl
+    command: ["--replay-clip", "/data/replays/silverstone-2024-race.jsonl", "--session", "live"]
+    volumes:
+      - ./data:/data:ro
     depends_on: [redis]
 
   gateway:
@@ -27,4 +30,4 @@ services:
       REDIS_URL: redis://redis:6379
       SESSION_KEY: replay       # initial source the gateway fans out
     ports: ["8080:8080"]
-    depends_on: [redis, replay, replay-live]
+    depends_on: [redis, replay, live]
