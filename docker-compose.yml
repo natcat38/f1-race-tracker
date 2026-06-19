@@ -23,6 +23,26 @@ services:
       - ./data:/data:ro
     depends_on: [redis]
 
+  compare-2023:                # COMPARE left  → session "compare-monza-2023"
+    build: .
+    environment:
+      ROLE: replay
+      REDIS_URL: redis://redis:6379
+      SESSION_KEY: compare-monza-2023
+      CLIP_FILE: /data/replays/monza-2023-race.jsonl
+      PHASE_WALLCLOCK: "1"
+    depends_on: [redis]
+
+  compare-2024:                # COMPARE right → session "compare-monza-2024"
+    build: .
+    environment:
+      ROLE: replay
+      REDIS_URL: redis://redis:6379
+      SESSION_KEY: compare-monza-2024
+      CLIP_FILE: /data/replays/monza-2024-race.jsonl
+      PHASE_WALLCLOCK: "1"
+    depends_on: [redis]
+
   gateway:
     build: .
     environment:
