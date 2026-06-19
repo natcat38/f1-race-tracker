@@ -1,0 +1,6 @@
+FROM python:3.11-slim
+WORKDIR /app
+COPY ingest/requirements-live.txt ./
+RUN pip install --no-cache-dir -r requirements-live.txt
+COPY ingest/live.py ./
+ENTRYPOINT ["python", "live.py"]
