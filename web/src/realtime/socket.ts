@@ -8,13 +8,15 @@ export type ConnStatus = 'connecting' | 'live' | 'reconnecting';
 export function connectRace(
   onState: (s: RaceState) => void,
   onStatus?: (status: ConnStatus) => void,
+  session?: string,
 ): () => void {
   let state = emptyState();
   let ws: WebSocket | null = null;
   let closed = false;
   let backoff = 500;
 
-  const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
+  const base = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
+  const url = session ? `${base}?session=${encodeURIComponent(session)}` : base;
 
   function open() {
     let live = false; // per-connection: emit 'live' on the first message of THIS connection

@@ -5,6 +5,7 @@ import { Map } from './components/Map';
 import { Standings } from './components/Standings';
 import { StatusBadge } from './components/StatusBadge';
 import { SourceToggle } from './components/SourceToggle';
+import { Compare } from './components/Compare';
 
 const SIZE = 600;
 
@@ -25,8 +26,16 @@ function SkeletonMap() {
 export default function App() {
   const [state, setState] = useState<RaceState>(emptyState());
   const [status, setStatus] = useState<ConnStatus>('connecting');
+  const [hash, setHash] = useState<string>(typeof location !== 'undefined' ? location.hash : '');
 
   useEffect(() => connectRace(setState, setStatus), []);
+  useEffect(() => {
+    const onHash = () => setHash(location.hash);
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  if (hash === '#compare') return <Compare />;
 
   const showSkeleton = state.rev === 0;
 
@@ -37,6 +46,7 @@ export default function App() {
           <StatusBadge status={status} state={state} />
           {state.label ? <span style={{ color: '#aaa', fontWeight: 400, fontSize: 16 }}>{state.label}</span> : null}
           <SourceToggle state={state} />
+          <a href="#compare" style={{ color: '#3671C6', fontSize: 13, fontWeight: 400 }}>Compare years →</a>
         </h2>
         {status === 'reconnecting' && !showSkeleton && (
           <div style={{
