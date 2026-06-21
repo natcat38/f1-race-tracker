@@ -26,7 +26,7 @@ A **real-time F1 race visualisation**: a Python ingestion layer feeds normalised
 - An **animated track map**: cars moving around the circuit in real time, the **track outline drawn from the position data itself** (no per-circuit map files needed).
 - A **minimal standings list** beside the map (running order), which comes "for free" from the same data.
 - **Live or replay**, with a **manual toggle** to switch between them. The replay loops cleanly and is the default "always looks alive" mode.
-- **Cross-year comparison:** the same circuit across two seasons (e.g. **2025 vs 2026**) shown as **two maps side by side, aligned**, so you can watch how the racing differed. Built *last* in Phase 1, on top of the working single map.
+- **Cross-year comparison:** the same circuit across two seasons (e.g. **2023 vs 2024**) shown as **two maps side by side, aligned**, so you can watch how the racing differed. Built *last* in Phase 1, on top of the working single map.
 - New visitors **joining mid-session immediately see the current state** (a snapshot), then live updates. **Reconnects** re-sync automatically.
 
 **Phase 2 — Pit-Wall Timing Dashboard (later):**
@@ -62,7 +62,7 @@ A **real-time F1 race visualisation**: a Python ingestion layer feeds normalised
 | Python | **1c:** Live feed (FastF1 live → Redis) + manual live/replay toggle | 2 d | Ingest |
 | Both | **1d:** Cross-year comparison (two maps side by side, lap-aligned) | 2.5 d | Comparison |
 | Ops | Curated downsampled clips (incl. same-track two-year pair) | 0.5 d | Data |
-| Both | `docker-compose` (Python + Redis + N Go gateways) | 1 d | Shell/Ops |
+| Both | `docker-compose` (Python + Redis + Go gateway) | 1 d | Shell/Ops |
 | Go | Hub convergence integration test | 0.5 d | Realtime |
 | Ops | Load test + benchmark + README + demo recording | 1.5 d | Ops |
 | | **Phase 1 total** | **~23–25 d** | |
@@ -90,12 +90,12 @@ A **real-time F1 race visualisation**: a Python ingestion layer feeds normalised
 - A compact list beside the map showing the **running order** (position, driver code, team colour). The detailed timing screen (gaps, tyres, sectors) is **Phase 2**, not here.
 
 ### 4.3 Live / replay toggle (Phase 1)
-- A control to **switch the source**: play a recorded replay, or connect to the **live** session. The switch is server-side (the active *writer* changes); all connected viewers converge to the new source.
+- A control to **switch the source**: play a recorded replay, or switch to the **live** lane. The switch is server-side (the active *writer* changes); all connected viewers converge to the new source. The live lane is best-effort: a real F1 session is only available on race weekends, so **out of the box the live lane streams a clip through the Python writer** — this exercises the polyglot seam (Python publishing the identical contract the Go writer uses) rather than literal live data. The real live-timing client exists and is used during actual sessions.
 - Because the deployment is local and single-operator, the toggle is **open** — no login. (There is no anonymous public site to protect.)
 - The replay **loops cleanly** — a brief `↻ replay restarting` beat covers the reset so it never snaps jarringly from finish back to lap 1.
 
 ### 4.4 Cross-year comparison (Phase 1, built last)
-- Pick the **same circuit across two seasons** (e.g. Monza 2025 and Monza 2026). The view shows **two maps side by side**, playback **aligned** so you can watch the same phase of the race in both years at once. It is literally the single-map view **rendered twice** — no new data type.
+- Pick the **same circuit across two seasons** (e.g. Monza 2023 and Monza 2024). The view shows **two maps side by side**, playback **aligned** so you can watch the same phase of the race in both years at once. It is literally the single-map view **rendered twice** — no new data type.
 
 ### 4.5 Joining mid-session & connection states
 A visitor who connects after playback started **immediately sees the current car positions** (from the latest snapshot), then live updates. Connection rules:
@@ -133,9 +133,9 @@ A visitor who connects after playback started **immediately sees the current car
 > This replaces the original "always-on hosted site." There is **no required hosting** and **no cost**.
 
 - **Primary artifact (what most people see):** a polished **README** with the architecture diagram, a recorded **GIF/video** of the map animating and the two-year comparison, and the **benchmark numbers**.
-- **Hands-on reviewer:** **`docker-compose up`** runs the *full real system* locally — Python ingestion + Redis + **multiple** Go gateways — so a serious reviewer sees the actual distributed architecture, not a simplified version.
+- **Hands-on reviewer:** **`docker-compose up`** runs the *full real system* locally — Python ingestion + Redis + the Go gateway — so a serious reviewer sees the actual polyglot architecture, not a simplified version. The gateway is stateless by design (so it *could* run as multiple replicas), but the system currently runs and is benchmarked as a single gateway — see `docs/adr/0001-single-gateway-deferred-multigateway.md`.
 - **Hosted live link:** *optional and deferred.* Deploy instructions are included so it can go live in ~20 minutes, but running it 24/7 is never a requirement or a maintenance burden.
-- **The benchmark** (thousands of concurrent WebSocket connections, p50/p99 latency) is run on demand and published in `BENCHMARKS.md` — this is where the horizontal-scale claim is *proven*, with the multi-gateway + Redis configuration.
+- **The benchmark** (concurrent WebSocket connections, p50/p99 fan-out latency) is run on demand and published in `BENCHMARKS.md` — it measures how a **single gateway** holds up as concurrent viewers climb (a lower bound, since the load generator shares the host). The stateless-gateway + Redis seam is what *would* make a multi-gateway tier a config change; building and benchmarking that tier is future work (see ADR-0001).
 
 ---
 
