@@ -10,6 +10,8 @@ docker compose up --build -d
 
 Open [http://localhost:8080](http://localhost:8080).
 
+**Benchmark:** one gateway sustained 1,000 concurrent WebSocket viewers at 10 Hz with p99 fan-out latency of 48 ms and zero dropped clients — see [BENCHMARKS.md](BENCHMARKS.md).
+
 The default view shows the Monza 2024 race clip (replay lane). Use the toggle at the top of the page to switch to the Silverstone 2024 clip streaming on the live lane.
 
 ### Cross-year comparison
