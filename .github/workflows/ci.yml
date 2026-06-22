@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   go:
-    name: Go (vet + test)
+    name: Go (fmt + vet + test)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,6 +20,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
+      - name: gofmt
+        run: test -z "$(gofmt -l .)"
       - name: go vet
         run: go vet ./...
       - name: go test
@@ -41,3 +43,34 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm test
+
+  contract:
+    name: Contract parity (Python <-> Go)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install redis
+      - name: live.py <-> Go contract self-check
+        run: python check_live_contract.py
+        working-directory: ingest
+
+  docs-links:
+    name: Docs link check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: lycheeverse/lychee-action@v2
+        with:
+          args: "--no-progress --exclude-loopback README.md CONTEXT.md docs/*.md docs/adr/**/*.md"
+          fail: true
+
+  docker:
+    name: Docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: docker compose build
+        run: docker compose build
