@@ -16,9 +16,9 @@ describe('applyMessage', () => {
 
   it('applies a newer frame and ignores a stale one', () => {
     let s: RaceState = applyMessage(emptyState(), snapMsg);
-    s = applyMessage(s, { type: 'frame' as const, data: { rev: 4, timeMs: 100, cars: [{ driverNum: 1, code: 'VER', pos: 1, p: { x: 0.6, y: 0.5 }, status: 'OnTrack' }] } });
+    s = applyMessage(s, { type: 'frame' as const, data: { rev: 4, timeMs: 100, cars: [{ driverNum: 1, code: 'VER', team: 'Red Bull', pos: 1, p: { x: 0.6, y: 0.5 }, status: 'OnTrack' }] } });
     expect(s.cars[1].p.x).toBe(0.6);
-    const stale = applyMessage(s, { type: 'frame' as const, data: { rev: 4, timeMs: 100, cars: [{ driverNum: 1, code: 'XXX', pos: 1, p: { x: 0, y: 0 }, status: 'OnTrack' }] } });
+    const stale = applyMessage(s, { type: 'frame' as const, data: { rev: 4, timeMs: 100, cars: [{ driverNum: 1, code: 'XXX', team: 'Red Bull', pos: 1, p: { x: 0, y: 0 }, status: 'OnTrack' }] } });
     expect(stale.cars[1].code).toBe('VER'); // unchanged
   });
 });

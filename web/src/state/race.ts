@@ -12,7 +12,15 @@ export function emptyState(): RaceState {
   return { session: '', mode: '', label: '', track: [], cars: {}, timeMs: 0, rev: 0 };
 }
 
-type Msg = { type: 'snapshot' | 'frame'; data: any };
+// Wire payloads from the gateway, mirroring internal/model (Snapshot, Frame).
+interface SnapshotData {
+  session: string; mode: string; label: string;
+  track?: Point[]; cars: Record<number, Car>; timeMs: number; rev: number;
+}
+interface FrameData { rev: number; timeMs: number; cars?: Car[] }
+type Msg =
+  | { type: 'snapshot'; data: SnapshotData }
+  | { type: 'frame'; data: FrameData };
 
 // applyMessage folds a snapshot or frame into state. Frames with rev <= current
 // are ignored (idempotent — mirrors the Go Apply, Tech §2.6).

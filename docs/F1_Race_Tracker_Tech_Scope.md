@@ -307,8 +307,7 @@ Architecture diagram (§2.1), GIF of the map + the two-year comparison, `docker 
   benchmark is **designed but not yet implemented** (no `cmd/loadtest`, `bench/`, or
   `BENCHMARKS.md` exist yet).
 - **CI:** `.github/workflows/ci.yml` gates every PR with: `gofmt` + `go vet` + `go test`;
-  the web build + test; the Python↔Go contract self-check (`ingest/check_live_contract.py`);
-  a markdown link check over `README`/`CONTEXT`/`docs/` (lychee); and a `docker compose build`
-  smoke test. `.github/workflows/okf.yml` separately validates the `knowledge/` bundle.
-  (`npm run lint` and `go test -race` are intentionally not gated yet — lint has pre-existing
-  errors to clear first.)
+  the web lint (`--max-warnings 0`) + build + test; the Python↔Go contract self-check
+  (`ingest/check_live_contract.py`); a markdown link check over `README`/`CONTEXT`/`docs/`
+  (lychee); and a `docker compose build` smoke test. `.github/workflows/okf.yml` separately
+  validates the `knowledge/` bundle. (`go test -race` is not gated yet.)
