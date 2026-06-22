@@ -19,8 +19,10 @@ only on the [event model](/domain/event-model.md) JSON over Redis.
 - **The snapshot is the source of truth; frames are an optimisation** — any missed frame is
   healed by the next snapshot, which is why lossy pub/sub is safe.
 
-Gateways are stateless (subscribe + serve only), so they scale horizontally — the headline of
-the [WebSocket protocol](/components/websocket-protocol.md) benchmark.
+Gateways are stateless (subscribe + serve only), so the design *can* scale horizontally to
+multiple gateways behind a load balancer. The system currently runs and is benchmarked as a
+**single** gateway; the multi-gateway tier is deferred — see
+[ADR-0001](../../docs/adr/0001-single-gateway-deferred-multigateway.md).
 
 # Citations
 

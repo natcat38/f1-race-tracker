@@ -61,7 +61,7 @@ Referenced by all tasks. Define it once here. This section *is* the system-desig
 
 - **Exactly one writer publishes at a time.** In **replay** mode the Go replay player is the writer; in **live** mode the Python live client is the writer. The manual toggle (Task 10) starts one and stops the other — never both on the `featured` channel at once.
 - **Redis is the language-agnostic seam.** Python and Go never call each other; they agree only on the JSON event contract (§2.2) over Redis. ⚠️ This decoupling is the headline — say it in the README.
-- **Gateways only read + serve.** Subscribe to `frames:{s}`, keep an in-memory snapshot, serve the React app + WebSockets. Stateless, so you scale them horizontally (the benchmark, Task 14).
+- **Gateways only read + serve.** Subscribe to `frames:{s}`, keep an in-memory snapshot, serve the React app + WebSockets. Stateless *by design*, so the tier could scale out to multiple gateways — though the system as built runs a single gateway and the benchmark (Task 14) measures that one (see the as-built addendum and ADR-0001).
 - ⚠️ **One global, monotonic `Rev`, owned by whichever writer is active.** It must **never reset** — not across a replay loop, not across a live↔replay switch. If a fresh source restarted at `Rev=1`, clients holding a higher rev would reject its snapshot and the map would freeze. On every source switch, publish a full fresh snapshot at the next rev.
 
 ### 2.2 The normalised model — positions first
@@ -264,7 +264,51 @@ Architecture diagram (§2.1), GIF of the map + the two-year comparison, `docker 
 - **Draw the track from data, not files** (§2.4) — scale coordinates to a unit box at record time.
 - **Build order is load-bearing:** plain dots end-to-end (Task 7) before the polished map (Task 8); comparison (Task 11) only after a single map works live + replay. Cut order if schedule slips: comparison first, then the live toggle (keep replay-only core + benchmark).
 - **Live is best-effort and Python-side** (Task 10) — verify FastF1's live behaviour early; never let live-hardening eat the schedule, since replay is the demo.
-- **No required hosting / no cost:** `docker compose up` runs the full real system locally (Python + Redis + N gateways); the multi-gateway + Redis benchmark is where scale is proven. Deploy is an optional ~20-min bonus.
+- **No required hosting / no cost:** `docker compose up` runs the full real system locally (Python + Redis + the Go gateway); the benchmark measures the single gateway's fan-out under load. A multi-gateway tier is designed-for but unbuilt (ADR-0001). Deploy is an optional ~20-min bonus.
 - **Free data only:** FastF1 (historical + free live client); OpenF1 historical as a fallback. ⚠️ OpenF1 *live* now needs a paid tier and is rate-limited — prefer FastF1 for live.
 - **Presentable repo:** `main` branch, README with the §2.1 diagram + GIF + `BENCHMARKS.md` headline, MIT `LICENSE`, green CI, Conventional Commits.
 - **Out-of-scope guardrails:** Phase 1 is the map + standings + comparison only. Pit-wall timing (Phase 2), team radio (Phase 3), and the computed ghost-overlay (Phase 4) are deferred and reuse this pipeline.
+
+---
+
+## Built differently than planned (as-built deltas)
+
+> This section reconciles the plan above (written pre-build) with the code as it
+> actually shipped. The task table and file paths above are kept as the historical
+> plan; where reality diverged, the truth is here. The living architecture docs are
+> the [README](../README.md) and the [`knowledge/`](../knowledge/index.md) bundle.
+
+- **Gateway entrypoint** is `cmd/server/main.go` (the plan said `cmd/gateway/main.go`).
+  Gateway wiring lives under `internal/app/`.
+- **The source-toggle control endpoint** (`GET`/`POST /control/source`) lives in
+  `internal/app/gateway.go`, not the planned `internal/api/control.go`.
+- **The Python side of the contract is inline** in `ingest/live.py` (and
+  `ingest/record.py`) — there is no separate `ingest/model.py` or `ingest/normalise.py`.
+  The Go types in `internal/model/model.go` are the canonical contract; the Python
+  writer emits the byte-identical JSON shape directly.
+- **Track drawing and smoothing live in the frontend components**, not a `web/src/track/`
+  module: the circuit is drawn in `web/src/components/Map.tsx` and inter-frame motion is
+  smoothed in `web/src/hooks/useSmoothedCars.ts`.
+- **`cmd/genclip`** (Go) is an as-built clip baker/normaliser that produces the
+  committed `data/replays/*.jsonl` clips; it isn't named in the plan's task table.
+- **Tests** landed as `internal/ws/hub_test.go` plus an end-to-end
+  `internal/app/integration_test.go` (the plan named `internal/ws/hub_integration_test.go`).
+- **Compose runs lane services, not one `ingest`.** `docker-compose.yml` has `redis`,
+  `replay` (Go writer, Monza), `live` (Python writer, currently a clip — the polyglot
+  seam demo), `compare-2023` + `compare-2024` (the two phased comparison lanes), and
+  `gateway`. The plan's Task 6.2 described a single `ingest` service.
+- **Committed clips** are Monza 2023, Monza 2024, and Silverstone 2024 (the plan's
+  `2025`/`2026` examples were placeholders).
+- **Task 14 (load test + benchmark) was re-scoped** to a single-gateway, client-side
+  latency measurement (`now − frame.T`) — no `/metrics` endpoint and no multi-gateway
+  setup, neither of which M1–M3 built. See
+  `docs/superpowers/specs/2026-06-19-f1-m4-loadtest-benchmark-design.md` and
+  `docs/adr/0001-single-gateway-deferred-multigateway.md`. As of this writing the
+  benchmark is **designed but not yet implemented** (no `cmd/loadtest`, `bench/`, or
+  `BENCHMARKS.md` exist yet).
+- **CI:** `.github/workflows/ci.yml` gates every PR with: `gofmt` + `go vet` + `go test`;
+  the web build + test; the Python↔Go contract self-check (`ingest/check_live_contract.py`);
+  a markdown link check over `README`/`CONTEXT`/`docs/` (lychee); and a `docker compose build`
+  smoke test. `.github/workflows/okf.yml` separately validates the `knowledge/` bundle.
+  (`npm run lint` and `go test -race` are intentionally not gated yet — lint has pre-existing
+  errors to clear first.)
