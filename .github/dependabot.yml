@@ -1,0 +1,50 @@
+version: 2
+updates:
+  # Go modules (root)
+  - package-ecosystem: gomod
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      go-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # Web app (Vite / TypeScript)
+  - package-ecosystem: npm
+    directory: "/web"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(dev-deps)"
+    groups:
+      npm-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # Python ingest
+  - package-ecosystem: pip
+    directory: "/ingest"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      pip-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # GitHub Actions workflow pins
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci(deps)"
+    groups:
+      actions-minor-patch:
+        update-types: ["minor", "patch"]
