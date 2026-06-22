@@ -1,6 +1,11 @@
 package main
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+
+	"github.com/natcat38/f1-race-tracker/internal/model"
+)
 
 func TestHist_PercentileAndMax(t *testing.T) {
 	h := newHist()
@@ -50,5 +55,39 @@ func TestHist_Merge(t *testing.T) {
 	}
 	if got := a.Max(); got != 30 {
 		t.Errorf("merged max = %d, want 30", got)
+	}
+}
+
+func envFrame(t *testing.T, tMs int64) []byte {
+	t.Helper()
+	d, _ := json.Marshal(model.Frame{T: tMs})
+	b, _ := json.Marshal(wsEnvelope{Type: "frame", Data: d})
+	return b
+}
+
+func TestParseFrameLatency_FrameYieldsLatency(t *testing.T) {
+	raw := envFrame(t, 1000)
+	lat, ok := parseFrameLatency(raw, 1050)
+	if !ok || lat != 50 {
+		t.Errorf("got (%d,%v), want (50,true)", lat, ok)
+	}
+}
+
+func TestParseFrameLatency_SnapshotSkipped(t *testing.T) {
+	b, _ := json.Marshal(wsEnvelope{Type: "snapshot", Data: json.RawMessage(`{}`)})
+	if _, ok := parseFrameLatency(b, 1050); ok {
+		t.Error("snapshot envelope should not yield a latency sample")
+	}
+}
+
+func TestParseFrameLatency_GarbageSkipped(t *testing.T) {
+	if _, ok := parseFrameLatency([]byte("not json"), 1050); ok {
+		t.Error("malformed input should not yield a sample")
+	}
+}
+
+func TestParseFrameLatency_MissingTSkipped(t *testing.T) {
+	if _, ok := parseFrameLatency(envFrame(t, 0), 1050); ok {
+		t.Error("a frame with T==0 should not yield a sample")
 	}
 }
