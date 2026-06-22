@@ -59,12 +59,12 @@ class StatsSampler(threading.Thread):
     def __init__(self, container: str):
         super().__init__(daemon=True)
         self.container = container
-        self._stop = threading.Event()
+        self._stop_event = threading.Event()
         self.cpu = []
         self.mem = []
 
     def run(self):
-        while not self._stop.is_set():
+        while not self._stop_event.is_set():
             out = subprocess.run(
                 ["docker", "stats", "--no-stream", "--format",
                  "{{.CPUPerc}};{{.MemUsage}}", self.container],
@@ -77,10 +77,10 @@ class StatsSampler(threading.Thread):
                     self.cpu.append(c)
                 if m is not None:
                     self.mem.append(m)
-            self._stop.wait(2.0)
+            self._stop_event.wait(2.0)
 
     def stop(self):
-        self._stop.set()
+        self._stop_event.set()
         self.join(timeout=5)
 
     def avg(self):

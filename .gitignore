@@ -1,6 +1,7 @@
 # --- Go ---
 /gateway
 /gateway.exe
+/bench/loadtest          # built load-test binary (the .exe form is caught by *.exe below)
 *.exe
 *.test
 *.out
