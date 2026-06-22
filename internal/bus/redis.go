@@ -11,7 +11,7 @@ import (
 	"github.com/natcat38/f1-race-tracker/internal/model"
 )
 
-func snapshotKey(s string) string { return "snapshot:" + s }
+func snapshotKey(s string) string   { return "snapshot:" + s }
 func framesChannel(s string) string { return "frames:" + s }
 
 type Bus struct{ rdb *redis.Client }
