@@ -1,9 +1,15 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/coder/websocket"
 	"github.com/natcat38/f1-race-tracker/internal/model"
 )
 
@@ -89,5 +95,67 @@ func TestParseFrameLatency_GarbageSkipped(t *testing.T) {
 func TestParseFrameLatency_MissingTSkipped(t *testing.T) {
 	if _, ok := parseFrameLatency(envFrame(t, 0), 1050); ok {
 		t.Error("a frame with T==0 should not yield a sample")
+	}
+}
+
+func wsURL(s string) string { return "ws" + strings.TrimPrefix(s, "http") }
+
+// fakeServer sends one snapshot then `n` frames stamped with the current time,
+// then blocks until the client disconnects.
+func fakeServer(n int) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true})
+		if err != nil {
+			return
+		}
+		defer c.CloseNow()
+		ctx := r.Context()
+		snap, _ := json.Marshal(wsEnvelope{Type: "snapshot", Data: json.RawMessage(`{}`)})
+		_ = c.Write(ctx, websocket.MessageText, snap)
+		for i := 0; i < n; i++ {
+			d, _ := json.Marshal(model.Frame{T: timeNowMs()})
+			env, _ := json.Marshal(wsEnvelope{Type: "frame", Data: d})
+			if err := c.Write(ctx, websocket.MessageText, env); err != nil {
+				return
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+		<-ctx.Done()
+	}))
+}
+
+func TestRunClient_RecordsFramesAfterSteadyStart(t *testing.T) {
+	srv := fakeServer(5)
+	defer srv.Close()
+	h := newHist()
+	ctr := &counters{}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	runClient(ctx, wsURL(srv.URL), time.Now().Add(-time.Second), h, ctr) // steadyStart in the past
+	if ctr.connected.Load() != 1 {
+		t.Errorf("connected = %d, want 1", ctr.connected.Load())
+	}
+	if h.Count() < 1 {
+		t.Error("expected at least one latency sample recorded")
+	}
+}
+
+// A server that closes immediately should be counted as a drop, not a clean exit.
+func TestRunClient_ServerCloseCountsAsDrop(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true})
+		if err != nil {
+			return
+		}
+		c.CloseNow() // drop the client right away
+	}))
+	defer srv.Close()
+	h := newHist()
+	ctr := &counters{}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	runClient(ctx, wsURL(srv.URL), time.Now(), h, ctr)
+	if ctr.drops.Load() != 1 {
+		t.Errorf("drops = %d, want 1", ctr.drops.Load())
 	}
 }
