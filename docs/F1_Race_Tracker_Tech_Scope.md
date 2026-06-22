@@ -306,6 +306,9 @@ Architecture diagram (§2.1), GIF of the map + the two-year comparison, `docker 
   `docs/adr/0001-single-gateway-deferred-multigateway.md`. As of this writing the
   benchmark is **designed but not yet implemented** (no `cmd/loadtest`, `bench/`, or
   `BENCHMARKS.md` exist yet).
-- **CI:** `.github/workflows/ci.yml` runs `go vet` + `go test` and the web build + test;
-  `.github/workflows/okf.yml` separately validates the `knowledge/` bundle. (`npm run lint`
-  is intentionally not gated yet — there are pre-existing lint errors to clear first.)
+- **CI:** `.github/workflows/ci.yml` gates every PR with: `gofmt` + `go vet` + `go test`;
+  the web build + test; the Python↔Go contract self-check (`ingest/check_live_contract.py`);
+  a markdown link check over `README`/`CONTEXT`/`docs/` (lychee); and a `docker compose build`
+  smoke test. `.github/workflows/okf.yml` separately validates the `knowledge/` bundle.
+  (`npm run lint` and `go test -race` are intentionally not gated yet — lint has pre-existing
+  errors to clear first.)
