@@ -1,6 +1,16 @@
 # F1 Race Tracker
 
-A real-time F1 race tracker built as a polyglot stack: Python ingests position data and publishes it to Redis; Go reads from Redis and fans it out over WebSocket; a React SPA renders an interactive track map. The design is track-map-first — car positions on circuit are the primary view, updating at 10 Hz.
+![Live lane — Silverstone 2024 on the track map](docs/assets/live-lane.png)
+
+A real-time F1 race tracker built as a polyglot stack — Python ingests position data, Redis is the seam, a Go gateway fans it out over WebSocket, and a React SPA renders an interactive track map updating at 10 Hz. The design is track-map-first: car positions on circuit are the primary view.
+
+**One gateway sustained 1,000 concurrent WebSocket viewers at 10 Hz** — p99 fan-out latency of 48 ms, zero dropped clients, on a single laptop. See [BENCHMARKS.md](BENCHMARKS.md).
+
+### What this demonstrates
+
+- **A polyglot seam done right** — Python and Go publish byte-identical JSON to the same Redis keys; the gateway consumes either with zero code changes.
+- **Live WebSocket fan-out at scale** — one in-memory hub pushes 10 Hz frames to a thousand viewers, with backpressure that sheds milliseconds rather than dropping clients.
+- **Track-map-first design** — positions on circuit are the primary view, not an afterthought table.
 
 ## Run it
 
@@ -10,24 +20,23 @@ docker compose up --build -d
 
 Open [http://localhost:8080](http://localhost:8080).
 
-**Benchmark:** one gateway sustained 1,000 concurrent WebSocket viewers at 10 Hz with p99 fan-out latency of 48 ms and zero dropped clients — see [BENCHMARKS.md](BENCHMARKS.md).
-
 The default view shows the Monza 2024 race clip (replay lane). Use the toggle at the top of the page to switch to the Silverstone 2024 clip streaming on the live lane.
 
 ### Cross-year comparison
+
+![Monza 2023 vs 2024 side by side](docs/assets/compare.png)
 
 Open <http://localhost:8080/#compare> for the side-by-side **Monza 2023 vs 2024** view — two maps fed by two `compare-*` lanes through the same gateway via `/ws?session=<key>`, kept in phase by the replay lanes' wall-clock-phased loop. Use the "Compare years →" link on the main board.
 
 ## Architecture — two lanes, one seam
 
-```
-Python live.py ──────────────────────┐
-  (lane: "live", Silverstone clip)   │
-                                      ▼
-                              Redis ──────► Gateway (Go) ──► WebSocket ──► React SPA
-                                      ▲         ▲
-Go replay writer ────────────────────┘         │
-  (lane: "replay", Monza clip)            /control/source
+```mermaid
+flowchart LR
+    py["Python live.py<br/>lane: live · Silverstone clip"] --> redis[(Redis<br/>the polyglot seam)]
+    go["Go replay writer<br/>lane: replay · Monza clip"] --> redis
+    redis --> gw["Gateway (Go)<br/>fans out one lane"]
+    gw --> ws[WebSocket] --> spa["React SPA<br/>track map"]
+    ctl(["POST /control/source"]) -.->|switch active lane, live| gw
 ```
 
 Each lane writes to its own Redis keys (`snapshot:<session>` and `frames:<session>`) and never touches the other lane's keys. The gateway fans out exactly one lane at a time. Switching lanes is a live operation — no restart needed.
