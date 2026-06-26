@@ -21,6 +21,7 @@ or a long pit phase for a particular GP).
 
 import fastf1
 import numpy as np
+import pandas as pd
 import json
 import sys
 import os
@@ -231,12 +232,116 @@ def get_position(driver_num, session_time_s):
     return pos
 
 # ---------------------------------------------------------------------------
+# Per-driver timing lookup: at session time T, the "current" pit-wall numbers.
+# Lap/sector times become current at lap COMPLETION (LapStartTime + LapTime);
+# tyre compound/age are current from the lap's start. Best lap is the running
+# min of completed lap times. Step-lookup mirrors get_position().
+# ---------------------------------------------------------------------------
+
+def _ms(td):
+    """pandas Timedelta -> int milliseconds, or 0 if NaT."""
+    if pd.isna(td):
+        return 0
+    return int(round(td.total_seconds() * 1000))
+
+print("\nBuilding timing lookup (laps / sectors / tyre)...")
+
+# driver_num -> list of (becomes_current_time_s, fields_dict), sorted by time.
+timing_lookup = {}
+for num in session.drivers:
+    inum = int(num)
+    if inum not in driver_info:
+        continue
+    drv = session.laps.pick_drivers(num)
+    if len(drv) == 0:
+        continue
+    events = []
+    best_ms = 0
+    for _, lap in drv.iterrows():
+        start_s = lap['LapStartTime'].total_seconds() if not pd.isna(lap['LapStartTime']) else None
+        if start_s is None:
+            continue
+        last_ms = _ms(lap['LapTime'])
+        if last_ms > 0:
+            best_ms = last_ms if best_ms == 0 else min(best_ms, last_ms)
+        compound = lap['Compound'] if not pd.isna(lap['Compound']) else ''
+        tyre_age = int(lap['TyreLife']) if not pd.isna(lap['TyreLife']) else 0
+        events.append((start_s, {
+            'tyre': str(compound).upper() if compound else '',
+            'tyreAge': tyre_age,
+            'complete_at': start_s + (last_ms / 1000.0) if last_ms > 0 else start_s,
+            'lastLapMs': last_ms,
+            'bestLapMs': best_ms,
+            's1Ms': _ms(lap['Sector1Time']),
+            's2Ms': _ms(lap['Sector2Time']),
+            's3Ms': _ms(lap['Sector3Time']),
+        }))
+    events.sort(key=lambda e: e[0])
+    timing_lookup[inum] = events
+
+
+def get_timing(driver_num, t_s):
+    """Pit-wall numbers for a driver at session time t_s (step lookup)."""
+    events = timing_lookup.get(driver_num, [])
+    tyre, tyre_age = '', 0
+    last_ms = best_ms = s1 = s2 = s3 = 0
+    for start_s, f in events:
+        if start_s <= t_s:
+            tyre, tyre_age = f['tyre'], f['tyreAge']
+        if f['complete_at'] <= t_s:
+            last_ms, best_ms = f['lastLapMs'], f['bestLapMs']
+            s1, s2, s3 = f['s1Ms'], f['s2Ms'], f['s3Ms']
+        elif start_s > t_s:
+            break
+    return {'tyre': tyre, 'tyreAge': tyre_age, 'lastLapMs': last_ms,
+            'bestLapMs': best_ms, 's1Ms': s1, 's2Ms': s2, 's3Ms': s3}
+
+# ---------------------------------------------------------------------------
+# Gap / interval (BEST-EFFORT, derived). FastF1 gives no per-tick gap, so we
+# approximate race distance as lap_number + fraction-along-the-baked-outline,
+# and convert a distance-behind-leader into milliseconds via field pace.
+# ponytail: good enough for a labeled-approximate tower; swap for a real
+# timing-feed gap if broadcast accuracy is ever needed. Fallback if noisy:
+# lap-level position deltas (coarser, stable).
+# ---------------------------------------------------------------------------
+
+_track_xy = np.array([(p['x'], p['y']) for p in track_points])  # (N,2) in [0,1]
+
+def _lap_fraction(nx, ny):
+    """Fraction [0,1) around the lap = nearest baked-outline index / N."""
+    d = (_track_xy[:, 0] - nx) ** 2 + (_track_xy[:, 1] - ny) ** 2
+    return int(np.argmin(d)) / len(_track_xy)
+
+# Lap-number step lookup per driver (from laps 'LapNumber').
+lapnum_lookup = {}
+for num in session.drivers:
+    inum = int(num)
+    if inum not in driver_info:
+        continue
+    drv = session.laps.pick_drivers(num)[['LapStartTime', 'LapNumber']].dropna()
+    lapnum_lookup[inum] = [(t.total_seconds(), int(n)) for t, n in
+                           zip(drv['LapStartTime'], drv['LapNumber'])]
+
+def _lap_number(driver_num, t_s):
+    entries = lapnum_lookup.get(driver_num, [])
+    n = entries[0][1] if entries else 1
+    for t, ln in entries:
+        if t <= t_s:
+            n = ln
+        else:
+            break
+    return n
+
+# Field pace: median completed lap time (ms) across the field; fallback 90s.
+_all_laps_ms = [_ms(t) for t in session.laps['LapTime'] if not pd.isna(t)]
+_all_laps_ms = [m for m in _all_laps_ms if m > 0]
+LEADER_LAP_MS = int(np.median(_all_laps_ms)) if _all_laps_ms else 90000
+
+# ---------------------------------------------------------------------------
 # Resample all drivers onto common 10 Hz grid over the window
 # ---------------------------------------------------------------------------
 
 print(f"\nResampling {len(session.drivers)} drivers from {WINDOW_START_S}s to {WINDOW_END_S}s at {HZ} Hz...")
-
-import pandas as pd
 
 window_start = pd.Timedelta(seconds=WINDOW_START_S)
 window_end   = pd.Timedelta(seconds=WINDOW_END_S)
@@ -279,10 +384,32 @@ for num in session.drivers:
     t_indices = np.searchsorted(t_s, t_grid_s, side='left').clip(0, len(t_s) - 1)
     status_interp = status_raw[t_indices]
 
+    # Telemetry: resample car_data onto the same grid (nearest-neighbour in time).
+    # Build all five arrays locally first; assign to tel atomically so a partial
+    # failure (e.g. missing column) never leaves tel in an inconsistent state.
+    tel = {'speed': None, 'gear': None, 'throttle': None, 'brake': None, 'drs': None}
+    try:
+        cd = session.car_data[num]
+        cd_t = cd['SessionTime'].dt.total_seconds().values
+        idx = np.searchsorted(cd_t, t_grid_s, side='left').clip(0, len(cd_t) - 1)
+        _speed    = cd['Speed'].values[idx].astype(int)
+        _gear     = cd['nGear'].values[idx].astype(int)
+        _throttle = cd['Throttle'].values[idx].astype(int)
+        # FastF1 Brake is a BOOLEAN in current versions (not 0-100). Normalise to
+        # 0/100 robustly so the FE bar is right whether the source is bool or %.
+        _brake    = (cd['Brake'].values[idx].astype(float) > 0).astype(int) * 100
+        # FastF1 DRS code >= 10 means the flap is open (10,12,14 = on; 8 = eligible).
+        _drs      = (cd['DRS'].values[idx] >= 10)
+        # All five succeeded — assign atomically.
+        tel = {'speed': _speed, 'gear': _gear, 'throttle': _throttle, 'brake': _brake, 'drs': _drs}
+    except Exception as e:
+        print(f"  Warning: no telemetry for {num} ({driver_info[inum]['code']}): {e}")
+
     driver_frames[inum] = {
         'x': x_interp,
         'y': y_interp,
         'status': status_interp,
+        'tel': tel,
     }
 
 print(f"Active drivers in window: {len(driver_frames)}")
@@ -333,14 +460,68 @@ with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
             nx, ny = normalise(xi, yi)
             pos_order = get_position(dnum, t_s)
 
-            cars.append({
+            t = get_timing(dnum, t_s)
+            car = {
                 "driverNum": dnum,
                 "code": info['code'],
                 "team": info['team'],
                 "pos": pos_order,
                 "p": {"x": nx, "y": ny},
                 "status": status_str,
-            })
+            }
+            # Only attach non-zero/non-empty timing fields (mirror Go omitempty).
+            if t['tyre']:
+                car['tyre'] = t['tyre']
+            for k in ('tyreAge', 'lastLapMs', 'bestLapMs', 's1Ms', 's2Ms', 's3Ms'):
+                if t[k] > 0:
+                    car[k] = t[k]
+            tel = driver_frames[dnum]['tel']
+            if tel['speed'] is not None:
+                sp = int(tel['speed'][i])
+                if sp > 0:
+                    car['speed'] = sp
+                gr = int(tel['gear'][i])
+                if gr > 0:
+                    car['gear'] = gr
+                th = int(tel['throttle'][i])
+                if th > 0:
+                    car['throttle'] = th
+                br = int(tel['brake'][i])
+                if br > 0:
+                    car['brake'] = br
+                if bool(tel['drs'][i]):
+                    car['drs'] = True
+            cars.append(car)
+
+        # --- gap / interval pass (best-effort) ---
+        # Race distance in "lap units" = whole lap number + fraction round the lap.
+        lapn, frac, dist = {}, {}, {}
+        for car in cars:
+            dn = car['driverNum']
+            lapn[dn] = _lap_number(dn, t_s)
+            frac[dn] = _lap_fraction(car['p']['x'], car['p']['y'])
+            dist[dn] = lapn[dn] + frac[dn]
+        by_pos = sorted(cars, key=lambda c: c['pos'])
+        # Anchor the leader to the CLASSIFIED P1 (matches the FE pos===1 leader test),
+        # not the max-distance car (derivation noise could disagree).
+        leader_dn = by_pos[0]['driverNum'] if by_pos else None
+        leader_dist = dist.get(leader_dn, 0.0)
+        leader_lap = lapn.get(leader_dn, 0)
+        prev_dist = None
+        for car in by_pos:
+            dn = car['driverNum']
+            behind = max(0.0, leader_dist - dist[dn])      # lap units behind leader
+            gap_ms = int(behind * LEADER_LAP_MS)
+            gap_laps = max(0, leader_lap - lapn[dn])        # whole-lap deficit (from LapNumber)
+            if gap_ms > 0:
+                car['gapMs'] = gap_ms
+            if gap_laps > 0:
+                car['gapLaps'] = gap_laps
+            if prev_dist is not None:
+                int_ms = int(max(0.0, prev_dist - dist[dn]) * LEADER_LAP_MS)
+                if int_ms > 0:
+                    car['intMs'] = int_ms
+            prev_dist = dist[dn]
 
         frame_line = {
             "timeMs": time_ms,

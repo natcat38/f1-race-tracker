@@ -13,8 +13,21 @@ type CarState struct {
 	Pos       int    `json:"pos"`            // running order
 	P         Point  `json:"p"`              // track-space coordinate, scaled to [0,1]
 	Status    string `json:"status"`         // "OnTrack" | "Pit" | "Out"
-	Tyre      string `json:"tyre,omitempty"` // Phase 2
+	Tyre      string `json:"tyre,omitempty"` // Phase 2: compound, e.g. "SOFT"
+	TyreAge   int    `json:"tyreAge,omitempty"`
+	LastLapMs int    `json:"lastLapMs,omitempty"`
+	BestLapMs int    `json:"bestLapMs,omitempty"`
+	S1Ms      int    `json:"s1Ms,omitempty"`
+	S2Ms      int    `json:"s2Ms,omitempty"`
+	S3Ms      int    `json:"s3Ms,omitempty"`
+	GapMs     int    `json:"gapMs,omitempty"`   // to leader; best-effort, derived at record time
+	GapLaps   int    `json:"gapLaps,omitempty"` // whole laps behind leader; FE shows "+1 LAP" when >= 1
+	IntMs     int    `json:"intMs,omitempty"`   // interval to car ahead; best-effort
 	Speed     int    `json:"speed,omitempty"`
+	Gear      int    `json:"gear,omitempty"`
+	Throttle  int    `json:"throttle,omitempty"` // 0-100
+	Brake     int    `json:"brake,omitempty"`    // 0-100
+	DRS       bool   `json:"drs,omitempty"`
 }
 
 type RaceControlMessage struct {
