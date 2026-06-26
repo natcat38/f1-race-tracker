@@ -1,13 +1,8 @@
 import type { RaceState } from '../state/race';
 import { useSmoothedCars } from '../hooks/useSmoothedCars';
+import { teamColour } from './teamColours';
 
 const SIZE = 600;
-const teamColour: Record<string, string> = {
-  'Red Bull': '#3671C6', Ferrari: '#E8002D', Mercedes: '#27F4D2', McLaren: '#FF8000',
-  'Aston Martin': '#229971', Alpine: '#0093CC', Williams: '#64C4FF',
-  RB: '#6692FF', 'Kick Sauber': '#52E252', Haas: '#B6BABD',
-  AlphaTauri: '#2B4562', 'Alfa Romeo': '#C92D4B',
-};
 
 export function Map({ state }: { state: RaceState }) {
   const cars = useSmoothedCars(state);
