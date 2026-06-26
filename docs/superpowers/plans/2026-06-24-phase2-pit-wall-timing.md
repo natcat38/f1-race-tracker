@@ -23,7 +23,7 @@
 | `web/src/components/TimingTower.tsx` | NEW — one row per car (pos/gap/interval/lastLap/tyre/sectors); row click selects a car. Replaces `Standings.tsx`. |
 | `web/src/components/TimingTower.test.tsx` | NEW — renders rows sorted by pos; sector colouring; blanks for missing fields. |
 | `web/src/components/TelemetryPanel.tsx` | NEW — per selected-car readout (speed/gear/throttle/brake/DRS). |
-| `web/src/components/Standings.tsx` | DELETE — superseded by `TimingTower`. |
+| `web/src/components/Standings.tsx` | KEEP — `Compare.tsx` still uses it for the compare view. App stops importing it; the file stays. |
 | `web/src/App.tsx` | Hold `selectedDriver` state; render `TimingTower` + `TelemetryPanel`. |
 | `ingest/record.py` | Bake lap/tyre/sector, telemetry, and derived gap/interval into each frame. |
 | `data/replays/*.jsonl` | Re-baked clips (monza-2024, monza-2023, silverstone-2024). |
@@ -590,7 +590,8 @@ git commit -m "feat(web): TelemetryPanel for selected-car readout"
 
 **Files:**
 - Modify: `web/src/App.tsx`
-- Delete: `web/src/components/Standings.tsx`
+
+> NOTE: do NOT delete `Standings.tsx` — `Compare.tsx` still imports it. App just stops using it.
 
 - [ ] **Step 1: Replace the Standings import + usage**
 
@@ -630,23 +631,16 @@ Replace the right-hand column (the `<div><h3>Order</h3><Standings state={state} 
 </div>
 ```
 
-- [ ] **Step 2: Delete the dead component**
-
-```bash
-rm web/src/components/Standings.tsx
-```
-
-- [ ] **Step 3: Verify build + tests + lint**
+- [ ] **Step 2: Verify build + tests + lint**
 
 Run: `cd web && npm run build && npm test && npm run lint`
-Expected: build succeeds, all tests pass, no lint errors. (If lint flags an unused import, remove it.)
+Expected: build succeeds, all tests pass, no lint errors. (If lint flags an unused import, remove it.) Confirm `Standings.tsx` is untouched and still imported by `Compare.tsx`.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
 git add web/src/App.tsx
-git rm web/src/components/Standings.tsx
-git commit -m "feat(web): dock TimingTower + TelemetryPanel on the board, drop Standings"
+git commit -m "feat(web): dock TimingTower + TelemetryPanel on the board"
 ```
 
 ---
