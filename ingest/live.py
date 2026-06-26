@@ -9,7 +9,7 @@ Modes:
 
 Redis contract:
   SET     snapshot:<session> = {"session","mode","label","track":[{x,y}],
-                                "cars":{"1":{...}},"timeMs","rev"}
+                                "radio":[{timeMs,driverNum,clip}],"cars":{"1":{...}},"timeMs","rev"}
   PUBLISH frames:<session>   = {"session","rev","t","timeMs","cars":[{...}]}
   Car = {"driverNum":int,"code":str,"team":str,"pos":int,"p":{"x":float,"y":float},"status":str}
   Go marshals map[int]CarState with STRING keys, so snapshot.cars is keyed by str(driverNum).
