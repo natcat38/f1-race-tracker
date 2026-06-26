@@ -21,6 +21,7 @@ or a long pit phase for a particular GP).
 
 import fastf1
 import numpy as np
+import pandas as pd
 import json
 import sys
 import os
@@ -231,12 +232,75 @@ def get_position(driver_num, session_time_s):
     return pos
 
 # ---------------------------------------------------------------------------
+# Per-driver timing lookup: at session time T, the "current" pit-wall numbers.
+# Lap/sector times become current at lap COMPLETION (LapStartTime + LapTime);
+# tyre compound/age are current from the lap's start. Best lap is the running
+# min of completed lap times. Step-lookup mirrors get_position().
+# ---------------------------------------------------------------------------
+
+def _ms(td):
+    """pandas Timedelta -> int milliseconds, or 0 if NaT."""
+    if pd.isna(td):
+        return 0
+    return int(round(td.total_seconds() * 1000))
+
+print("\nBuilding timing lookup (laps / sectors / tyre)...")
+
+# driver_num -> list of (becomes_current_time_s, fields_dict), sorted by time.
+timing_lookup = {}
+for num in session.drivers:
+    inum = int(num)
+    if inum not in driver_info:
+        continue
+    drv = session.laps.pick_drivers(num)
+    if len(drv) == 0:
+        continue
+    events = []
+    best_ms = 0
+    for _, lap in drv.iterrows():
+        start_s = lap['LapStartTime'].total_seconds() if not pd.isna(lap['LapStartTime']) else None
+        if start_s is None:
+            continue
+        last_ms = _ms(lap['LapTime'])
+        if last_ms > 0:
+            best_ms = last_ms if best_ms == 0 else min(best_ms, last_ms)
+        compound = lap['Compound'] if not pd.isna(lap['Compound']) else ''
+        tyre_age = int(lap['TyreLife']) if not pd.isna(lap['TyreLife']) else 0
+        events.append((start_s, {
+            'tyre': str(compound).upper() if compound else '',
+            'tyreAge': tyre_age,
+            'complete_at': start_s + (last_ms / 1000.0) if last_ms > 0 else start_s,
+            'lastLapMs': last_ms,
+            'bestLapMs': best_ms,
+            's1Ms': _ms(lap['Sector1Time']),
+            's2Ms': _ms(lap['Sector2Time']),
+            's3Ms': _ms(lap['Sector3Time']),
+        }))
+    events.sort(key=lambda e: e[0])
+    timing_lookup[inum] = events
+
+
+def get_timing(driver_num, t_s):
+    """Pit-wall numbers for a driver at session time t_s (step lookup)."""
+    events = timing_lookup.get(driver_num, [])
+    tyre, tyre_age = '', 0
+    last_ms = best_ms = s1 = s2 = s3 = 0
+    for start_s, f in events:
+        if start_s <= t_s:
+            tyre, tyre_age = f['tyre'], f['tyreAge']
+        if f['complete_at'] <= t_s:
+            last_ms, best_ms = f['lastLapMs'], f['bestLapMs']
+            s1, s2, s3 = f['s1Ms'], f['s2Ms'], f['s3Ms']
+        elif start_s > t_s:
+            break
+    return {'tyre': tyre, 'tyreAge': tyre_age, 'lastLapMs': last_ms,
+            'bestLapMs': best_ms, 's1Ms': s1, 's2Ms': s2, 's3Ms': s3}
+
+# ---------------------------------------------------------------------------
 # Resample all drivers onto common 10 Hz grid over the window
 # ---------------------------------------------------------------------------
 
 print(f"\nResampling {len(session.drivers)} drivers from {WINDOW_START_S}s to {WINDOW_END_S}s at {HZ} Hz...")
-
-import pandas as pd
 
 window_start = pd.Timedelta(seconds=WINDOW_START_S)
 window_end   = pd.Timedelta(seconds=WINDOW_END_S)
@@ -333,14 +397,22 @@ with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
             nx, ny = normalise(xi, yi)
             pos_order = get_position(dnum, t_s)
 
-            cars.append({
+            t = get_timing(dnum, t_s)
+            car = {
                 "driverNum": dnum,
                 "code": info['code'],
                 "team": info['team'],
                 "pos": pos_order,
                 "p": {"x": nx, "y": ny},
                 "status": status_str,
-            })
+            }
+            # Only attach non-zero/non-empty timing fields (mirror Go omitempty).
+            if t['tyre']:
+                car['tyre'] = t['tyre']
+            for k in ('tyreAge', 'lastLapMs', 'bestLapMs', 's1Ms', 's2Ms', 's3Ms'):
+                if t[k] > 0:
+                    car[k] = t[k]
+            cars.append(car)
 
         frame_line = {
             "timeMs": time_ms,
