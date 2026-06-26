@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { connectRace, type ConnStatus } from './realtime/socket';
 import { emptyState, type RaceState } from './state/race';
 import { Map } from './components/Map';
-import { Standings } from './components/Standings';
+import { TimingTower } from './components/TimingTower';
+import { TelemetryPanel } from './components/TelemetryPanel';
 import { StatusBadge } from './components/StatusBadge';
 import { SourceToggle } from './components/SourceToggle';
 import { Compare } from './components/Compare';
@@ -27,6 +28,7 @@ export default function App() {
   const [state, setState] = useState<RaceState>(emptyState());
   const [status, setStatus] = useState<ConnStatus>('connecting');
   const [hash, setHash] = useState<string>(typeof location !== 'undefined' ? location.hash : '');
+  const [selected, setSelected] = useState<number | null>(null);
 
   useEffect(() => connectRace(setState, setStatus), []);
   useEffect(() => {
@@ -65,7 +67,16 @@ export default function App() {
         {!showSkeleton && status !== 'reconnecting' && <Map state={state} />}
         {showSkeleton && <SkeletonMap />}
       </div>
-      <div><h3>Order</h3><Standings state={state} /></div>
+      <div style={{ display: 'grid', gap: 16, alignContent: 'start' }}>
+        <div>
+          <h3 style={{ margin: '0 0 8px' }}>Timing</h3>
+          <TimingTower state={state} selected={selected} onSelect={setSelected} />
+        </div>
+        <div>
+          <h3 style={{ margin: '0 0 8px' }}>Telemetry</h3>
+          <TelemetryPanel car={selected != null ? state.cars[selected] : undefined} />
+        </div>
+      </div>
     </div>
   );
 }
