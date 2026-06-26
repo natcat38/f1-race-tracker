@@ -436,10 +436,18 @@ with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
                     car[k] = t[k]
             tel = driver_frames[dnum]['tel']
             if tel['speed'] is not None:
-                car['speed'] = int(tel['speed'][i])
-                car['gear'] = int(tel['gear'][i])
-                car['throttle'] = int(tel['throttle'][i])
-                car['brake'] = int(tel['brake'][i])
+                sp = int(tel['speed'][i])
+                if sp > 0:
+                    car['speed'] = sp
+                gr = int(tel['gear'][i])
+                if gr > 0:
+                    car['gear'] = gr
+                th = int(tel['throttle'][i])
+                if th > 0:
+                    car['throttle'] = th
+                br = int(tel['brake'][i])
+                if br > 0:
+                    car['brake'] = br
                 if bool(tel['drs'][i]):
                     car['drs'] = True
             cars.append(car)
