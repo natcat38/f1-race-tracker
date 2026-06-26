@@ -10,7 +10,7 @@ This is **the first change to the event model / contract** since it was frozen. 
 
 ## Goal
 
-A **timing tower docked beside the existing track map** on the main board: one row per car (position, gap, interval, last lap, tyre, sectors), with a per-car telemetry readout on selection. Keeps the track map primary (the project's signature), adds pit-wall data density alongside it. The committed **replay** clips are the demo target.
+A **timing tower docked beside the existing track map** on the main board: one row per car (position, gap, interval, last lap, best lap, tyre, sectors), with a per-car telemetry readout on selection. Keeps the track map primary (the project's signature), adds pit-wall data density alongside it. The committed **replay** clips are the demo target.
 
 ## Scope
 
