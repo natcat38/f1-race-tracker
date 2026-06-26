@@ -11,6 +11,7 @@ A real-time F1 race tracker built as a polyglot stack — Python ingests positio
 - **A polyglot seam done right** — Python and Go publish byte-identical JSON to the same Redis keys; the gateway consumes either with zero code changes.
 - **Live WebSocket fan-out at scale** — one in-memory hub pushes 10 Hz frames to a thousand viewers, with backpressure that sheds milliseconds rather than dropping clients.
 - **Track-map-first design** — positions on circuit are the primary view, not an afterthought table.
+- **Pit-wall timing tower** — beside the map the board shows a live timing tower with gaps/intervals, last lap, tyres, and sector times for every car; click any driver to open a per-car telemetry panel (speed, gear, throttle, brake, DRS) sourced from the same 10 Hz frame.
 
 ## Run it
 
