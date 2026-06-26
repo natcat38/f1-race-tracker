@@ -19,9 +19,11 @@ A **toggleable radio layer** over the existing board: when on, it **auto-plays**
 **In scope**
 - New `RadioMessage` type + `Radio []RadioMessage` on **`Snapshot` only** (`internal/model/model.go`); Python↔Go contract parity updated.
 - Recorder (`ingest/record.py`): fetch `team_radio`, map `Utc`→session-time via `t0_date`, keep in-window captures, bake a radio timeline into the **clip header** (`[{timeMs, driverNum, clip}]`, `clip` = full https URL).
-- **Widen the recorder window** 3600→3300s (2.5→7.5 min) for radio density; re-bake `monza-2024-race.jsonl` (default replay) and `monza-2023-race.jsonl` (compare phase). Bake radio into `silverstone-2024-race.jsonl` (live lane) too — free from the same recorder change.
-- Gateway: thread the `Radio` field header→snapshot. No new routes, no proxy.
-- Frontend: a radio hook that schedules auto-play against the frame clock (FIFO queue + staleness skip + loop reset), an `<audio>` element, a toggleable now-playing banner + small history, and a layer toggle alongside the existing toggles.
+- **Widen the recorder window** 3600→3300s (2.5→7.5 min) for radio density; re-bake `monza-2024-race.jsonl` (default replay) and `monza-2023-race.jsonl` (compare phase). Bake radio into `silverstone-2024-race.jsonl` (live lane) too.
+- Thread `Radio` header→snapshot on **both** lane paths: the Go replay path (`clipHeader` in `internal/feed/replay/play.go` → `Source.Radio()` → `snap.Radio` in `internal/app/writer.go`, next to the existing `snap.Track`) **and** the Python live path (`ingest/live.py` `build_snapshot`, mirroring its `header.get("track")` with `header.get("radio")` — one line, not free). No new routes, no proxy.
+- Frontend (the **comms layer**): a comms hook that schedules auto-play against the frame clock (FIFO queue + staleness skip + loop reset), an `<audio>` element, a toggleable now-playing banner + small history, and a comms toggle alongside the existing toggles.
+
+**Terminology** (CONTEXT.md): the data is **team radio** (short form "radio", as in the `radio` snapshot field / `RadioMessage` type); the on-screen feature is the **comms layer**, switched by the **comms toggle**. Never "overlay" (reserved, Phase 4).
 
 **Out of scope (explicitly deferred / not built — ponytail)**
 - **Committing audio, any download/cache dir, Git LFS.** Streamed from F1's URL; nothing on disk.
@@ -35,7 +37,7 @@ A **toggleable radio layer** over the existing board: when on, it **auto-plays**
 ## Design decisions (from brainstorming)
 
 1. **Stream from F1's URL; metadata-only in the clip.** The clip header carries `{timeMs, driverNum, clip-URL}` (tiny text). At play time the browser streams the bytes from CloudFront via a plain `<audio src>`. Verified: cross-origin playback works without CORS. This resolves both the "audio source" and "binary asset" questions at once and is fully in the spirit of the no-hosting rule — we host nothing and commit nothing.
-   - **Known ceiling (ponytail):** depends on F1 keeping those public URLs live (they're 2024 assets, still served in 2026). If they ever expire or add CORS/referer locks, the upgrade path is a small Go gateway passthrough route serving the bytes (sidesteps CORS, still nothing committed). Named, not built.
+   - **Known ceiling (ponytail):** depends on F1 keeping those public URLs live (they're 2024 assets, still served in 2026). If they ever expire or add CORS/referer locks, the upgrade path is a small Go gateway passthrough route serving the bytes (sidesteps CORS, still nothing committed). Named, not built. Recorded as **ADR-0003** (`docs/adr/0003-team-radio-streamed-not-committed.md`).
 2. **`Radio` on `Snapshot` only — not rebroadcast per-frame.** Radio is a finite, sparse timeline for a replay clip; it belongs in the snapshot (the source of truth, healed on reconnect) exactly like `Track []Point` is sent once. No `Frame.Radio`, no ADR-0002 frame-size pressure, no benchmark impact. The FE already tracks the frame clock and schedules playback locally.
    - Contrast with `RaceControlMessage` (which sits on both Snapshot and Frame): that shape anticipated live text flags; radio's fixed-timeline nature makes snapshot-only both correct and lazier. If a true-live radio source is ever added, add `Frame.Radio` then.
 3. **Auto-play at each message's moment, with a guarded queue.** One `<audio>` element, FIFO. As the frame `timeMs` passes an unplayed message, enqueue it. Any message more than **~3 s stale** vs the current race clock when it reaches the queue front is **skipped for audio but still added to history** (so a busy spell, or toggling the layer on mid-replay, never lags the audio behind the race). On replay **loop** (clock jumps backward), reset the played-cursor so the timeline replays.
@@ -69,9 +71,13 @@ Radio []RadioMessage `json:"radio,omitempty"`
 
 ## Frontend (`web/src`)
 
-- **Radio hook** (new, in `state/` or `hooks/`): holds `snapshot.radio`; on each frame, fires any message with `timeMs <= currentClock` not yet played; manages the FIFO queue + ~3 s staleness skip + loop-reset (cursor resets when the clock jumps backward).
+- **Radio hook** (new, in `state/` or `hooks/`): holds `snapshot.radio` and a `lastClock` cursor. One rule drives steady-state, loop, and connect:
+  - **Steady state:** each frame, enqueue every message with `lastClock < timeMs <= frame.timeMs`, then `lastClock = frame.timeMs` (~100 ms window at 10 Hz → normally 0–1 messages).
+  - **Connect mid-replay:** on the snapshot, init `lastClock = snapshot.timeMs`; all earlier messages go straight to **history** (clickable), not the play queue — a late joiner is never blasted with backlog audio.
+  - **Loop:** detect `frame.timeMs < lastClock` (Rev still climbs, `timeMs` resets), set `lastClock = frame.timeMs` and enqueue nothing; the timeline re-fires on the new lap.
+  - **Staleness:** at the queue front, if `currentClock - msg.timeMs > 3000`, skip its audio but still show it in banner/history (keeps a busy spell — clips longer than the gaps between them — from lagging the race).
 - **Audio:** a single `<audio>` element; `src` set to the firing message's `clip`; no `crossOrigin` attribute (keep it CORS-free).
-- **UI (banner + small history):** a transient **now-playing banner** — driver code in team colour + a replay button, auto-fades — plus a short **collapsible history** of recent clips (click to replay). Driver code/team/colour from the existing `cars` map. A **radio layer toggle** sits with the existing source/seconds toggles; OFF disables auto-play and hides the banner/history.
+- **UI (the comms layer — banner + small history):** a transient **now-playing banner** — driver code in team colour + a replay button, auto-fades — plus a short **collapsible history** of recent clips (click to replay). Driver code/team/colour from the existing `cars` map. A **comms toggle** sits with the existing source/seconds toggles; OFF disables auto-play and hides the banner/history.
 
 ## Testing
 
@@ -88,4 +94,4 @@ Radio []RadioMessage `json:"radio,omitempty"`
 - **Loop/seek edge cases** in the FE cursor reset — covered by the queue logic test.
 
 ---
-*Next: `grill-with-docs` pass to pressure-test against CONTEXT.md + ADRs and update domain docs inline (CONTEXT.md gains "radio layer"; no ADR expected unless the contract decision warrants one).*
+*Updated by `grill-with-docs` (2026-06-26): live-lane plumbing sharpened (one-line `live.py` change, not "free"); FE cursor rule made precise (steady/connect/loop/staleness from one comparison); CONTEXT.md gained **Team radio** + **Comms** entries; canonical terms locked (data = "team radio"/`radio`; UI = "comms layer"/"comms toggle"; "overlay" stays reserved for Phase 4).*

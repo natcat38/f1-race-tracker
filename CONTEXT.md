@@ -122,3 +122,23 @@ The per-car live readout — speed, gear, throttle, brake, DRS — shown for the
 selected in the **timing tower**. Per-tick data; updates every frame.
 
 - _Use_ "telemetry" for this readout.
+
+## Team radio
+
+A driver↔race-engineer audio clip tied to a moment in the race (a session-time).
+Best-effort, like **gap** — placed by mapping the clip's wall-clock to session time
+when a clip is recorded. The audio is streamed from a public URL at play time, never
+stored; only the reference (driver, session-time, clip URL) rides the **snapshot**.
+
+- _Use_ "team radio" (or just "radio" as the short form for the clip/data); not
+  "audio" or bare "message". A team-radio reference is a sparse, fixed timeline — it
+  rides the **snapshot**, not every **frame**.
+
+## Comms
+
+The toggleable **layer** that surfaces **team radio** during replay: a now-playing
+banner (driver attribution) and a short replayable history, switched by the comms
+toggle. It auto-plays each clip as the replay clock reaches its moment.
+
+- _Use_ "comms" / "comms layer"; never "overlay" (reserved for the Phase-4 ghost
+  delta) and not "lane" (a lane is a whole stream of state, not a UI toggle).
