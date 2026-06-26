@@ -85,3 +85,40 @@ lanes** — no new data type.
 
 - _Use_ "compare" / "comparison", not "diff" or "overlay" (the computed delta overlay
   is a separate, deferred Phase 4 concept).
+
+## Gap
+
+A car's time behind the race **leader**. Best-effort — derived when a clip is recorded
+(the source has no per-tick gap), so the UI marks it approximate.
+
+- _Use_ "gap"; not "delta" or "distance".
+
+## Interval
+
+A car's time behind the car **directly ahead** in running order. Same best-effort
+derivation as **Gap**.
+
+- _Use_ "interval"; not "gap-ahead".
+
+## Lap deficit
+
+How many whole laps a car trails the **leader**. A car a lap or more down ("lapped")
+is shown as "+1 LAP", not a time. The time gap and the lap deficit are carried
+separately so the UI never has to guess which to show.
+
+- _Use_ "lap deficit" for the count, "lapped" for the ≥1 state.
+
+## Timing tower
+
+The per-car table beside the track map: position, **gap**, **interval**, last lap,
+tyre, sector times — one row per car, sorted by running order. Clicking a row selects
+that car for the **telemetry** readout.
+
+- _Use_ "timing tower" or "the tower"; not "standings", "order", or "leaderboard".
+
+## Telemetry
+
+The per-car live readout — speed, gear, throttle, brake, DRS — shown for the one car
+selected in the **timing tower**. Per-tick data; updates every frame.
+
+- _Use_ "telemetry" for this readout.

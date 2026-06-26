@@ -22,7 +22,7 @@ A **timing tower docked beside the existing track map** on the main board: one r
 - One benchmark run to validate the Option A frame-size tradeoff.
 
 **Out of scope (explicitly deferred)**
-- **Full timing on the live lane.** Live is best-effort; its omitted fields render blank. Phase 2 targets the committed replay demo. (Live can be enriched later without a contract change — the fields already exist.)
+- **The genuine SignalR `--live` source.** `live_signalr.py` (real-session feed) is exploratory and not in the default demo; it may emit partial/no timing, and the UI's blank-graceful rendering covers that. Not built out here. (Note: the *default-demo* live lane is **not** this path — see decision 4.)
 - **Lower-cadence / split timing message (Option B).** Deferred unless the benchmark proves Option A blows the p99 budget. The `ponytail:` comment names this upgrade path.
 - Pit-stop history, weather, fuel, lap-by-lap charts, driver standings deltas over time — not pit-wall-essential for the demo.
 - Any change to the gateway, replay player streaming logic, the operator toggle, or the compare view beyond the new fields flowing through.
@@ -30,10 +30,11 @@ A **timing tower docked beside the existing track map** on the main board: one r
 ## Design decisions (from brainstorming)
 
 1. **Option A — flat fields on `CarState`, rebroadcast every frame.** Rationale: zero new types, byte-identical Python↔Go extension, consistent with CONTEXT.md's "a frame is not a sparse diff — it carries almost all cars." Nothing about parity, heal-by-snapshot, or Rev changes. The slow fields (laps/sectors/tyre/gap) are redundant per-tick but the simplicity wins until measured otherwise.
-   - **Known ceiling (ponytail):** frame size roughly doubles (~2 KB → ~4 KB for 20 cars). If the existing `BENCHMARKS.md` harness (1000 viewers @ 10 Hz) shows the p99 budget blown, *that measurement* justifies upgrading to Option B (split slow data to a lower-cadence sub-message). Not a guess up front.
+   - **Known ceiling (ponytail):** frame size roughly doubles (~2 KB → ~4 KB for 20 cars). If the existing `BENCHMARKS.md` harness (1000 viewers @ 10 Hz) shows the p99 budget blown, *that measurement* justifies upgrading to Option B (split slow data to a lower-cadence sub-message). Not a guess up front. Recorded as **ADR-0002** (`docs/adr/0002-timing-fields-rebroadcast-flat.md`).
 2. **Gap/interval is the one best-effort field.** FastF1 gives no per-tick gap; it's derived at record time from per-car race distance (lap count + lap fraction) ÷ leader pace, baked into the clips. Labeled approximate in the UI so it doesn't read as broadcast-grade.
+   - **Lap deficit is carried separately (`gapLaps`).** The backend stays specific — exact time *and* exact whole-lap deficit — so the frontend renders pit-wall-style without guessing: a car ≥1 lap down shows **"+1 LAP"**, lead-lap cars show **"+s.SSS"**. Interval lap-deficit is *derived* in the FE from the `gapLaps` difference between adjacent cars (no separate `intLaps` field — the two can't disagree). A **toggle** over the whole tower forces raw-seconds display (`gapMs`/`intMs`) regardless of lap deficit.
 3. **Sector best-colouring computed in the frontend.** Send raw sector times (3 plain ints); the UI tracks personal-best (green) / session-best (purple) from values seen so far. Keeps the contract minimal — no baked flags, no per-frame bloat for presentation state.
-4. **Replay demo is the target, live degrades gracefully.** All four field groups are populated in the baked clips; the live lane omits what it lacks and the UI renders blanks.
+4. **Both the replay board and the live toggle show a full tower.** The default-demo "live" lane is `live.py --replay-clip silverstone-2024-race.jsonl`, which re-publishes each car's fields verbatim — so once Silverstone is re-baked (Task 9) it carries full timing for free, no Go/Python changes. The UI's blank-graceful rendering exists only for the future genuine `--live` SignalR path, which is out of scope here.
 
 ## The contract extension
 
@@ -47,6 +48,7 @@ New fields on `CarState` (all `omitempty`; `Tyre`/`Speed` already present):
 | `BestLapMs` | `bestLapMs` | int | `laps.LapTime` (min) | slow |
 | `S1Ms` / `S2Ms` / `S3Ms` | `s1Ms`/`s2Ms`/`s3Ms` | int | `laps.Sector{1,2,3}Time` | slow |
 | `GapMs` | `gapMs` | int | **derived (best-effort)** | slow |
+| `GapLaps` | `gapLaps` | int | **derived (best-effort)** — whole laps behind leader | slow |
 | `IntMs` | `intMs` | int | **derived (best-effort)** | slow |
 | `Speed` *(exists)* | `speed` | int | `car_data.Speed` | fast |
 | `Gear` | `gear` | int | `car_data.nGear` | fast |
@@ -77,7 +79,7 @@ record.py  ──(bakes timing fields into clip JSONL)──►  data/replays/*.
 
 - **Go:** essentially free. Adding fields to `model.CarState` flows through the replay player, snapshot store, and gateway fan-out with no logic change (they (de)serialise the whole struct).
 - **Python recorder:** the real work on the ingest side — populate the new fields per frame via a session-time step-lookup against `session.laps` (same pattern already used to derive `pos`) plus `car_data` for telemetry, and compute gap/interval.
-- **Frontend:** the bulk of new code — parse the fields in `race.ts`, render the tower + telemetry panel, manage selected-car state, compute sector colouring.
+- **Frontend:** the bulk of new code — parse the fields in `race.ts`, render the tower + telemetry panel, manage selected-car state and the gap-display toggle, derive pit-wall gap/interval (lap deficit vs seconds), compute sector colouring.
 
 ## Components / files
 
@@ -89,7 +91,7 @@ record.py  ──(bakes timing fields into clip JSONL)──►  data/replays/*.
 | `data/replays/monza-2024-race.jsonl` | Re-bake with timing fields. |
 | `data/replays/monza-2023-race.jsonl` | Re-bake (keep equal-length with 2024 for compare). |
 | `data/replays/silverstone-2024-race.jsonl` | Re-bake with timing fields. |
-| `ingest/check_live_contract.py` | Extend the parity check to cover the new optional fields. |
+| `ingest/check_live_contract.py` | No change — it asserts message-level keys (snapshot/frame), not car fields; the new optional fields don't affect it. Contract safety = a Go round-trip test. |
 | `web/src/components/Standings.tsx` | The existing per-car table — decide in planning whether to enrich it into the tower or keep it and add `TimingTower.tsx` alongside. |
 | `web/src/components/TimingTower.tsx` | New (or enriched `Standings`): one row per car, sorted by `pos`; gap/interval/lastLap/tyre/sectors. |
 | `web/src/components/TelemetryPanel.tsx` | New: per selected-car readout (speed/gear/throttle/brake/DRS). |

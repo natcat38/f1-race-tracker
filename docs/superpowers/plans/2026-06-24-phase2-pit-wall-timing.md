@@ -56,7 +56,7 @@ func TestCarStateRoundTripWithTimingFields(t *testing.T) {
 		Tyre: "SOFT", TyreAge: 12,
 		LastLapMs: 81234, BestLapMs: 80950,
 		S1Ms: 26100, S2Ms: 28200, S3Ms: 26900,
-		GapMs: 0, IntMs: 0,
+		GapMs: 0, GapLaps: 0, IntMs: 0,
 		Speed: 312, Gear: 7, Throttle: 100, Brake: 0, DRS: true,
 	}
 	b, err := json.Marshal(in)
@@ -120,8 +120,9 @@ type CarState struct {
 	S1Ms      int    `json:"s1Ms,omitempty"`
 	S2Ms      int    `json:"s2Ms,omitempty"`
 	S3Ms      int    `json:"s3Ms,omitempty"`
-	GapMs     int    `json:"gapMs,omitempty"` // to leader; best-effort, derived at record time
-	IntMs     int    `json:"intMs,omitempty"` // interval to car ahead; best-effort
+	GapMs     int    `json:"gapMs,omitempty"`   // to leader; best-effort, derived at record time
+	GapLaps   int    `json:"gapLaps,omitempty"` // whole laps behind leader; FE shows "+1 LAP" when >= 1
+	IntMs     int    `json:"intMs,omitempty"`   // interval to car ahead; best-effort
 	Speed     int    `json:"speed,omitempty"`
 	Gear      int    `json:"gear,omitempty"`
 	Throttle  int    `json:"throttle,omitempty"` // 0-100
@@ -205,7 +206,7 @@ export interface Car {
   tyre?: string; tyreAge?: number;
   lastLapMs?: number; bestLapMs?: number;
   s1Ms?: number; s2Ms?: number; s3Ms?: number;
-  gapMs?: number; intMs?: number;
+  gapMs?: number; gapLaps?: number; intMs?: number;
   speed?: number; gear?: number; throttle?: number; brake?: number; drs?: boolean;
 }
 ```
@@ -228,7 +229,7 @@ git commit -m "feat(web): add Phase 2 timing fields to client Car type"
 
 ## Task 3: TimingTower component (replaces Standings)
 
-A pure presentational table sorted by `pos`. Formats ms→`m:ss.SSS`, shows tyre compound + age, sector cells coloured for session-best. Clicking a row calls `onSelect(driverNum)`. The project has **no DOM test deps** (no jsdom/testing-library) — so the test covers the **pure exported helpers** (`fmtLap`, `fmtGap`, `bestSectors`, `orderCars`); the rendered output is verified in the Task 9 e2e step.
+A presentational table sorted by `pos`. Formats ms→`m:ss.SSS`, shows tyre compound + age, and colours sector cells **personal-best green / session-best purple** (purple wins). Personal bests are accumulated across frames in a `useRef`. Clicking a row calls `onSelect(driverNum)`; a local toggle flips gap/interval between pit-wall and raw-seconds. The project has **no DOM test deps** (no jsdom/testing-library) — so the test covers the **pure exported helpers** (`fmtLap`, `fmtGap`, `gapLabel`, `intLabel`, `bestSectors`, `orderCars`, `updatePersonalBests`, `sectorColour`); the rendered output is verified in the Task 9 e2e step.
 
 **Files:**
 - Create: `web/src/components/TimingTower.tsx`
@@ -241,7 +242,7 @@ Create `web/src/components/TimingTower.test.ts`:
 
 ```ts
 import { describe, it, expect } from 'vitest';
-import { fmtLap, fmtGap, bestSectors, orderCars } from './TimingTower';
+import { fmtLap, fmtGap, gapLabel, intLabel, bestSectors, orderCars, updatePersonalBests, sectorColour } from './TimingTower';
 import type { Car } from '../state/race';
 
 const car = (over: Partial<Car>): Car => ({
@@ -257,10 +258,41 @@ describe('fmtLap', () => {
 });
 
 describe('fmtGap', () => {
-  it('reads LEADER for the leader and +s.SSS otherwise', () => {
-    expect(fmtGap(0, true)).toBe('LEADER');
-    expect(fmtGap(1234, false)).toBe('+1.234');
-    expect(fmtGap(undefined, false)).toBe('—');
+  it('formats seconds as +s.SSS, dash when absent', () => {
+    expect(fmtGap(1234)).toBe('+1.234');
+    expect(fmtGap(undefined)).toBe('—');
+    expect(fmtGap(0)).toBe('—');
+  });
+});
+
+describe('gapLabel (pit-wall)', () => {
+  it('reads LEADER for the leader', () => {
+    expect(gapLabel(0, 0, true, false)).toBe('LEADER');
+  });
+  it('shows lap deficit when lapped, pluralising', () => {
+    expect(gapLabel(92000, 1, false, false)).toBe('+1 LAP');
+    expect(gapLabel(184000, 2, false, false)).toBe('+2 LAPS');
+  });
+  it('shows seconds for lead-lap cars', () => {
+    expect(gapLabel(1234, 0, false, false)).toBe('+1.234');
+  });
+  it('seconds mode forces seconds even when lapped', () => {
+    expect(gapLabel(92000, 1, false, true)).toBe('+92.000');
+  });
+});
+
+describe('intLabel (pit-wall)', () => {
+  it('dash for the leader', () => {
+    expect(intLabel(0, undefined, 0, true, false)).toBe('—');
+  });
+  it('derives lap deficit from the gapLaps difference', () => {
+    expect(intLabel(2, 1, 5000, false, false)).toBe('+1 LAP'); // this car 2 down, car ahead 1 down
+  });
+  it('shows seconds when on the same lap as the car ahead', () => {
+    expect(intLabel(1, 1, 800, false, false)).toBe('+0.800');
+  });
+  it('seconds mode forces seconds', () => {
+    expect(intLabel(2, 1, 5000, false, true)).toBe('+5.000');
   });
 });
 
@@ -277,6 +309,23 @@ describe('bestSectors', () => {
     expect(bestSectors(cars)[0]).toBe(25900);
   });
 });
+
+describe('updatePersonalBests', () => {
+  it('accumulates the per-driver min across frames, ignoring zeros', () => {
+    let b = updatePersonalBests({}, [car({ driverNum: 1, s1Ms: 26100, s2Ms: 0, s3Ms: 27000 })]);
+    b = updatePersonalBests(b, [car({ driverNum: 1, s1Ms: 25900, s2Ms: 28000, s3Ms: 27500 })]);
+    expect(b[1]).toEqual([25900, 28000, 27000]); // s1 improved, s2 first real value, s3 kept faster
+  });
+});
+
+describe('sectorColour', () => {
+  it('purple for session-best, green for personal-best, undefined otherwise', () => {
+    expect(sectorColour(25900, 25900, 25900)).toBe('#b14aff'); // session-best wins
+    expect(sectorColour(26100, 25900, 26100)).toBe('#3bb273'); // personal-best only
+    expect(sectorColour(26500, 25900, 26100)).toBeUndefined();
+    expect(sectorColour(undefined, 25900, 26100)).toBeUndefined();
+  });
+});
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -289,6 +338,7 @@ Expected: FAIL — cannot find module `./TimingTower`.
 Create `web/src/components/TimingTower.tsx`:
 
 ```tsx
+import { useRef, useState } from 'react';
 import type { RaceState, Car } from '../state/race';
 
 // fmtLap renders a lap/sector time (ms) as m:ss.SSS, or em-dash when absent.
@@ -306,11 +356,34 @@ function fmtSec(ms: number | undefined): string {
   return (ms / 1000).toFixed(3);
 }
 
-// fmtGap renders a gap/interval (ms). The leader (pos 1) reads "LEADER".
-export function fmtGap(ms: number | undefined, isLeader: boolean): string {
-  if (isLeader) return 'LEADER';
+// fmtGap renders a time gap/interval (ms) as +s.SSS, or em-dash when absent.
+export function fmtGap(ms: number | undefined): string {
   if (!ms || ms <= 0) return '—';
   return `+${(ms / 1000).toFixed(3)}`;
+}
+
+const laps = (n: number) => `+${n} LAP${n > 1 ? 'S' : ''}`;
+
+// gapLabel renders the pit-wall gap to leader: LEADER for P1; "+N LAP(S)" when
+// lapped (unless secondsMode forces raw time); else the time gap.
+export function gapLabel(
+  gapMs: number | undefined, gapLaps: number | undefined, isLeader: boolean, secondsMode: boolean,
+): string {
+  if (isLeader) return 'LEADER';
+  if (!secondsMode && gapLaps && gapLaps >= 1) return laps(gapLaps);
+  return fmtGap(gapMs);
+}
+
+// intLabel renders the pit-wall interval to the car ahead. The lap deficit is
+// derived from the gapLaps difference (this car minus the car ahead).
+export function intLabel(
+  gapLaps: number | undefined, aheadGapLaps: number | undefined,
+  intMs: number | undefined, isLeader: boolean, secondsMode: boolean,
+): string {
+  if (isLeader) return '—';
+  const def = (gapLaps ?? 0) - (aheadGapLaps ?? 0);
+  if (!secondsMode && def >= 1) return laps(def);
+  return fmtGap(intMs);
 }
 
 const TYRE_COLOUR: Record<string, string> = {
@@ -333,6 +406,36 @@ export function bestSectors(cars: Car[]): [number, number, number] {
   return [min((c) => c.s1Ms), min((c) => c.s2Ms), min((c) => c.s3Ms)];
 }
 
+// Bests maps driverNum -> their best-seen [s1, s2, s3] (ms) across all frames.
+export type Bests = Record<number, [number, number, number]>;
+
+const faster = (prev: number, v: number | undefined) => (v && v > 0 && v < prev ? v : prev);
+
+// updatePersonalBests folds this frame's sectors into the running per-driver mins.
+// Pure: returns a new map; Infinity means "no value yet".
+export function updatePersonalBests(prev: Bests, cars: Car[]): Bests {
+  const next: Bests = { ...prev };
+  for (const c of cars) {
+    const cur = next[c.driverNum] ?? [Infinity, Infinity, Infinity];
+    next[c.driverNum] = [faster(cur[0], c.s1Ms), faster(cur[1], c.s2Ms), faster(cur[2], c.s3Ms)];
+  }
+  return next;
+}
+
+const PURPLE = '#b14aff'; // session-best
+const GREEN = '#3bb273';  // personal-best
+
+// sectorColour returns the cell colour for a sector value: purple if it ties the
+// session-best, else green if it ties this driver's personal-best, else none.
+export function sectorColour(
+  v: number | undefined, sessionBest: number, personalBest: number,
+): string | undefined {
+  if (!v || v <= 0) return undefined;
+  if (v === sessionBest) return PURPLE;
+  if (v === personalBest) return GREEN;
+  return undefined;
+}
+
 export function TimingTower({
   state, selected, onSelect,
 }: {
@@ -340,12 +443,26 @@ export function TimingTower({
   selected: number | null;
   onSelect: (driverNum: number) => void;
 }) {
+  const [secondsMode, setSecondsMode] = useState(false);
+  const pbRef = useRef<Bests>({});
   const order = orderCars(state.cars);
+  // Accumulate per-driver best sectors. Monotonic (min only) so re-running on a
+  // re-render with the same frame is idempotent — safe to do during render.
+  pbRef.current = updatePersonalBests(pbRef.current, order);
   const [b1, b2, b3] = bestSectors(order);
-  const sectorStyle = (v: number | undefined, best: number) =>
-    v && v > 0 && v === best ? { color: '#b14aff' } : undefined; // session-best = purple
+  const cellColour = (v: number | undefined, best: number, dn: number, i: number) => {
+    const c = sectorColour(v, best, pbRef.current[dn]?.[i] ?? Infinity);
+    return c ? { color: c } : undefined;
+  };
 
   return (
+    <div>
+    <button
+      onClick={() => setSecondsMode((m) => !m)}
+      style={{ marginBottom: 6, fontFamily: 'monospace', fontSize: 11, background: '#1d2a44', color: '#9bf', border: 'none', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}
+    >
+      {secondsMode ? 'Show laps' : 'Show seconds'}
+    </button>
     <table style={{ fontFamily: 'monospace', fontSize: 12, borderCollapse: 'collapse', color: '#ddd' }}>
       <thead style={{ color: '#888', textAlign: 'left' }}>
         <tr>
@@ -361,8 +478,9 @@ export function TimingTower({
         </tr>
       </thead>
       <tbody>
-        {order.map((c) => {
+        {order.map((c, idx) => {
           const isLeader = c.pos === 1;
+          const ahead = order[idx - 1];
           const isSel = c.driverNum === selected;
           return (
             <tr
@@ -372,25 +490,26 @@ export function TimingTower({
             >
               <td style={{ padding: '2px 8px' }}>{c.pos}</td>
               <td style={{ padding: '2px 8px' }}><b>{c.code}</b></td>
-              <td style={{ padding: '2px 8px' }} title="best-effort, derived">{fmtGap(c.gapMs, isLeader)}</td>
-              <td style={{ padding: '2px 8px' }} title="best-effort, derived">{isLeader ? '—' : fmtGap(c.intMs, false)}</td>
+              <td style={{ padding: '2px 8px' }} title="best-effort, derived">{gapLabel(c.gapMs, c.gapLaps, isLeader, secondsMode)}</td>
+              <td style={{ padding: '2px 8px' }} title="best-effort, derived">{intLabel(c.gapLaps, ahead?.gapLaps, c.intMs, isLeader, secondsMode)}</td>
               <td style={{ padding: '2px 8px' }}>{fmtLap(c.lastLapMs)}</td>
               <td style={{ padding: '2px 8px', color: TYRE_COLOUR[c.tyre ?? ''] ?? '#ddd' }}>
                 {c.tyre ? `${c.tyre[0]}${c.tyreAge ? ` ${c.tyreAge}` : ''}` : '—'}
               </td>
-              <td style={{ padding: '2px 8px', ...sectorStyle(c.s1Ms, b1) }}>{fmtSec(c.s1Ms)}</td>
-              <td style={{ padding: '2px 8px', ...sectorStyle(c.s2Ms, b2) }}>{fmtSec(c.s2Ms)}</td>
-              <td style={{ padding: '2px 8px', ...sectorStyle(c.s3Ms, b3) }}>{fmtSec(c.s3Ms)}</td>
+              <td style={{ padding: '2px 8px', ...cellColour(c.s1Ms, b1, c.driverNum, 0) }}>{fmtSec(c.s1Ms)}</td>
+              <td style={{ padding: '2px 8px', ...cellColour(c.s2Ms, b2, c.driverNum, 1) }}>{fmtSec(c.s2Ms)}</td>
+              <td style={{ padding: '2px 8px', ...cellColour(c.s3Ms, b3, c.driverNum, 2) }}>{fmtSec(c.s3Ms)}</td>
             </tr>
           );
         })}
       </tbody>
     </table>
+    </div>
   );
 }
 ```
 
-> `// ponytail:` session-best sector colouring (purple) only; personal-best (green) is omitted because a 2.5-min clip window gives each driver ~1 lap, so personal-best ≈ their only value and adds no signal. Add per-driver min-tracking if longer clips ever land.
+> Note: in a 2.5-min clip window each driver completes ~1–2 laps, so personal-best (green) will paint most cells — that's expected given the data, not a bug. Purple (session-best) is the high-signal colour here. Personal bests persist across clip loops (mins never reset), which is fine for the demo.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -677,8 +796,10 @@ In the per-driver resample loop (the `for num in session.drivers:` block that fi
         tel['speed'] = cd['Speed'].values[idx].astype(int)
         tel['gear'] = cd['nGear'].values[idx].astype(int)
         tel['throttle'] = cd['Throttle'].values[idx].astype(int)
-        tel['brake'] = cd['Brake'].values[idx].astype(int)
-        # FastF1 DRS code >= 10 means the flap is open (8,10,12,14 = on).
+        # FastF1 Brake is a BOOLEAN in current versions (not 0-100). Normalise to
+        # 0/100 robustly so the FE bar is right whether the source is bool or %.
+        tel['brake'] = (cd['Brake'].values[idx].astype(float) > 0).astype(int) * 100
+        # FastF1 DRS code >= 10 means the flap is open (10,12,14 = on; 8 = eligible).
         tel['drs'] = (cd['DRS'].values[idx] >= 10)
     except Exception as e:
         print(f"  Warning: no telemetry for {num} ({driver_info[inum]['code']}): {e}")
@@ -795,20 +916,29 @@ The gap needs every car's race distance for the frame *before* assigning gaps. R
 
 ```python
         # --- gap / interval pass (best-effort) ---
-        dist = {}  # driverNum -> race distance in "lap units"
+        # Race distance in "lap units" = whole lap number + fraction round the lap.
+        lapn, frac, dist = {}, {}, {}
         for car in cars:
             dn = car['driverNum']
-            nx, ny = car['p']['x'], car['p']['y']
-            dist[dn] = _lap_number(dn, t_s) + _lap_fraction(nx, ny)
-        leader_dist = max(dist.values()) if dist else 0
+            lapn[dn] = _lap_number(dn, t_s)
+            frac[dn] = _lap_fraction(car['p']['x'], car['p']['y'])
+            dist[dn] = lapn[dn] + frac[dn]
         by_pos = sorted(cars, key=lambda c: c['pos'])
+        # Anchor the leader to the CLASSIFIED P1 (matches the FE pos===1 leader test),
+        # not the max-distance car (derivation noise could disagree).
+        leader_dn = by_pos[0]['driverNum'] if by_pos else None
+        leader_dist = dist.get(leader_dn, 0.0)
+        leader_lap = lapn.get(leader_dn, 0)
         prev_dist = None
         for car in by_pos:
             dn = car['driverNum']
-            behind = max(0.0, leader_dist - dist[dn])      # laps behind leader
+            behind = max(0.0, leader_dist - dist[dn])      # lap units behind leader
             gap_ms = int(behind * LEADER_LAP_MS)
+            gap_laps = max(0, leader_lap - lapn[dn])        # whole-lap deficit (from LapNumber)
             if gap_ms > 0:
                 car['gapMs'] = gap_ms
+            if gap_laps > 0:
+                car['gapLaps'] = gap_laps
             if prev_dist is not None:
                 int_ms = int(max(0.0, prev_dist - dist[dn]) * LEADER_LAP_MS)
                 if int_ms > 0:
@@ -824,9 +954,9 @@ Run:
 ```
 Then check gaps are monotonic-ish by position on a mid frame:
 ```bash
-sed -n '750p' data/replays/monza-2024-race.jsonl | python -c "import sys,json; cs=sorted(json.loads(sys.stdin.readline())['frame']['cars'], key=lambda c:c['pos']); print([(c['pos'], c.get('gapMs',0)) for c in cs[:6]])"
+sed -n '750p' data/replays/monza-2024-race.jsonl | python -c "import sys,json; cs=sorted(json.loads(sys.stdin.readline())['frame']['cars'], key=lambda c:c['pos']); print([(c['pos'], c.get('gapMs',0), c.get('gapLaps',0)) for c in cs])"
 ```
-Expected: pos 1 has `gapMs` 0 (absent) and gaps generally increase down the order (small non-monotonic jitter is acceptable — it's best-effort).
+Expected: pos 1 has `gapMs`/`gapLaps` 0 (absent); gaps generally increase down the order (small non-monotonic jitter is acceptable — best-effort). Note whether any tail cars carry `gapLaps ≥ 1` — that's the lapped case the FE renders as "+N LAP".
 
 - [ ] **Step 4: Commit**
 
