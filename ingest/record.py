@@ -4,7 +4,8 @@ FastF1 → JSONL clip recorder.
 Bakes a real F1 session into the contract read by the Go replay player.
 
 CONTRACT (must match internal/model/model.go + web/src/state/race.ts):
-  Header line: {"track":[{"x":float,"y":float},...], "label":"...", "maxRev":int}
+  Header line: {"track":[{"x":float,"y":float},...], "label":"...", "maxRev":int,
+                "radio":[{"timeMs":int,"driverNum":int,"clip":"https://..."}]}
   Frame lines: {"timeMs":int, "frame":{"rev":int,"timeMs":int,"cars":[
                  {"driverNum":int,"code":"VER","team":"Red Bull","pos":int,
                   "p":{"x":float,"y":float},"status":"OnTrack"}]}}
@@ -27,6 +28,8 @@ import sys
 import os
 import argparse
 from pathlib import Path
+from fastf1 import _api
+from radio import extract_radio
 
 # ---------------------------------------------------------------------------
 # Args
@@ -50,11 +53,10 @@ GP_LABEL = _args.label or f"{_args.gp} {_args.year} · Race"
 HZ = 10          # target sample rate (frames per second)
 TRACK_POINTS = 150  # number of track outline points
 
-# Window: 15:00 - 17:30 into session (green-flag mid-race racing at Monza).
-# Monza race is ~1:20:00 total. We pick a ~2.5-min window in the middle of lap ~30-35.
-# Note: this window is generic enough for a full race; may need tuning per circuit.
-WINDOW_START_S = 3600   # 60 min into session
-WINDOW_END_S   = 3750   # 60 + 2.5 min = 62.5 min
+# Window: 7.5-min green-flag mid-race window (widened from 2.5 min in Phase 3 so the
+# comms layer has enough team radio to feel alive — see ADR-0003 / Phase 3 spec).
+WINDOW_START_S = 3300   # 55 min into session
+WINDOW_END_S   = 3750   # 62.5 min  (7.5-min window)
 
 # FastF1 team name → frontend colour map key (from web/src/components/Map.tsx teamColour)
 TEAM_MAP = {
@@ -104,6 +106,30 @@ for num in session.drivers:
 print(f"Driver info ({len(driver_info)} drivers):")
 for num, info in sorted(driver_info.items()):
     print(f"  {num:>3} | {info['code']} | {info['team']}")
+
+# ---------------------------------------------------------------------------
+# Team radio (Phase 3): baked into the header as [{timeMs, driverNum, clip}].
+# Streamed from F1's public URL at play time, never stored (ADR-0003).
+# ---------------------------------------------------------------------------
+print("\nFetching team radio...")
+radio_clips = []
+try:
+    raw = _api.fetch_page(session.api_path, "team_radio")  # list of [ts, content]
+    captures = []
+    for _ts, content in raw:
+        caps = content.get("Captures") if isinstance(content, dict) else None
+        if caps:
+            captures.extend(caps.values() if isinstance(caps, dict) else caps)
+    # t0_date is tz-naive-UTC today; tz_convert if FastF1 ever returns it tz-aware.
+    _t0 = pd.Timestamp(session.t0_date)
+    t0_epoch_s = (_t0.tz_convert("UTC") if _t0.tzinfo else _t0.tz_localize("UTC")).timestamp()
+    radio_clips = extract_radio(
+        captures, t0_epoch_s, WINDOW_START_S, WINDOW_END_S,
+        _api.base_url, session.api_path,
+    )
+    print(f"Team radio: {len(captures)} captures in session, {len(radio_clips)} in window")
+except Exception as e:
+    print(f"  Warning: team radio fetch failed ({e}); clip will have no radio")
 
 # ---------------------------------------------------------------------------
 # Collect all position data and determine coordinate bounds
@@ -433,6 +459,7 @@ with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
         "track": track_points,
         "label": GP_LABEL,
         "maxRev": max_rev,
+        "radio": radio_clips,
     }
     f.write(json.dumps(header, separators=(',', ':')) + '\n')
 
@@ -540,8 +567,8 @@ size_bytes = os.path.getsize(OUTPUT_PATH)
 size_mb = size_bytes / (1024 * 1024)
 print(f"File size: {size_mb:.2f} MB ({size_bytes:,} bytes)")
 
-if size_mb > 5.0:
-    print(f"WARNING: File exceeds 5 MB! Consider trimming the window or reducing Hz.")
+if size_mb > 25.0:
+    print(f"WARNING: File exceeds 25 MB! Consider trimming the window or reducing Hz.")
 
 # ---------------------------------------------------------------------------
 # Contract validation
@@ -568,7 +595,13 @@ try:
         assert 'x' in tp and 'y' in tp, f"track point missing x/y: {tp}"
         assert 0 <= tp['x'] <= 1 and 0 <= tp['y'] <= 1, f"track point out of [0,1]: {tp}"
     assert hdr['maxRev'] == n_frames, f"maxRev mismatch: {hdr['maxRev']} vs {n_frames}"
-    print(f"  Header OK: {len(hdr['track'])} track points, maxRev={hdr['maxRev']}")
+    assert 'radio' in hdr, "header missing 'radio'"
+    assert isinstance(hdr['radio'], list), "radio must be a list"
+    for rm in hdr['radio']:
+        assert {'timeMs', 'driverNum', 'clip'} <= set(rm.keys()), f"radio item missing fields: {rm}"
+        assert WINDOW_START_S * 1000 <= rm['timeMs'] < WINDOW_END_S * 1000, f"radio timeMs out of window: {rm}"
+        assert rm['clip'].startswith('http'), f"radio clip not a URL: {rm}"
+    print(f"  Header OK: {len(hdr['track'])} track points, maxRev={hdr['maxRev']}, {len(hdr['radio'])} radio clips")
 except AssertionError as e:
     print(f"  HEADER ERROR: {e}")
     errors += 1

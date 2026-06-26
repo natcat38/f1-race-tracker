@@ -84,3 +84,21 @@ func TestReplay_HeaderAndMonotonicRevAcrossLoop(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadParsesRadioFromHeader(t *testing.T) {
+	clip := `{"track":[{"x":0.1,"y":0.2}],"label":"T","maxRev":1,"radio":[{"timeMs":3300500,"driverNum":1,"clip":"https://x/VER.mp3"}]}
+{"timeMs":3300000,"frame":{"rev":1,"timeMs":3300000,"cars":[{"driverNum":1,"code":"VER","team":"Red Bull","pos":1,"p":{"x":0.1,"y":0.2},"status":"OnTrack"}]}}
+`
+	path := filepath.Join(t.TempDir(), "clip.jsonl")
+	if err := os.WriteFile(path, []byte(clip), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	src, err := Load(path, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	radio := src.Radio()
+	if len(radio) != 1 || radio[0].DriverNum != 1 || radio[0].TimeMs != 3300500 || radio[0].Clip == "" {
+		t.Fatalf("radio not parsed: %+v", radio)
+	}
+}
