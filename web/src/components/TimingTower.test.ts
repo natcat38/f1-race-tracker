@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fmtLap, fmtGap, gapLabel, intLabel, bestSectors, orderCars, updatePersonalBests, sectorColour } from './TimingTower';
+import { fmtLap, fmtGap, gapLabel, intLabel, bestSectors, orderCars, updatePersonalBests, sectorColour } from './timingHelpers';
 import type { Car } from '../state/race';
 
 const car = (over: Partial<Car>): Car => ({
