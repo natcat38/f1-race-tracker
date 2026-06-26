@@ -2,6 +2,7 @@ package model
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -29,24 +30,14 @@ func TestCarStateRoundTripWithTimingFields(t *testing.T) {
 }
 
 func TestCarStateOmitsZeroTimingFields(t *testing.T) {
-	b, _ := json.Marshal(CarState{DriverNum: 1, Code: "VER", Team: "x", Pos: 1, Status: "OnTrack"})
+	b, err := json.Marshal(CarState{DriverNum: 1, Code: "VER", Team: "x", Pos: 1, Status: "OnTrack"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	s := string(b)
 	for _, k := range []string{"tyreAge", "lastLapMs", "gapMs", "gear", "drs"} {
-		if contains(s, k) {
+		if strings.Contains(s, k) {
 			t.Errorf("expected %q omitted from %s", k, s)
 		}
 	}
-}
-
-func contains(haystack, needle string) bool {
-	return len(haystack) >= len(needle) && (indexOf(haystack, needle) >= 0)
-}
-
-func indexOf(h, n string) int {
-	for i := 0; i+len(n) <= len(h); i++ {
-		if h[i:i+len(n)] == n {
-			return i
-		}
-	}
-	return -1
 }
