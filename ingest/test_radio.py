@@ -10,9 +10,11 @@ caps = [
     {"Utc": "2024-09-01T12:00:30.000Z", "RacingNumber": "1", "Path": "TeamRadio/VER.mp3"},   # 30s -> before window
     {"Utc": "2024-09-01T12:54:00.000Z", "RacingNumber": "4", "Path": "TeamRadio/NOR.mp3"},   # 3240s -> before 3300
     {"Utc": "2024-09-01T13:02:30.000Z", "RacingNumber": "55", "Path": "TeamRadio/SAI.mp3"},  # 3750s -> EXACTLY at upper bound; half-open window excludes it
+    {"Utc": "2024-09-01T12:55:20.000Z", "RacingNumber": "TBD", "Path": "TeamRadio/BAD.mp3"}, # in window but non-numeric number -> skipped, not a crash
 ]
 out = extract_radio(caps, t0, 3300, 3750, "https://livetiming.formula1.com", "/static/x/")
 
+# A malformed in-window capture is skipped, not fatal: still exactly 1 valid clip.
 assert len(out) == 1, f"expected 1 in-window clip, got {len(out)}: {out}"
 m = out[0]
 assert m["timeMs"] == 3310000, m

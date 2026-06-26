@@ -31,7 +31,14 @@ export function useComms(state: RaceState) {
     nowPlayingRef.current = next;
     setNowPlaying(next);
     audio.src = next.clip; // ponytail: no crossOrigin attr -> plays cross-origin without CORS
-    audio.play().catch(() => { nowPlayingRef.current = null; setNowPlaying(null); });
+    // A late play() rejection (transient error, or an interrupting src change/AbortError)
+    // must only clear the banner if this clip is still the current one — otherwise it
+    // would blank the clip that has since replaced it.
+    audio.play().catch(() => {
+      if (nowPlayingRef.current !== next) return;
+      nowPlayingRef.current = null;
+      setNowPlaying(null);
+    });
   }
 
   // Create the single audio element on mount and wire 'ended' to drain the queue.
@@ -74,7 +81,7 @@ export function useComms(state: RaceState) {
   // toggle() runs from an onClick, so its setState calls are not cascading-render
   // hazards. Turning off stops audio and clears the queue + banner.
   function toggle() {
-    if (enabled) {
+    if (enabledRef.current) {
       queueRef.current = [];
       audioRef.current?.pause();
       nowPlayingRef.current = null;
@@ -94,7 +101,11 @@ export function useComms(state: RaceState) {
     nowPlayingRef.current = msg;
     setNowPlaying(msg);
     audio.src = msg.clip;
-    audio.play().catch(() => { nowPlayingRef.current = null; setNowPlaying(null); });
+    audio.play().catch(() => {
+      if (nowPlayingRef.current !== msg) return; // a newer replay/clip already took over
+      nowPlayingRef.current = null;
+      setNowPlaying(null);
+    });
   }
 
   return { enabled, toggle, nowPlaying, history, replay };

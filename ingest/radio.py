@@ -20,15 +20,24 @@ def extract_radio(captures, t0_epoch_s, window_start_s, window_end_s, base_url, 
 
     The clip URL join is slash-normalised: it works whether or not api_path has a
     trailing slash (or Path a leading one), so a missing separator can't silently
-    produce a broken URL."""
+    produce a broken URL. A capture with a missing/non-numeric RacingNumber (or a
+    missing Utc/Path) is skipped rather than crashing the whole extraction — the
+    feed is external, so one malformed entry must not drop the entire timeline."""
     out = []
     for cap in captures:
-        time_ms = _utc_to_session_ms(cap["Utc"], t0_epoch_s)
+        utc, num, path = cap.get("Utc"), cap.get("RacingNumber"), cap.get("Path")
+        if utc is None or num is None or path is None:
+            continue
+        try:
+            driver_num = int(num)
+        except (TypeError, ValueError):
+            continue
+        time_ms = _utc_to_session_ms(utc, t0_epoch_s)
         if window_start_s * 1000 <= time_ms < window_end_s * 1000:
             out.append({
                 "timeMs": time_ms,
-                "driverNum": int(cap["RacingNumber"]),
-                "clip": base_url + api_path.rstrip("/") + "/" + cap["Path"].lstrip("/"),
+                "driverNum": driver_num,
+                "clip": base_url + api_path.rstrip("/") + "/" + path.lstrip("/"),
             })
     out.sort(key=lambda m: m["timeMs"])
     return out
