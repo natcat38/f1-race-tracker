@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, test } from 'vitest';
 import { emptyState, applyMessage, type RaceState } from './race';
 
 const snapMsg = {
@@ -46,4 +46,28 @@ describe('timing fields', () => {
     expect(s1.cars[1].tyre).toBe('SOFT');
     expect(s1.cars[1].drs).toBe(true);
   });
+});
+
+test('snapshot carries the radio timeline', () => {
+  const s = applyMessage(emptyState(), {
+    type: 'snapshot',
+    data: {
+      session: 'replay', mode: 'replay', label: 'M', cars: {}, timeMs: 3300000, rev: 1,
+      radio: [{ timeMs: 3300500, driverNum: 1, clip: 'https://x/VER.mp3' }],
+    },
+  });
+  expect(s.radio).toHaveLength(1);
+  expect(s.radio[0].driverNum).toBe(1);
+});
+
+test('a frame does not clobber the radio timeline', () => {
+  const s0 = applyMessage(emptyState(), {
+    type: 'snapshot',
+    data: {
+      session: 'replay', mode: 'replay', label: 'M', cars: {}, timeMs: 3300000, rev: 1,
+      radio: [{ timeMs: 3300500, driverNum: 1, clip: 'https://x/VER.mp3' }],
+    },
+  });
+  const s1 = applyMessage(s0, { type: 'frame', data: { rev: 2, timeMs: 3300100, cars: [] } });
+  expect(s1.radio).toHaveLength(1);
 });
