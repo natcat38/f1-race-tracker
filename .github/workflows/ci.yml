@@ -57,6 +57,9 @@ jobs:
       - name: live.py <-> Go contract self-check
         run: python check_live_contract.py
         working-directory: ingest
+      - name: radio extraction self-check
+        run: python test_radio.py
+        working-directory: ingest
 
   docs-links:
     name: Docs link check
