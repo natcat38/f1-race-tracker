@@ -98,7 +98,7 @@ func TestLoadParsesRadioFromHeader(t *testing.T) {
 		t.Fatal(err)
 	}
 	radio := src.Radio()
-	if len(radio) != 1 || radio[0].DriverNum != 1 || radio[0].TimeMs != 3300500 {
+	if len(radio) != 1 || radio[0].DriverNum != 1 || radio[0].TimeMs != 3300500 || radio[0].Clip == "" {
 		t.Fatalf("radio not parsed: %+v", radio)
 	}
 }

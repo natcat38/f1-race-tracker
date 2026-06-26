@@ -83,10 +83,10 @@ func Load(path string, speed float64) (*Source, error) {
 	return &Source{track: hdr.Track, radio: hdr.Radio, label: hdr.Label, lines: lines, max: hdr.MaxRev, speed: speed}, nil
 }
 
-func (s *Source) Track() []model.Point          { return s.track }
-func (s *Source) Radio() []model.RadioMessage   { return s.radio }
-func (s *Source) Label() string                 { return s.label }
-func (s *Source) Mode() string                  { return "replay" }
+func (s *Source) Track() []model.Point        { return s.track }
+func (s *Source) Radio() []model.RadioMessage { return s.radio }
+func (s *Source) Label() string               { return s.label }
+func (s *Source) Mode() string                { return "replay" }
 
 // Events streams frames forever, looping. T is stamped to emit-time (Tech §2.9).
 // Rev on the emitted frame is advisory — the writer reassigns a monotonic Rev.
