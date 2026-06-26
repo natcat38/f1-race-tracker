@@ -44,10 +44,10 @@ def starting_rev(r, session):
         return 0
 
 
-def build_snapshot(session, label, track, rev):
+def build_snapshot(session, label, track, radio, rev):
     return {
         "session": session, "mode": "live", "label": label,
-        "track": track, "cars": {}, "timeMs": 0, "rev": rev,
+        "track": track, "radio": radio, "cars": {}, "timeMs": 0, "rev": rev,
     }
 
 
@@ -67,8 +67,9 @@ def publish_clip(r, session, clip_path, label_override):
         sys.exit(1)
 
     track = header.get("track", [])
+    radio = header.get("radio", [])
     label = label_override or header.get("label", "Live")
-    snapshot = build_snapshot(session, label, track, starting_rev(r, session))
+    snapshot = build_snapshot(session, label, track, radio, starting_rev(r, session))
     rev = snapshot["rev"]
     base_ms = lines[0]["timeMs"]
     print(f"live: streaming {len(lines)} frames of '{label}' to session '{session}' (start rev {rev})")
