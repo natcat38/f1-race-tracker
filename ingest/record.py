@@ -120,7 +120,9 @@ try:
         caps = content.get("Captures") if isinstance(content, dict) else None
         if caps:
             captures.extend(caps.values() if isinstance(caps, dict) else caps)
-    t0_epoch_s = pd.Timestamp(session.t0_date).tz_localize("UTC").timestamp()
+    # t0_date is tz-naive-UTC today; tz_convert if FastF1 ever returns it tz-aware.
+    _t0 = pd.Timestamp(session.t0_date)
+    t0_epoch_s = (_t0.tz_convert("UTC") if _t0.tzinfo else _t0.tz_localize("UTC")).timestamp()
     radio_clips = extract_radio(
         captures, t0_epoch_s, WINDOW_START_S, WINDOW_END_S,
         _api.base_url, session.api_path,
