@@ -343,10 +343,32 @@ for num in session.drivers:
     t_indices = np.searchsorted(t_s, t_grid_s, side='left').clip(0, len(t_s) - 1)
     status_interp = status_raw[t_indices]
 
+    # Telemetry: resample car_data onto the same grid (nearest-neighbour in time).
+    # Build all five arrays locally first; assign to tel atomically so a partial
+    # failure (e.g. missing column) never leaves tel in an inconsistent state.
+    tel = {'speed': None, 'gear': None, 'throttle': None, 'brake': None, 'drs': None}
+    try:
+        cd = session.car_data[num]
+        cd_t = cd['SessionTime'].dt.total_seconds().values
+        idx = np.searchsorted(cd_t, t_grid_s, side='left').clip(0, len(cd_t) - 1)
+        _speed    = cd['Speed'].values[idx].astype(int)
+        _gear     = cd['nGear'].values[idx].astype(int)
+        _throttle = cd['Throttle'].values[idx].astype(int)
+        # FastF1 Brake is a BOOLEAN in current versions (not 0-100). Normalise to
+        # 0/100 robustly so the FE bar is right whether the source is bool or %.
+        _brake    = (cd['Brake'].values[idx].astype(float) > 0).astype(int) * 100
+        # FastF1 DRS code >= 10 means the flap is open (10,12,14 = on; 8 = eligible).
+        _drs      = (cd['DRS'].values[idx] >= 10)
+        # All five succeeded — assign atomically.
+        tel = {'speed': _speed, 'gear': _gear, 'throttle': _throttle, 'brake': _brake, 'drs': _drs}
+    except Exception as e:
+        print(f"  Warning: no telemetry for {num} ({driver_info[inum]['code']}): {e}")
+
     driver_frames[inum] = {
         'x': x_interp,
         'y': y_interp,
         'status': status_interp,
+        'tel': tel,
     }
 
 print(f"Active drivers in window: {len(driver_frames)}")
@@ -412,6 +434,14 @@ with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
             for k in ('tyreAge', 'lastLapMs', 'bestLapMs', 's1Ms', 's2Ms', 's3Ms'):
                 if t[k] > 0:
                     car[k] = t[k]
+            tel = driver_frames[dnum]['tel']
+            if tel['speed'] is not None:
+                car['speed'] = int(tel['speed'][i])
+                car['gear'] = int(tel['gear'][i])
+                car['throttle'] = int(tel['throttle'][i])
+                car['brake'] = int(tel['brake'][i])
+                if bool(tel['drs'][i]):
+                    car['drs'] = True
             cars.append(car)
 
         frame_line = {
