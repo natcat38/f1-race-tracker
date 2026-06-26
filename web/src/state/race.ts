@@ -2,6 +2,12 @@ export interface Point { x: number; y: number }
 export interface Car {
   driverNum: number; code: string; team: string; pos: number;
   p: Point; status: string;
+  // Phase 2 — all optional; absent renders blank.
+  tyre?: string; tyreAge?: number;
+  lastLapMs?: number; bestLapMs?: number;
+  s1Ms?: number; s2Ms?: number; s3Ms?: number;
+  gapMs?: number; gapLaps?: number; intMs?: number;
+  speed?: number; gear?: number; throttle?: number; brake?: number; drs?: boolean;
 }
 export interface RaceState {
   session: string; mode: string; label: string;

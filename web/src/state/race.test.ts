@@ -22,3 +22,28 @@ describe('applyMessage', () => {
     expect(stale.cars[1].code).toBe('VER'); // unchanged
   });
 });
+
+describe('timing fields', () => {
+  it('folds a frame carrying timing fields into the car', () => {
+    const s0 = applyMessage(emptyState(), {
+      type: 'snapshot',
+      data: { session: 'replay', mode: 'replay', label: 'x', cars: {}, timeMs: 0, rev: 1 },
+    });
+    const s1 = applyMessage(s0, {
+      type: 'frame',
+      data: {
+        rev: 2, timeMs: 100,
+        cars: [{
+          driverNum: 1, code: 'VER', team: 'Red Bull', pos: 1,
+          p: { x: 0.5, y: 0.5 }, status: 'OnTrack',
+          tyre: 'SOFT', tyreAge: 12, lastLapMs: 81234, bestLapMs: 80950,
+          s1Ms: 26100, s2Ms: 28200, s3Ms: 26900, gapMs: 0, gapLaps: 0, intMs: 0,
+          speed: 312, gear: 7, throttle: 100, brake: 0, drs: true,
+        }],
+      },
+    });
+    expect(s1.cars[1].lastLapMs).toBe(81234);
+    expect(s1.cars[1].tyre).toBe('SOFT');
+    expect(s1.cars[1].drs).toBe(true);
+  });
+});
