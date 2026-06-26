@@ -297,6 +297,47 @@ def get_timing(driver_num, t_s):
             'bestLapMs': best_ms, 's1Ms': s1, 's2Ms': s2, 's3Ms': s3}
 
 # ---------------------------------------------------------------------------
+# Gap / interval (BEST-EFFORT, derived). FastF1 gives no per-tick gap, so we
+# approximate race distance as lap_number + fraction-along-the-baked-outline,
+# and convert a distance-behind-leader into milliseconds via field pace.
+# ponytail: good enough for a labeled-approximate tower; swap for a real
+# timing-feed gap if broadcast accuracy is ever needed. Fallback if noisy:
+# lap-level position deltas (coarser, stable).
+# ---------------------------------------------------------------------------
+
+_track_xy = np.array([(p['x'], p['y']) for p in track_points])  # (N,2) in [0,1]
+
+def _lap_fraction(nx, ny):
+    """Fraction [0,1) around the lap = nearest baked-outline index / N."""
+    d = (_track_xy[:, 0] - nx) ** 2 + (_track_xy[:, 1] - ny) ** 2
+    return int(np.argmin(d)) / len(_track_xy)
+
+# Lap-number step lookup per driver (from laps 'LapNumber').
+lapnum_lookup = {}
+for num in session.drivers:
+    inum = int(num)
+    if inum not in driver_info:
+        continue
+    drv = session.laps.pick_drivers(num)[['LapStartTime', 'LapNumber']].dropna()
+    lapnum_lookup[inum] = [(t.total_seconds(), int(n)) for t, n in
+                           zip(drv['LapStartTime'], drv['LapNumber'])]
+
+def _lap_number(driver_num, t_s):
+    entries = lapnum_lookup.get(driver_num, [])
+    n = entries[0][1] if entries else 1
+    for t, ln in entries:
+        if t <= t_s:
+            n = ln
+        else:
+            break
+    return n
+
+# Field pace: median completed lap time (ms) across the field; fallback 90s.
+_all_laps_ms = [_ms(t) for t in session.laps['LapTime'] if not pd.isna(t)]
+_all_laps_ms = [m for m in _all_laps_ms if m > 0]
+LEADER_LAP_MS = int(np.median(_all_laps_ms)) if _all_laps_ms else 90000
+
+# ---------------------------------------------------------------------------
 # Resample all drivers onto common 10 Hz grid over the window
 # ---------------------------------------------------------------------------
 
@@ -451,6 +492,36 @@ with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
                 if bool(tel['drs'][i]):
                     car['drs'] = True
             cars.append(car)
+
+        # --- gap / interval pass (best-effort) ---
+        # Race distance in "lap units" = whole lap number + fraction round the lap.
+        lapn, frac, dist = {}, {}, {}
+        for car in cars:
+            dn = car['driverNum']
+            lapn[dn] = _lap_number(dn, t_s)
+            frac[dn] = _lap_fraction(car['p']['x'], car['p']['y'])
+            dist[dn] = lapn[dn] + frac[dn]
+        by_pos = sorted(cars, key=lambda c: c['pos'])
+        # Anchor the leader to the CLASSIFIED P1 (matches the FE pos===1 leader test),
+        # not the max-distance car (derivation noise could disagree).
+        leader_dn = by_pos[0]['driverNum'] if by_pos else None
+        leader_dist = dist.get(leader_dn, 0.0)
+        leader_lap = lapn.get(leader_dn, 0)
+        prev_dist = None
+        for car in by_pos:
+            dn = car['driverNum']
+            behind = max(0.0, leader_dist - dist[dn])      # lap units behind leader
+            gap_ms = int(behind * LEADER_LAP_MS)
+            gap_laps = max(0, leader_lap - lapn[dn])        # whole-lap deficit (from LapNumber)
+            if gap_ms > 0:
+                car['gapMs'] = gap_ms
+            if gap_laps > 0:
+                car['gapLaps'] = gap_laps
+            if prev_dist is not None:
+                int_ms = int(max(0.0, prev_dist - dist[dn]) * LEADER_LAP_MS)
+                if int_ms > 0:
+                    car['intMs'] = int_ms
+            prev_dist = dist[dn]
 
         frame_line = {
             "timeMs": time_ms,
