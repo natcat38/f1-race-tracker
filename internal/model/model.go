@@ -38,6 +38,12 @@ type RaceControlMessage struct {
 	Driver   *int   `json:"driver,omitempty"`
 }
 
+type RadioMessage struct {
+	TimeMs    int64  `json:"timeMs"`    // session clock at which the team radio occurred
+	DriverNum int    `json:"driverNum"` // FE derives code/team/colour from the cars map
+	Clip      string `json:"clip"`      // full https URL to the .mp3 on livetiming.formula1.com
+}
+
 type Snapshot struct {
 	SessionKey string               `json:"session"`
 	Mode       string               `json:"mode"`  // "live" | "replay"
@@ -45,6 +51,7 @@ type Snapshot struct {
 	Track      []Point              `json:"track,omitempty"`
 	Cars       map[int]CarState     `json:"cars"`
 	Messages   []RaceControlMessage `json:"messages,omitempty"`
+	Radio      []RadioMessage       `json:"radio,omitempty"`
 	TimeMs     int64                `json:"timeMs"`
 	Rev        int64                `json:"rev"`
 }
