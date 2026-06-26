@@ -47,6 +47,7 @@ export function TimingTower({
           <th style={{ padding: '2px 8px' }}>Gap</th>
           <th style={{ padding: '2px 8px' }}>Int</th>
           <th style={{ padding: '2px 8px' }}>Last</th>
+          <th style={{ padding: '2px 8px' }}>Best</th>
           <th style={{ padding: '2px 8px' }}>Tyre</th>
           <th style={{ padding: '2px 8px' }}>S1</th>
           <th style={{ padding: '2px 8px' }}>S2</th>
@@ -69,6 +70,7 @@ export function TimingTower({
               <td style={{ padding: '2px 8px' }} title="best-effort, derived">{gapLabel(c.gapMs, c.gapLaps, isLeader, secondsMode)}</td>
               <td style={{ padding: '2px 8px' }} title="best-effort, derived">{intLabel(c.gapLaps, ahead?.gapLaps, c.intMs, isLeader, secondsMode)}</td>
               <td style={{ padding: '2px 8px' }}>{fmtLap(c.lastLapMs)}</td>
+              <td style={{ padding: '2px 8px' }}>{fmtLap(c.bestLapMs)}</td>
               <td style={{ padding: '2px 8px', color: TYRE_COLOUR[c.tyre ?? ''] ?? '#ddd' }}>
                 {c.tyre ? `${c.tyre[0]}${c.tyreAge ? ` ${c.tyreAge}` : ''}` : '—'}
               </td>
