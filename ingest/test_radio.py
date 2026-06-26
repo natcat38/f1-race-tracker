@@ -9,6 +9,7 @@ caps = [
     {"Utc": "2024-09-01T12:55:10.000Z", "RacingNumber": "16", "Path": "TeamRadio/LEC.mp3"},  # 3310s -> in window
     {"Utc": "2024-09-01T12:00:30.000Z", "RacingNumber": "1", "Path": "TeamRadio/VER.mp3"},   # 30s -> before window
     {"Utc": "2024-09-01T12:54:00.000Z", "RacingNumber": "4", "Path": "TeamRadio/NOR.mp3"},   # 3240s -> before 3300
+    {"Utc": "2024-09-01T13:02:30.000Z", "RacingNumber": "55", "Path": "TeamRadio/SAI.mp3"},  # 3750s -> EXACTLY at upper bound; half-open window excludes it
 ]
 out = extract_radio(caps, t0, 3300, 3750, "https://livetiming.formula1.com", "/static/x/")
 
@@ -17,6 +18,8 @@ m = out[0]
 assert m["timeMs"] == 3310000, m
 assert m["driverNum"] == 16 and isinstance(m["driverNum"], int), m
 assert m["clip"] == "https://livetiming.formula1.com/static/x/TeamRadio/LEC.mp3", m
+# half-open window: a capture exactly at window_end_s (3750s) is EXCLUDED
+assert 55 not in [c["driverNum"] for c in out], f"upper-bound capture leaked in: {out}"
 
 # sorted ascending when multiple in-window
 caps2 = [

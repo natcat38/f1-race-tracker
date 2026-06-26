@@ -16,7 +16,11 @@ def _utc_to_session_ms(utc_str, t0_epoch_s):
 
 def extract_radio(captures, t0_epoch_s, window_start_s, window_end_s, base_url, api_path):
     """captures: list of {'Utc','RacingNumber','Path'} from FastF1's team_radio feed.
-    Returns [{timeMs, driverNum, clip}] for captures inside the window, sorted by time."""
+    Returns [{timeMs, driverNum, clip}] for captures inside the window, sorted by time.
+
+    The clip URL join is slash-normalised: it works whether or not api_path has a
+    trailing slash (or Path a leading one), so a missing separator can't silently
+    produce a broken URL."""
     out = []
     for cap in captures:
         time_ms = _utc_to_session_ms(cap["Utc"], t0_epoch_s)
@@ -24,7 +28,7 @@ def extract_radio(captures, t0_epoch_s, window_start_s, window_end_s, base_url, 
             out.append({
                 "timeMs": time_ms,
                 "driverNum": int(cap["RacingNumber"]),
-                "clip": base_url + api_path + cap["Path"],
+                "clip": base_url + api_path.rstrip("/") + "/" + cap["Path"].lstrip("/"),
             })
     out.sort(key=lambda m: m["timeMs"])
     return out
