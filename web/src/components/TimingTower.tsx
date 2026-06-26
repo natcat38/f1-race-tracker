@@ -17,12 +17,19 @@ export function TimingTower({
   const [secondsMode, setSecondsMode] = useState(false);
   const [pb, setPb] = useState<Bests>({});
   const pbRef = useRef<Bests>({});
+  const sessionRef = useRef(state.session);
 
   useEffect(() => {
+    // New session (e.g. replay <-> live switch): drop the previous clip's
+    // personal bests so sector colours don't bleed across datasets.
+    if (sessionRef.current !== state.session) {
+      sessionRef.current = state.session;
+      pbRef.current = {};
+    }
     const next = updatePersonalBests(pbRef.current, orderCars(state.cars));
     pbRef.current = next;
     setPb(next);
-  }, [state.rev]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.rev, state.session]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const order = orderCars(state.cars);
   const [b1, b2, b3] = bestSectors(order);
