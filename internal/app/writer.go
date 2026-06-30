@@ -14,6 +14,7 @@ type Source interface {
 	Events(ctx context.Context) (<-chan model.Frame, error)
 	Track() []model.Point
 	Radio() []model.RadioMessage
+	LapTrace() map[int][]int
 	Label() string
 	Mode() string
 }
@@ -44,6 +45,7 @@ func (wr *Writer) Run(ctx context.Context, session string) error {
 	snap := model.NewSnapshot(session, wr.src.Mode(), wr.src.Label())
 	snap.Track = wr.src.Track()
 	snap.Radio = wr.src.Radio()
+	snap.LapTrace = wr.src.LapTrace()
 	snap.Rev = base
 	rev := base
 	for {

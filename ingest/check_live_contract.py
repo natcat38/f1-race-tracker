@@ -2,11 +2,12 @@
 import sys
 from live import build_snapshot, build_frame
 
-SNAP_KEYS = {"session", "mode", "label", "track", "radio", "cars", "timeMs", "rev"}
+SNAP_KEYS = {"session", "mode", "label", "track", "radio", "lapTrace", "cars", "timeMs", "rev"}
 FRAME_KEYS = {"session", "rev", "t", "timeMs", "cars"}
 
 snap = build_snapshot("live", "Test", [{"x": 0.1, "y": 0.2}],
-                      [{"timeMs": 1000, "driverNum": 1, "clip": "https://x/a.mp3"}], 5)
+                      [{"timeMs": 1000, "driverNum": 1, "clip": "https://x/a.mp3"}],
+                      {1: [0, 100, 200]}, 5)
 frame = build_frame("live", 6, 1234, [{"driverNum": 1, "code": "VER", "team": "Red Bull",
                                        "pos": 1, "p": {"x": 0.1, "y": 0.2}, "status": "OnTrack"}])
 

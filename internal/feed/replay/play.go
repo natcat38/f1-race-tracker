@@ -14,10 +14,11 @@ import (
 )
 
 type clipHeader struct {
-	Track  []model.Point        `json:"track"`
-	Label  string               `json:"label"`
-	MaxRev int64                `json:"maxRev"`
-	Radio  []model.RadioMessage `json:"radio"`
+	Track    []model.Point        `json:"track"`
+	Label    string               `json:"label"`
+	MaxRev   int64                `json:"maxRev"`
+	Radio    []model.RadioMessage `json:"radio"`
+	LapTrace map[int][]int        `json:"lapTrace"`
 }
 
 type clipLine struct {
@@ -26,12 +27,13 @@ type clipLine struct {
 }
 
 type Source struct {
-	track []model.Point
-	radio []model.RadioMessage
-	label string
-	lines []clipLine
-	max   int64
-	speed float64
+	track    []model.Point
+	radio    []model.RadioMessage
+	lapTrace map[int][]int
+	label    string
+	lines    []clipLine
+	max      int64
+	speed    float64
 
 	phaseWallclock bool // when true, loop position is derived from the wall clock (M4 compare)
 }
@@ -80,11 +82,12 @@ func Load(path string, speed float64) (*Source, error) {
 	if hdr.MaxRev == 0 {
 		hdr.MaxRev = lines[len(lines)-1].Frame.Rev
 	}
-	return &Source{track: hdr.Track, radio: hdr.Radio, label: hdr.Label, lines: lines, max: hdr.MaxRev, speed: speed}, nil
+	return &Source{track: hdr.Track, radio: hdr.Radio, lapTrace: hdr.LapTrace, label: hdr.Label, lines: lines, max: hdr.MaxRev, speed: speed}, nil
 }
 
 func (s *Source) Track() []model.Point        { return s.track }
 func (s *Source) Radio() []model.RadioMessage { return s.radio }
+func (s *Source) LapTrace() map[int][]int     { return s.lapTrace }
 func (s *Source) Label() string               { return s.label }
 func (s *Source) Mode() string                { return "replay" }
 
