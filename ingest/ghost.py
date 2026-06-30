@@ -18,6 +18,8 @@ def build_lap_trace(sample_ts, sample_xy, track_xy):
     value forward, so the result is length len(track_xy), starts at 0, and is
     monotonic non-decreasing — well-defined to invert (time -> index) later.
     """
+    if not sample_ts:
+        return [0] * len(track_xy)
     n = len(track_xy)
     t0 = sample_ts[0]
     reached = [None] * n
@@ -32,6 +34,8 @@ def build_lap_trace(sample_ts, sample_xy, track_xy):
     trace = []
     last = 0
     for i in range(n):
+        # A reached value that would break monotonicity is silently discarded;
+        # the carried-forward value is correct for the downstream time->index inversion.
         if reached[i] is not None and reached[i] >= last:
             last = reached[i]
         trace.append(last)
