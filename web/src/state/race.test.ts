@@ -84,3 +84,15 @@ test('snapshot carries lapTrace; emptyState defaults it', () => {
   });
   expect(s.lapTrace[1]).toEqual([0, 100, 200]);
 });
+
+test('a frame does not clobber lapTrace', () => {
+  const s0 = applyMessage(emptyState(), {
+    type: 'snapshot',
+    data: {
+      session: 'compare-monza-2024', mode: 'replay', label: 'Monza', cars: {}, timeMs: 0, rev: 1,
+      lapTrace: { 1: [0, 100, 200] },
+    },
+  });
+  const s1 = applyMessage(s0, { type: 'frame', data: { rev: 2, timeMs: 100, cars: [] } });
+  expect(s1.lapTrace[1]).toEqual([0, 100, 200]);
+});
