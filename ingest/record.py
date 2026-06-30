@@ -31,6 +31,7 @@ import argparse
 from pathlib import Path
 from fastf1 import _api
 from radio import extract_radio
+from ghost import build_lap_trace
 
 # ---------------------------------------------------------------------------
 # Args
@@ -229,8 +230,6 @@ print(f"Track outline: {len(track_points)} points")
 # Lap traces (Phase 4): per-driver pace curve over the fastest accurate lap.
 # Cumulative ms at each track-outline index, for the cross-year ghost overlay.
 # ---------------------------------------------------------------------------
-from ghost import build_lap_trace
-
 _outline_xy = [(p['x'], p['y']) for p in track_points]
 lap_traces = {}
 for num in session.drivers:
@@ -247,11 +246,11 @@ for num in session.drivers:
         lap_start = fastest['LapStartTime']
         lap_end = lap_start + fastest['LapTime']
         pos = session.pos_data[num]
-        lap_pos = pos[(pos['SessionTime'] >= lap_start) & (pos['SessionTime'] < lap_end)]
-        if len(lap_pos) < 2:
+        driver_lap_pos = pos[(pos['SessionTime'] >= lap_start) & (pos['SessionTime'] < lap_end)]
+        if len(driver_lap_pos) < 2:
             continue
-        sample_ts = lap_pos['SessionTime'].dt.total_seconds().tolist()
-        sample_xy = [normalise(row['X'], row['Y']) for _, row in lap_pos.iterrows()]
+        sample_ts = driver_lap_pos['SessionTime'].dt.total_seconds().tolist()
+        sample_xy = [normalise(row['X'], row['Y']) for _, row in driver_lap_pos.iterrows()]
         lap_traces[inum] = build_lap_trace(sample_ts, sample_xy, _outline_xy)
     except Exception as e:
         print(f"  Warning: no lap trace for {num}: {e}")
