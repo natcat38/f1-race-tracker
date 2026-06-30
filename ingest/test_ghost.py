@@ -30,5 +30,14 @@ trace2 = build_lap_trace(ts2, xy2, track2)
 assert trace2[0] == 0 and trace2[2] == 2000, trace2
 assert trace2[1] == 0, trace2  # never the nearest point -> carried forward from index 0
 
+# Index 0 reached LATE (car's first sample is nearest a later index) must still
+# anchor to 0 — the real-data case (Piastri Monza 2024) the contract invariant guards.
+track3 = [(0.0, 0.0), (1.0, 0.0)]
+ts3 = [0.0, 1.0]
+xy3 = [(1.0, 0.0), (0.0, 0.0)]  # first sample nearest index 1; index 0 reached at t=1s
+trace3 = build_lap_trace(ts3, xy3, track3)
+assert trace3[0] == 0, trace3
+assert all(trace3[i] >= trace3[i - 1] for i in range(1, len(trace3))), trace3
+
 print("ghost.build_lap_trace self-check PASSED")
 sys.exit(0)
