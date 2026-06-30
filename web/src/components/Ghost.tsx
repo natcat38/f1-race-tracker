@@ -50,7 +50,10 @@ export function Ghost() {
   const idxThis = ready ? indexAtTime(traceThis!, tMs) : 0;
   const idxLast = ready ? indexAtTime(traceLast!, tMs) : 0;
   const delta = ready ? deltaSeries(traceThis!, traceLast!) : [];
-  const dNow = ready ? (delta[idxThis] ?? 0) / 1000 : 0;
+  // delta is clamped to the shorter trace; idxThis indexes the full outline, so clamp it
+  // before reading delta / placing the bar cursor (no-op when the traces are equal length).
+  const cursorIdx = delta.length ? Math.min(idxThis, delta.length - 1) : 0;
+  const dNow = ready ? (delta[cursorIdx] ?? 0) / 1000 : 0;
   const maxAbs = delta.reduce((m, d) => Math.max(m, Math.abs(d)), 1);
 
   const car =
@@ -114,7 +117,7 @@ export function Ghost() {
               return <rect key={i} x={x} y={y} width={Math.max(1, SIZE / delta.length)} height={h} fill={d > 0 ? '#ff5252' : '#4caf50'} />;
             })}
             {/* playback cursor at this-year's current fraction */}
-            <line x1={(idxThis / delta.length) * SIZE} y1={0} x2={(idxThis / delta.length) * SIZE} y2={BAR_H} stroke="#fff" strokeWidth={1.5} />
+            <line x1={(cursorIdx / delta.length) * SIZE} y1={0} x2={(cursorIdx / delta.length) * SIZE} y2={BAR_H} stroke="#fff" strokeWidth={1.5} />
           </svg>
         </>
       )}
