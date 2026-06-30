@@ -15,62 +15,70 @@ This is the **third change to the event model / contract**, and the first featur
 
 ## Goal
 
-A new `#ghost` route showing **one** Monza track map: **this year (2024) solid**, plus a **user-selected driver's last-year (2023) car as a translucent "ghost."** A **delta bar** beneath/around the map plots, round the lap, how much time that driver is **gaining or losing** vs their own 2023 lap — red where slower this year, green where faster. The track map stays primary; the overlay is the analytics layer on top.
+A new `#ghost` route: a **self-contained looping player** that replays a selected driver's **reference lap** (fastest accurate lap) from two seasons **in sync** on one Monza track map — **2024 solid**, **2023 a translucent ghost** — both animated along the shared track outline at their own pace. A **delta bar** plots, round the lap, the signed time the driver gains or loses vs their 2023 self (red slower, green faster), with a cursor following playback. Everything on screen derives from the same two reference laps, so the ghost's spatial gap and the bar always agree. This is **not** the live race with a ghost on top — it is a like-for-like flying-lap comparison.
 
 ## Scope
 
 **In scope**
 - New baked artifact **lap trace** — a per-driver pace curve. Additive `LapTrace map[int][]int` on **`Snapshot` only** (`internal/model/model.go`); Python↔Go contract parity updated.
-- Recorder (`ingest/record.py` + new pure helper `ingest/ghost.py`, templated on `ingest/radio.py`): for each driver, pick the **fastest clean complete lap** in the window as reference; record cumulative ms from lap-start at each track-outline index. Bake into the **clip header** (`lapTrace: {driverNum: [ms_at_i ...]}`). Length = `len(Track)`; index `i` ↔ `Track[i]` ↔ fraction `i/N`; value at `i=0` (start/finish) = 0.
-- Thread `LapTrace` header → snapshot on **both** lane paths (Go replay path in `internal/feed/replay/play.go` → `internal/app/writer.go`, beside `snap.Track`/`snap.Radio`; Python live path in `ingest/live.py` `build_snapshot`, mirroring `header.get("track")`). Mirrors exactly how `Radio` was threaded in Phase 3.
-- Frontend `#ghost` route — new `web/src/components/Ghost.tsx`, dual-subscribes both compare lanes (reuses `connectRace`, like `Compare.tsx`):
-  - **Base map** = 2024 lane.
-  - **Ghost marker** = selected driver's 2023 `P`, drawn translucent (time-phased — lanes are already in phase, so it's the live position at the same elapsed moment). FE-only, no baked data.
-  - **Delta bar** = a strip under the map, x = lap fraction (sector-divided), y = signed Δ seconds, red/green fill. `Δ_i = trace_2024[d][i] − trace_2023[d][i]`; `Δ_0 = 0`, `Δ_last` = lap-time difference.
-  - **Selection** = reuse the existing tower row-click / car-click → `selectedDriver`; default to a driver present in both years (VER) so the page is non-empty on load.
-- Pure FE delta helper (e.g. `web/src/state/ghost.ts`) with unit tests, mirroring the `comms.ts` pure-logic pattern.
+- Recorder (`ingest/record.py` + new pure helper `ingest/ghost.py`, templated on `ingest/radio.py`): for each driver, pick the **fastest accurate lap of the whole session** (`pick_accurate()` then fastest — the same clean-lap call that already builds the track outline, [record.py:196](../../ingest/record.py)); whole-session position data is available (unaffected by the replay window). Map each lap sample to the nearest track-outline index and record cumulative ms from lap-start. Force the per-index series monotonic. Bake into the **clip header** (`lapTrace: {driverNum: [ms_at_i ...]}`). Length = `len(Track)`; index `i` ↔ `Track[i]` ↔ fraction `i/N`; value at `i=0` (start/finish) = 0.
+- Thread `LapTrace` header → snapshot on **both** lane paths (Go replay path in `internal/feed/replay/play.go` → `internal/app/writer.go`, beside `snap.Track`/`snap.Radio`; Python live path in `ingest/live.py` `build_snapshot`, mirroring `header.get("track")`). Mirrors exactly how `Radio` was threaded in Phase 3. (All clips get a trace; only `#ghost` consumes it — parity over special-casing.)
+- Frontend `#ghost` route — new `web/src/components/Ghost.tsx`, dual-subscribes both compare lanes (reuses `connectRace`, like `Compare.tsx`) **only to receive each lane's snapshot** (`Track` + `LapTrace`); the live frame stream is **not** used for animation:
+  - **Map** = the shared `Track` outline + exactly **two cars** for the selected driver — 2024 solid, 2023 translucent ghost. The field is not drawn (the other cars are not on reference laps).
+  - **Animation** = a local looping clock `τ`. Each car sits at `Track[i]` where `i` is found by inverting that year's `LapTrace[d]` against `τ` (`LapTrace[d][i] ≈ τ`). Loop length = `max(lapTime_2024, lapTime_2023)` + a short gap; both restart together at the start/finish line.
+  - **Delta bar** = a strip under the map, x = lap fraction `i/N`, y = signed Δ seconds, red/green fill, with a cursor at the current `τ`. `Δ_i = LapTrace_2024[d][i] − LapTrace_2023[d][i]`; `Δ_0 = 0`, `Δ_last` = lap-time difference.
+  - **Selection** = a **driver picker** (simple list/dropdown) of drivers that have a trace in **both** years; default to the first such driver (no hardcoded code). Not the live timing tower — this route has no live order.
+- Pure FE helper (e.g. `web/src/state/ghost.ts`) for the delta subtraction + trace-inversion (`τ → index`), with unit tests, mirroring the `comms.ts` pure-logic pattern.
 
 **Terminology** (CONTEXT.md, finalised by grill-with-docs): **ghost** = the translucent last-year car marker; **overlay** = the whole one-map mode (this-year + ghost + delta); **delta bar** = the computed signed time difference round the lap; **lap trace** = the baked per-driver pace curve. All distinct from **compare** (side-by-side, no computation).
 
 **Out of scope (explicitly deferred / not built — ponytail)**
 - **3-sector delta from `S1/S2/S3`.** The cheaper FE-only path was offered and declined in favour of the continuous bar; not built.
+- **Live-phased ghost / live race under the overlay.** The ghost is the *reference lap* replayed, not last year's live position at the same wall-clock — that decoupled the ghost from the bar. The route is a self-contained player, not the live race with a ghost on top.
 - **Cross-clip delta baking.** Each recorder run is single-year; it bakes only its own per-driver traces. The cross-year subtraction happens FE-side. No new pipeline stage that reads both clips.
 - **`Frame.LapTrace`.** A lap trace is a fixed per-driver dataset → snapshot-only, like `Track`/`Radio`. No per-frame plumbing.
 - **Ghost on the main board or as a toggle on `#compare`.** A dedicated `#ghost` route was chosen; the main board and `#compare` are unchanged.
-- **Lap number on the wire.** Not needed — the delta normalises each trace to lap-start = 0 and compares shape vs fraction.
+- **The live field on the ghost map.** Only the two reference cars are drawn; the other 18 cars are not (they are not on reference laps).
+- **Lap number on the wire.** Not needed — the delta normalises each trace to lap-start = 0 and compares shape vs outline index.
+- **Sector dividers on the bar.** The continuous red/green fill already shows where time is won/lost; explicit sector lines need boundary fractions not on the wire — deferred.
 - **Multi-driver / all-driver ghosting at once.** One selected driver at a time.
 
 ## Design decisions (from brainstorming)
 
 1. **Deliverable = ghost marker + continuous delta bar, both.** The translucent moving ghost (spatial, intuitive) plus the round-the-lap delta bar (analytical "where time is won/lost"). The user chose the fuller version at each fork (both deliverables, user-selected driver, continuous bar over 3-sector, dedicated route).
 
-2. **Reference car = user-selected driver, like-for-like across years** (e.g. VER 2024 solid vs VER 2023 ghost). Reuses the tower's existing row-click selection. Cross-year "the leader" would compare different people; selecting a driver keeps it like-for-like.
+2. **Reference car = user-selected driver, like-for-like across years** (e.g. VER 2024 solid vs VER 2023 ghost). Cross-year "the leader" would compare different people; selecting a driver keeps it like-for-like. (Selection is a driver picker, not the live tower — see decision 6.)
 
 3. **Delta = baked per-clip pace traces, subtracted FE-side.** Each clip bakes a per-driver lap trace (cumulative ms vs outline index, for the driver's fastest clean lap). The FE holds both lanes (dual-subscribe) and subtracts: `Δ(f) = (t_2024(f) − t_2024(0)) − (t_2023(f) − t_2023(0))`. This is the real F1 "cumulative time gained/lost round the lap."
    - **Why baked, not pure-FE:** the continuous bar must show the **whole lap** immediately and accurately, not just the portion watched so far. A baked full-lap curve gives that on connect; accumulating it live from positions would be partial and noisy.
    - **Why per-clip + FE subtraction, not a cross-clip baking step:** keeps the recorder single-year (no new stage that loads both clips), and the contract addition is a clean per-clip per-driver field — same shape as `Track`/`Radio`.
-   - **Known ceiling (ponytail):** reference = *fastest clean lap*, best-effort, labelled approximate (consistent with gap/interval/radio). If a driver has no clean lap in the window, no trace for them. Recorded as **ADR-0004**.
+   - **Known ceiling (ponytail):** reference = *fastest accurate lap of the session* (`pick_accurate()` then fastest), best-effort, labelled approximate (consistent with gap/interval/radio). Each driver's real lap is mapped onto the shared outline by nearest point and forced monotonic. A driver with no accurate lap gets no trace. Recorded as **ADR-0004**.
 
-4. **Ghost marker is time-phased and FE-only.** Lanes are already in phase, so the selected driver's 2023 `P` at the current render tick *is* "where last year's car was at the same elapsed moment." Draw it translucent on the 2024 map. No baked data, no contract change for this part.
+4. **Self-contained reference-lap player, not a live overlay (grill decision).** The ghost and the delta bar are both the *reference lap*, so the route replays both years' reference laps in sync on a local looping clock — `2024-best` solid, `2023-best` ghost — and ignores the live frame stream for animation. This makes ghost position and bar always agree (same two laps), and removes all live-correlation complexity. The price: it shows a flying-lap comparison, not the live race with a ghost on top.
 
-5. **Trace resolution = track-outline index count.** `LapTrace[d]` has length `len(Track)`, so fraction buckets map 1:1 to outline points and to the rendered map — no separate fraction grid to reconcile.
+5. **Both cars animate along the shared `Track` outline (grill decision).** Each car sits at `Track[i]` where `i` is found by inverting that year's `LapTrace[d]` against the clock — so positions come from the shared outline and per-driver *timing* comes from the trace. The spatial separation between the two on the common racing line is the time delta made visible. No per-driver positions need baking — only the timing trace.
+
+6. **Selection is a driver picker, not the live tower (grill decision).** The route has no live running order, so the selected driver comes from a simple picker listing drivers with a trace in both years; default = the first such driver.
+
+7. **Trace resolution = track-outline index count.** `LapTrace[d]` has length `len(Track)`, so buckets map 1:1 to outline points and to the rendered map — no separate fraction grid to reconcile.
 
 ## Edge cases & approximations
 
-- Driver absent in the other year's window → no ghost, no delta bar; show "No 2023 data for X."
-- No clean lap for a driver → no trace baked for them (graceful; FE shows the same "no data" state).
-- Start/finish wrap: traces are cumulative from lap-start = 0, monotonic increasing to the lap end at `i = N`; the FE delta is a straight element-wise subtraction with no wrap math (the normalisation removes it).
+- Driver missing a trace in either year → not offered in the picker; if somehow selected, show "No reference lap for X in 2023."
+- No accurate lap for a driver → no trace baked for them (graceful; the picker omits them).
+- Trace monotonicity: a real lap mapped onto the shared outline can briefly go backwards at the chicane/overtaking line; the recorder forces the per-index series monotonic non-decreasing so inversion (`τ → index`) is well-defined.
+- The delta is a straight element-wise subtraction of two lap-start-normalised traces — no start/finish wrap math (normalisation removes it).
 - Everything labelled **approximate**, consistent with the existing best-effort precedent (ADR-0002).
 
 ## Testing
 
-- **Recorder helper** (`ingest/test_ghost.py`, stdlib-only, runs in CI like `test_radio.py`): trace starts at 0, is monotonic non-decreasing, length = N; fastest-clean-lap selection; missing-lap → no trace.
-- **FE delta math** (`web/src/state/ghost.test.ts`): subtraction + sign, `Δ_0 = 0`, missing-driver / missing-trace handling.
+- **Recorder helper** (`ingest/test_ghost.py`, stdlib-only, runs in CI like `test_radio.py`): trace starts at 0, is monotonic non-decreasing, length = N; fastest-accurate-lap selection; no-accurate-lap → no trace.
+- **FE helper** (`web/src/state/ghost.test.ts`): delta subtraction + sign, `Δ_0 = 0`; trace inversion (`τ → index`) monotonic and clamped at lap ends; missing-trace handling.
 - **Contract parity**: extend the existing Python↔Go self-check for the new `LapTrace` field, as was done for `Radio`.
 
 ## ADR
 
-**ADR-0004** — cross-year delta computed from baked per-clip pace traces, subtracted FE-side; reference = fastest clean lap; best-effort/approximate; `Frame` unchanged; ghost marker is FE-only/time-phased. A real where-to-compute + new-baked-field decision (mirrors ADR-0002's best-effort, derived-at-record-time precedent). Drafted in the grill-with-docs pass.
+**ADR-0004** (`docs/adr/0004-ghost-overlay-baked-traces-frontend-delta.md`, accepted) — per-clip baked lap traces, cross-year delta subtracted FE-side; reference = fastest accurate lap; best-effort/approximate; `Frame` unchanged. Records why record-time cross-clip baking, gateway computation, pure-FE accumulation, and the 3-sector shortcut were each rejected.
 
 ## Architecture impact
 
