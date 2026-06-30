@@ -28,7 +28,7 @@ ts2 = [0.0, 2.0]
 xy2 = [(0.0, 0.0), (1.0, 0.0)]   # the midpoint (0.5,0) is never the nearest
 trace2 = build_lap_trace(ts2, xy2, track2)
 assert trace2[0] == 0 and trace2[2] == 2000, trace2
-assert trace2[1] == 0, trace2  # ties resolve to the lower index
+assert trace2[1] == 0, trace2  # never the nearest point -> carried forward from index 0
 
 print("ghost.build_lap_trace self-check PASSED")
 sys.exit(0)
