@@ -39,4 +39,10 @@ def build_lap_trace(sample_ts, sample_xy, track_xy):
         if reached[i] is not None and reached[i] >= last:
             last = reached[i]
         trace.append(last)
+    # Guarantee the contract invariant: trace[0] == 0.
+    # Outline index 0 may be "reached" mid-lap (non-zero ms) if the car's first
+    # sample is nearest to a later index; force 0 so the ghost's time->index
+    # inversion always has a clean anchor.
+    if trace:
+        trace[0] = 0
     return trace

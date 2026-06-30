@@ -5,7 +5,8 @@ Bakes a real F1 session into the contract read by the Go replay player.
 
 CONTRACT (must match internal/model/model.go + web/src/state/race.ts):
   Header line: {"track":[{"x":float,"y":float},...], "label":"...", "maxRev":int,
-                "radio":[{"timeMs":int,"driverNum":int,"clip":"https://..."}]}
+                "radio":[{"timeMs":int,"driverNum":int,"clip":"https://..."}],
+                "lapTrace":{"<num>":[ms,...]}}
   Frame lines: {"timeMs":int, "frame":{"rev":int,"timeMs":int,"cars":[
                  {"driverNum":int,"code":"VER","team":"Red Bull","pos":int,
                   "p":{"x":float,"y":float},"status":"OnTrack"}]}}
@@ -223,6 +224,39 @@ track_points = [
 ]
 
 print(f"Track outline: {len(track_points)} points")
+
+# ---------------------------------------------------------------------------
+# Lap traces (Phase 4): per-driver pace curve over the fastest accurate lap.
+# Cumulative ms at each track-outline index, for the cross-year ghost overlay.
+# ---------------------------------------------------------------------------
+from ghost import build_lap_trace
+
+_outline_xy = [(p['x'], p['y']) for p in track_points]
+lap_traces = {}
+for num in session.drivers:
+    inum = int(num)
+    if inum not in driver_info:
+        continue
+    try:
+        accurate = session.laps.pick_drivers(num).pick_accurate()
+        if len(accurate) == 0:
+            continue
+        fastest = accurate.pick_fastest()
+        if fastest is None or pd.isna(fastest['LapTime']):
+            continue
+        lap_start = fastest['LapStartTime']
+        lap_end = lap_start + fastest['LapTime']
+        pos = session.pos_data[num]
+        lap_pos = pos[(pos['SessionTime'] >= lap_start) & (pos['SessionTime'] < lap_end)]
+        if len(lap_pos) < 2:
+            continue
+        sample_ts = lap_pos['SessionTime'].dt.total_seconds().tolist()
+        sample_xy = [normalise(row['X'], row['Y']) for _, row in lap_pos.iterrows()]
+        lap_traces[inum] = build_lap_trace(sample_ts, sample_xy, _outline_xy)
+    except Exception as e:
+        print(f"  Warning: no lap trace for {num}: {e}")
+
+print(f"Lap traces baked for {len(lap_traces)} drivers")
 
 # ---------------------------------------------------------------------------
 # Derive running order from laps data
@@ -460,6 +494,7 @@ with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
         "label": GP_LABEL,
         "maxRev": max_rev,
         "radio": radio_clips,
+        "lapTrace": lap_traces,
     }
     f.write(json.dumps(header, separators=(',', ':')) + '\n')
 
