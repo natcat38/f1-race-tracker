@@ -41,3 +41,32 @@ func TestCarStateOmitsZeroTimingFields(t *testing.T) {
 		}
 	}
 }
+
+func TestSnapshotRoundTripWithRadio(t *testing.T) {
+	in := NewSnapshot("replay", "replay", "Monza 2024 · Race")
+	in.Radio = []RadioMessage{
+		{TimeMs: 3300500, DriverNum: 1, Clip: "https://livetiming.formula1.com/x/VER_1.mp3"},
+		{TimeMs: 3301000, DriverNum: 16, Clip: "https://livetiming.formula1.com/x/LEC_16.mp3"},
+	}
+	b, err := json.Marshal(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out Snapshot
+	if err := json.Unmarshal(b, &out); err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Radio) != 2 || out.Radio[1].DriverNum != 16 || out.Radio[0].Clip == "" {
+		t.Fatalf("radio round-trip wrong: %+v", out.Radio)
+	}
+}
+
+func TestSnapshotOmitsEmptyRadio(t *testing.T) {
+	b, err := json.Marshal(NewSnapshot("replay", "replay", "x"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), "radio") {
+		t.Fatalf("empty radio should be omitted, got %s", b)
+	}
+}

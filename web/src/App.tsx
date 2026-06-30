@@ -6,6 +6,7 @@ import { TimingTower } from './components/TimingTower';
 import { TelemetryPanel } from './components/TelemetryPanel';
 import { StatusBadge } from './components/StatusBadge';
 import { SourceToggle } from './components/SourceToggle';
+import { Comms } from './components/Comms';
 import { Compare } from './components/Compare';
 
 const SIZE = 600;
@@ -75,6 +76,10 @@ export default function App() {
         <div>
           <h3 style={{ margin: '0 0 8px' }}>Telemetry</h3>
           <TelemetryPanel car={selected != null ? state.cars[selected] : undefined} />
+        </div>
+        <div>
+          <h3 style={{ margin: '0 0 8px' }}>Comms</h3>
+          <Comms state={state} />
         </div>
       </div>
     </div>

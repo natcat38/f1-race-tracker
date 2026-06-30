@@ -9,19 +9,22 @@ export interface Car {
   gapMs?: number; gapLaps?: number; intMs?: number;
   speed?: number; gear?: number; throttle?: number; brake?: number; drs?: boolean;
 }
+export interface RadioMessage { timeMs: number; driverNum: number; clip: string }
 export interface RaceState {
   session: string; mode: string; label: string;
   track: Point[]; cars: Record<number, Car>; timeMs: number; rev: number;
+  radio: RadioMessage[];
 }
 
 export function emptyState(): RaceState {
-  return { session: '', mode: '', label: '', track: [], cars: {}, timeMs: 0, rev: 0 };
+  return { session: '', mode: '', label: '', track: [], cars: {}, timeMs: 0, rev: 0, radio: [] };
 }
 
 // Wire payloads from the gateway, mirroring internal/model (Snapshot, Frame).
 interface SnapshotData {
   session: string; mode: string; label: string;
   track?: Point[]; cars: Record<number, Car>; timeMs: number; rev: number;
+  radio?: RadioMessage[];
 }
 interface FrameData { rev: number; timeMs: number; cars?: Car[] }
 type Msg =
@@ -36,6 +39,7 @@ export function applyMessage(s: RaceState, msg: Msg): RaceState {
     return {
       session: d.session, mode: d.mode, label: d.label,
       track: d.track ?? [], cars: { ...d.cars }, timeMs: d.timeMs, rev: d.rev,
+      radio: d.radio ?? [],
     };
   }
   const d = msg.data;
