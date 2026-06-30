@@ -7,7 +7,8 @@ test('deltaSeries subtracts last-year from this-year, element-wise', () => {
 });
 
 test('deltaSeries clamps to the shorter length', () => {
-  expect(deltaSeries([0, 100, 200], [0, 100])).toEqual([0, 0]);
+  // divergent values within the shorter length, so this also pins direction
+  expect(deltaSeries([0, 150, 300], [0, 100])).toEqual([0, 50]);
 });
 
 test('indexAtTime returns the largest index reached by t (monotonic trace)', () => {
@@ -17,6 +18,7 @@ test('indexAtTime returns the largest index reached by t (monotonic trace)', () 
   expect(indexAtTime(tr, 2000)).toBe(2);
   expect(indexAtTime(tr, 99999)).toBe(3); // clamp at end
   expect(indexAtTime(tr, -5)).toBe(0);    // clamp at start
+  expect(indexAtTime([], 500)).toBe(0);   // empty trace -> 0
 });
 
 test('commonDrivers returns sorted numeric keys present in both', () => {
