@@ -102,3 +102,22 @@ func TestLoadParsesRadioFromHeader(t *testing.T) {
 		t.Fatalf("radio not parsed: %+v", radio)
 	}
 }
+
+func TestLoadParsesLapTraceFromHeader(t *testing.T) {
+	clip := `{"track":[{"x":0.1,"y":0.2}],"label":"T","maxRev":1,"lapTrace":{"1":[0,100,200],"16":[0,90,210]}}
+{"timeMs":3300000,"frame":{"rev":1,"timeMs":3300000,"cars":[{"driverNum":1,"code":"VER","team":"Red Bull","pos":1,"p":{"x":0.1,"y":0.2},"status":"OnTrack"}]}}
+`
+	path := filepath.Join(t.TempDir(), "clip.jsonl")
+	if err := os.WriteFile(path, []byte(clip), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	src, err := Load(path, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lt := src.LapTrace()
+	// JSON object keys are strings on the wire; Go unmarshals them back to int map keys.
+	if len(lt) != 2 || len(lt[1]) != 3 || lt[1][0] != 0 || lt[1][2] != 200 || lt[16][1] != 90 {
+		t.Fatalf("lapTrace not parsed: %+v", lt)
+	}
+}

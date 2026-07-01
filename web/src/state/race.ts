@@ -14,10 +14,11 @@ export interface RaceState {
   session: string; mode: string; label: string;
   track: Point[]; cars: Record<number, Car>; timeMs: number; rev: number;
   radio: RadioMessage[];
+  lapTrace: Record<number, number[]>;
 }
 
 export function emptyState(): RaceState {
-  return { session: '', mode: '', label: '', track: [], cars: {}, timeMs: 0, rev: 0, radio: [] };
+  return { session: '', mode: '', label: '', track: [], cars: {}, timeMs: 0, rev: 0, radio: [], lapTrace: {} };
 }
 
 // Wire payloads from the gateway, mirroring internal/model (Snapshot, Frame).
@@ -25,6 +26,7 @@ interface SnapshotData {
   session: string; mode: string; label: string;
   track?: Point[]; cars: Record<number, Car>; timeMs: number; rev: number;
   radio?: RadioMessage[];
+  lapTrace?: Record<number, number[]>;
 }
 interface FrameData { rev: number; timeMs: number; cars?: Car[] }
 type Msg =
@@ -39,7 +41,7 @@ export function applyMessage(s: RaceState, msg: Msg): RaceState {
     return {
       session: d.session, mode: d.mode, label: d.label,
       track: d.track ?? [], cars: { ...d.cars }, timeMs: d.timeMs, rev: d.rev,
-      radio: d.radio ?? [],
+      radio: d.radio ?? [], lapTrace: d.lapTrace ?? {},
     };
   }
   const d = msg.data;

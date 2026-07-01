@@ -8,6 +8,7 @@ import { StatusBadge } from './components/StatusBadge';
 import { SourceToggle } from './components/SourceToggle';
 import { Comms } from './components/Comms';
 import { Compare } from './components/Compare';
+import { Ghost } from './components/Ghost';
 
 const SIZE = 600;
 
@@ -39,6 +40,7 @@ export default function App() {
   }, []);
 
   if (hash === '#compare') return <Compare />;
+  if (hash === '#ghost') return <Ghost />;
 
   const showSkeleton = state.rev === 0;
 
@@ -50,6 +52,7 @@ export default function App() {
           {state.label ? <span style={{ color: '#aaa', fontWeight: 400, fontSize: 16 }}>{state.label}</span> : null}
           <SourceToggle state={state} />
           <a href="#compare" style={{ color: '#3671C6', fontSize: 13, fontWeight: 400 }}>Compare years →</a>
+          <a href="#ghost" style={{ color: '#3671C6', fontSize: 13, fontWeight: 400 }}>Ghost overlay →</a>
         </h2>
         {status === 'reconnecting' && !showSkeleton && (
           <div style={{

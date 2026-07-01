@@ -52,6 +52,7 @@ type Snapshot struct {
 	Cars       map[int]CarState     `json:"cars"`
 	Messages   []RaceControlMessage `json:"messages,omitempty"`
 	Radio      []RadioMessage       `json:"radio,omitempty"`
+	LapTrace   map[int][]int        `json:"lapTrace,omitempty"`
 	TimeMs     int64                `json:"timeMs"`
 	Rev        int64                `json:"rev"`
 }

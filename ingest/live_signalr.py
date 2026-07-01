@@ -279,7 +279,7 @@ def _replay_capture(r, session: str, label: str, capture_path: str) -> None:
 
     bounds = BoundBox()
     rev = starting_rev(r, session)
-    snapshot = build_snapshot(session, label or "Live F1", [], [], rev)
+    snapshot = build_snapshot(session, label or "Live F1", [], [], {}, rev)
     r.set(snap_key(session), json.dumps(snapshot, separators=(",", ":")))
 
     # Interleave events by timedelta
@@ -423,7 +423,7 @@ def _run_live_signalr(r, session: str, label: str) -> None:
     driver_info: dict[str, dict] = {}
     running_positions: dict[str, int] = {}
     latest_cars: dict[str, dict] = {}
-    snapshot_holder = [build_snapshot(session, label or "Live F1", [], [], rev_holder[0])]
+    snapshot_holder = [build_snapshot(session, label or "Live F1", [], [], {}, rev_holder[0])]
     last_publish = [time.monotonic() - FRAME_INTERVAL_S]
 
     r.set(snap_key(session), json.dumps(snapshot_holder[0], separators=(",", ":")))

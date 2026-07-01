@@ -60,6 +60,9 @@ jobs:
       - name: radio extraction self-check
         run: python test_radio.py
         working-directory: ingest
+      - name: ghost lap-trace self-check
+        run: python test_ghost.py
+        working-directory: ingest
 
   docs-links:
     name: Docs link check

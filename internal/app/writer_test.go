@@ -18,6 +18,7 @@ type fakeSource struct{ frames []model.Frame }
 
 func (f *fakeSource) Track() []model.Point        { return []model.Point{{X: 0, Y: 0}} }
 func (f *fakeSource) Radio() []model.RadioMessage { return nil }
+func (f *fakeSource) LapTrace() map[int][]int     { return nil }
 func (f *fakeSource) Label() string               { return "Fake" }
 func (f *fakeSource) Mode() string                { return "replay" }
 func (f *fakeSource) Events(ctx context.Context) (<-chan model.Frame, error) {
