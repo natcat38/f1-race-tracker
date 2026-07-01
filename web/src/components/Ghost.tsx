@@ -17,7 +17,10 @@ export function Ghost() {
 
   const drivers = commonDrivers(thisYear.lapTrace, lastYear.lapTrace);
   const [selected, setSelected] = useState<number | null>(null);
-  const resolvedSelected = selected != null ? selected : (drivers[0] ?? null);
+  // Default to the first common driver; fall back to it if a prior selection is no
+  // longer present in both years (e.g. a lane reconnects with a different driver set).
+  const resolvedSelected =
+    selected != null && drivers.includes(selected) ? selected : (drivers[0] ?? null);
 
   const traceThis = resolvedSelected != null ? thisYear.lapTrace[resolvedSelected] : undefined;
   const traceLast = resolvedSelected != null ? lastYear.lapTrace[resolvedSelected] : undefined;
