@@ -64,8 +64,10 @@ export function Ghost() {
   const colour = car ? teamColour[car.team] ?? '#bbb' : '#bbb';
   const code = car?.code ?? (resolvedSelected != null ? String(resolvedSelected) : '');
 
-  const solid = ready ? track[idxThis] : undefined;
-  const ghost = ready ? track[idxLast] : undefined;
+  // idxLast comes from last-year's trace; clamp to this-year's outline before the
+  // lookup so a cross-year outline-length mismatch can't hand us an undefined point.
+  const solid = ready ? track[Math.min(idxThis, track.length - 1)] : undefined;
+  const ghost = ready ? track[Math.min(idxLast, track.length - 1)] : undefined;
 
   return (
     <div style={{ padding: 24, color: '#eee', background: '#0a0a0a', minHeight: '100vh' }}>
