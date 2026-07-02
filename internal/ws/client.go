@@ -35,7 +35,17 @@ func (c *Client) send(b []byte) {
 	}
 }
 
-func (c *Client) close() { c.once.Do(func() { close(c.closed) }) }
+func (c *Client) close() {
+	c.once.Do(func() {
+		close(c.closed)
+		// Also close the socket so a stalled client's blocking conn.Read in ServeWS
+		// returns, letting the deferred Unregister run (else the client leaks). conn is
+		// nil only in hub unit tests that never open a real socket.
+		if c.conn != nil {
+			_ = c.conn.CloseNow()
+		}
+	})
+}
 
 func (c *Client) writeLoop(ctx context.Context) {
 	for {

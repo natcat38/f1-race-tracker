@@ -8,13 +8,14 @@ import (
 
 // Hub holds the authoritative in-memory snapshot and fans frames to clients.
 type Hub struct {
-	mu       sync.Mutex
-	snapshot *model.Snapshot
-	clients  map[*Client]struct{}
+	mu             sync.Mutex
+	snapshot       *model.Snapshot
+	clients        map[*Client]struct{}
+	originPatterns []string // WS allowed origins; empty => same-origin only (coder/websocket default)
 }
 
-func NewHub(initial *model.Snapshot) *Hub {
-	return &Hub{snapshot: initial, clients: make(map[*Client]struct{})}
+func NewHub(initial *model.Snapshot, originPatterns ...string) *Hub {
+	return &Hub{snapshot: initial, clients: make(map[*Client]struct{}), originPatterns: originPatterns}
 }
 
 // ApplyFrame folds a frame into the hub snapshot and broadcasts it. Stale

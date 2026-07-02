@@ -22,18 +22,18 @@ func TestGateway_SessionParamServesRequestedSession(t *testing.T) {
 	defer cancel()
 
 	// Two lanes on two session keys (loopingSource is defined in switch_test.go).
-	go NewWriter(b, loopingSource(model.CarState{DriverNum: 1, Code: "VER"}), logger).Run(ctx, "alpha")
-	go NewWriter(b, loopingSource(model.CarState{DriverNum: 44, Code: "HAM"}), logger).Run(ctx, "beta")
+	go NewWriter(b, loopingSource(model.CarState{DriverNum: 1, Code: "VER"}), logger).Run(ctx, "compare-monza-2023")
+	go NewWriter(b, loopingSource(model.CarState{DriverNum: 44, Code: "HAM"}), logger).Run(ctx, "compare-monza-2024")
 	for {
-		a, _ := b.GetSnapshot(ctx, "alpha")
-		bb, _ := b.GetSnapshot(ctx, "beta")
+		a, _ := b.GetSnapshot(ctx, "compare-monza-2023")
+		bb, _ := b.GetSnapshot(ctx, "compare-monza-2024")
 		if a != nil && bb != nil {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	gw, err := NewGateway(ctx, b, "alpha", logger) // default/active session = alpha
+	gw, err := NewGateway(ctx, b, "compare-monza-2023", logger) // default/active session = compare-monza-2023
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,23 +43,23 @@ func TestGateway_SessionParamServesRequestedSession(t *testing.T) {
 	defer srv.Close()
 	wsBase := "ws" + strings.TrimPrefix(srv.URL, "http")
 
-	// A ?session=beta client must receive the beta lane...
-	connB, _, err := websocket.Dial(ctx, wsBase+"/ws?session=beta", nil)
+	// A ?session=compare-monza-2024 client must receive the compare-monza-2024 lane...
+	connB, _, err := websocket.Dial(ctx, wsBase+"/ws?session=compare-monza-2024", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer connB.Close(websocket.StatusNormalClosure, "")
-	if got := readSession(t, ctx, connB); got != "beta" { // readSession is in switch_test.go
-		t.Fatalf("?session=beta first snapshot = %q, want beta", got)
+	if got := readSession(t, ctx, connB); got != "compare-monza-2024" { // readSession is in switch_test.go
+		t.Fatalf("?session=compare-monza-2024 first snapshot = %q, want compare-monza-2024", got)
 	}
 
-	// ...while the default (no param) client still gets the active session (alpha).
+	// ...while the default (no param) client still gets the active session (compare-monza-2023).
 	connDef, _, err := websocket.Dial(ctx, wsBase+"/ws", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer connDef.Close(websocket.StatusNormalClosure, "")
-	if got := readSession(t, ctx, connDef); got != "alpha" {
-		t.Fatalf("default /ws first snapshot = %q, want alpha", got)
+	if got := readSession(t, ctx, connDef); got != "compare-monza-2023" {
+		t.Fatalf("default /ws first snapshot = %q, want compare-monza-2023", got)
 	}
 }

@@ -35,7 +35,7 @@ export function connectRace(
       if (closed) return;
       onStatus?.('reconnecting');
       setTimeout(open, backoff);
-      backoff = Math.min(backoff * 2, 8000); // exponential backoff (Tech §2.6)
+      backoff = Math.min(backoff * 2, 8000); // exponential backoff, capped at 8s (Task 7 acceptance)
     };
     ws.onerror = () => ws?.close();
   }

@@ -56,6 +56,9 @@ func (b *Bus) GetSnapshot(ctx context.Context, session string) (*model.Snapshot,
 }
 
 // Subscribe returns a PubSub for the session's frame channel. Caller closes it.
+// Note: a dropped Redis connection is not transparently re-subscribed here — it
+// surfaces to the consumer as a closed channel, and recovery relies on the
+// gateway re-subscribing (via SwitchTo / restart), which re-GETs the snapshot.
 func (b *Bus) Subscribe(ctx context.Context, session string) *redis.PubSub {
 	return b.rdb.Subscribe(ctx, framesChannel(session))
 }

@@ -673,9 +673,9 @@ def run_live(r, session: str, label: str | None) -> None:
 
     Behaviour:
         1. If env var CAPTURE_FILE is set and the file exists → replay offline.
-        2. Else if env var LIVE=1 is set (or no CAPTURE_FILE set but we're in
-           live mode) → attempt SignalR connection.
-        3. If neither condition holds → log and return 0 (structural-check mode).
+        2. Else, unless NO_LIVE=1 is set, attempt a SignalR connection directly
+           (no separate live-mode flag).
+        3. If NO_LIVE=1 → log and return (structural-check mode).
 
     Environment:
         CAPTURE_FILE  path to a saved capture file (for offline replay)

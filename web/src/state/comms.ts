@@ -37,3 +37,16 @@ export function stepComms(
 export function isStale(msg: RadioMessage, currentClock: number, toleranceMs = 3000): boolean {
   return currentClock - msg.timeMs > toleranceMs;
 }
+
+// isAllowedClip guards an external clip URL before it becomes an <audio> src: https only,
+// host formula1.com or a subdomain. Clips come from an untrusted external feed, so this
+// rejects a spoofed/hostile origin (S5). Malformed URLs are rejected.
+export function isAllowedClip(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:'
+      && (u.hostname === 'formula1.com' || u.hostname.endsWith('.formula1.com'));
+  } catch {
+    return false;
+  }
+}

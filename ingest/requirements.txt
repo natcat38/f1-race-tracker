@@ -1,2 +1,2 @@
-fastf1
-numpy
+fastf1==3.8.3
+numpy==2.4.6

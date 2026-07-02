@@ -37,6 +37,47 @@ func (f *fakeSource) Events(ctx context.Context) (<-chan model.Frame, error) {
 	return ch, nil
 }
 
+// closingSource emits its frames then CLOSES its channel (unlike fakeSource, which
+// blocks on ctx after emitting) — exercising Writer.Run's frames-channel-closed branch.
+type closingSource struct{ frames []model.Frame }
+
+func (closingSource) Track() []model.Point        { return nil }
+func (closingSource) Radio() []model.RadioMessage { return nil }
+func (closingSource) LapTrace() map[int][]int     { return nil }
+func (closingSource) Label() string               { return "Closing" }
+func (closingSource) Mode() string                { return "replay" }
+func (s closingSource) Events(ctx context.Context) (<-chan model.Frame, error) {
+	ch := make(chan model.Frame)
+	go func() {
+		defer close(ch)
+		for _, fr := range s.frames {
+			select {
+			case <-ctx.Done():
+				return
+			case ch <- fr:
+			}
+		}
+	}()
+	return ch, nil
+}
+
+func TestWriter_ReturnsNilWhenSourceChannelCloses(t *testing.T) {
+	b := testBus(t)
+	src := closingSource{frames: []model.Frame{{Rev: 1, Cars: []model.CarState{{DriverNum: 1}}}}}
+	done := make(chan error, 1)
+	go func() {
+		done <- NewWriter(b, src, slog.New(slog.NewTextHandler(io.Discard, nil))).Run(context.Background(), "demo")
+	}()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("Run returned %v, want nil when the source channel closes", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Run did not return after the source channel closed")
+	}
+}
+
 func testBus(t *testing.T) *bus.Bus {
 	t.Helper()
 	mr, err := miniredis.Run()
@@ -47,6 +88,21 @@ func testBus(t *testing.T) *bus.Bus {
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	t.Cleanup(func() { _ = rdb.Close() })
 	return bus.New(rdb)
+}
+
+func TestWriter_FailsFastWhenSnapshotReadErrors(t *testing.T) {
+	// Bus pointing at a dead address: GetSnapshot returns a real error (not not-found),
+	// so the writer must return it rather than silently starting at rev 0.
+	rdb := redis.NewClient(&redis.Options{Addr: "127.0.0.1:1", DialTimeout: 200 * time.Millisecond, MaxRetries: -1})
+	defer func() { _ = rdb.Close() }()
+	b := bus.New(rdb)
+	src := closingSource{frames: []model.Frame{{Rev: 1, Cars: []model.CarState{{DriverNum: 1}}}}}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := NewWriter(b, src, slog.New(slog.NewTextHandler(io.Discard, nil))).Run(ctx, "demo"); err == nil {
+		t.Fatal("expected Run to error when the snapshot read fails, got nil")
+	}
 }
 
 func TestWriter_PublishesSnapshotWithLatestRevAndTrack(t *testing.T) {

@@ -5,7 +5,7 @@ Go changes. This is the polyglot seam: Python and Go speak one Redis JSON shape.
 
 Modes:
   --replay-clip FILE   stream a baked .jsonl clip to Redis in real time (testable anytime)
-  --live               connect to the F1 live-timing SignalR feed (real sessions only; Task 8)
+  --live               connect to the F1 live-timing SignalR feed (real sessions only; Task 10)
 
 Redis contract:
   SET     snapshot:<session> = {"session","mode","label","track":[{x,y}],
@@ -103,7 +103,7 @@ def parse_args():
     ap.add_argument("--label", default=None, help="override the clip's label")
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--replay-clip", metavar="FILE", help="stream a baked .jsonl clip in real time")
-    g.add_argument("--live", action="store_true", help="connect to the F1 live-timing feed (Task 8)")
+    g.add_argument("--live", action="store_true", help="connect to the F1 live-timing feed (Task 10)")
     return ap.parse_args()
 
 
@@ -114,7 +114,7 @@ def main():
     if args.replay_clip:
         publish_clip(r, args.session, args.replay_clip, args.label)
     else:
-        from live_signalr import run_live  # Task 8 (exploratory; same dir)
+        from live_signalr import run_live  # Task 10 (exploratory; same dir)
         run_live(r, args.session, args.label)
 
 

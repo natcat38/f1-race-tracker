@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/coder/websocket"
-
 	"github.com/natcat38/f1-race-tracker/internal/model"
 )
 
@@ -28,7 +26,7 @@ func TestHub_RegisterQueuesSnapshotFirst(t *testing.T) {
 	s := model.NewSnapshot("demo", "replay", "Synthetic")
 	s.Rev = 7
 	h := NewHub(s)
-	c := newClient(&websocket.Conn{})
+	c := newClient(nil)
 	if err := h.Register(c); err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +37,7 @@ func TestHub_RegisterQueuesSnapshotFirst(t *testing.T) {
 
 func TestHub_ApplyFrameBroadcastsAndDropsStale(t *testing.T) {
 	h := NewHub(model.NewSnapshot("demo", "replay", "Synthetic"))
-	c := newClient(&websocket.Conn{})
+	c := newClient(nil)
 	_ = h.Register(c)
 	_ = drain(t, c) // discard snapshot
 
@@ -54,9 +52,25 @@ func TestHub_ApplyFrameBroadcastsAndDropsStale(t *testing.T) {
 	}
 }
 
+func TestHub_ResetDropsSlowClient(t *testing.T) {
+	h := NewHub(model.NewSnapshot("demo", "replay", "Synthetic"))
+	c := newClient(nil)
+	_ = h.Register(c) // 1 snapshot queued
+	// Reset is not Rev-gated but still fans out via send(); a switch-storm overflows
+	// the same bounded buffer and must drop the client the same way ApplyFrame does.
+	for i := 0; i < sendBuffer+5; i++ {
+		h.Reset(model.NewSnapshot("demo", "replay", "Synthetic"))
+	}
+	select {
+	case <-c.closed:
+	default:
+		t.Error("slow client not dropped after Reset buffer overflow")
+	}
+}
+
 func TestHub_SlowClientIsDropped(t *testing.T) {
 	h := NewHub(model.NewSnapshot("demo", "replay", "Synthetic"))
-	c := newClient(&websocket.Conn{})
+	c := newClient(nil)
 	_ = h.Register(c) // 1 snapshot frame queued
 	for i := int64(1); i <= sendBuffer+5; i++ {
 		h.ApplyFrame(model.Frame{Rev: i, Cars: []model.CarState{{DriverNum: 1}}})

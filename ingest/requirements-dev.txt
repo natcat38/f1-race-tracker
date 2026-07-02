@@ -1,0 +1,5 @@
+# Dev/test deps for the ingest contract tests. Deliberately light — radio/ghost/live
+# are kept free of fastf1/numpy, so pytest + redis is all that's needed to run them
+# (same philosophy as CI's `contract` job, which installs only redis).
+pytest
+redis

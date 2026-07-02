@@ -60,7 +60,7 @@ for num in s.drivers:
     try:
         d = s.get_driver(num)
         teams.add(d['TeamName'])
-    except:
+    except Exception:
         pass
 print(sorted(teams))
 

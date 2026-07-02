@@ -60,7 +60,7 @@ TRACK_POINTS = 150  # number of track outline points
 WINDOW_START_S = 3300   # 55 min into session
 WINDOW_END_S   = 3750   # 62.5 min  (7.5-min window)
 
-# FastF1 team name → frontend colour map key (from web/src/components/Map.tsx teamColour)
+# FastF1 team name → frontend colour map key (from web/src/components/teamColours.ts)
 TEAM_MAP = {
     'Red Bull Racing': 'Red Bull',
     'Ferrari':         'Ferrari',

@@ -91,7 +91,8 @@ func (s *Source) LapTrace() map[int][]int     { return s.lapTrace }
 func (s *Source) Label() string               { return s.label }
 func (s *Source) Mode() string                { return "replay" }
 
-// Events streams frames forever, looping. T is stamped to emit-time (Tech §2.9).
+// Events streams frames forever, looping. T is stamped to emit-time (see
+// knowledge/components/replay-engine.md).
 // Rev on the emitted frame is advisory — the writer reassigns a monotonic Rev.
 func (s *Source) Events(ctx context.Context) (<-chan model.Frame, error) {
 	out := make(chan model.Frame)

@@ -5,6 +5,9 @@ contract job (which installs only `redis`). The recorder does the FastF1 fetch
 and tz handling, then hands plain dicts here.
 """
 from datetime import datetime, timezone
+from urllib.parse import urlparse
+
+_ALLOWED_HOST_SUFFIX = "formula1.com"
 
 
 def _utc_to_session_ms(utc_str, t0_epoch_s):
@@ -22,7 +25,17 @@ def extract_radio(captures, t0_epoch_s, window_start_s, window_end_s, base_url, 
     trailing slash (or Path a leading one), so a missing separator can't silently
     produce a broken URL. A capture with a missing/non-numeric RacingNumber (or a
     missing Utc/Path) is skipped rather than crashing the whole extraction — the
-    feed is external, so one malformed entry must not drop the entire timeline."""
+    feed is external, so one malformed entry must not drop the entire timeline.
+
+    base_url must be an https URL on formula1.com (or a subdomain). The captures come from
+    an untrusted external feed, so this guards clip playback against a spoofed/hostile
+    origin (S5)."""
+    parsed = urlparse(base_url)
+    if parsed.scheme != "https":
+        raise ValueError(f"radio: base_url must use https, got scheme={parsed.scheme!r}")
+    host = (parsed.hostname or "").lower()
+    if host != _ALLOWED_HOST_SUFFIX and not host.endswith("." + _ALLOWED_HOST_SUFFIX):
+        raise ValueError(f"radio: base_url host {host!r} is not formula1.com or a subdomain")
     out = []
     for cap in captures:
         utc, num, path = cap.get("Utc"), cap.get("RacingNumber"), cap.get("Path")

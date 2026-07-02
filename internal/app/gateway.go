@@ -16,18 +16,27 @@ import (
 
 var allowedSources = map[string]bool{"replay": true, "live": true}
 
+// allowedSessions bounds the /ws?session=<key> registry to the known compare lanes, so an
+// arbitrary session value can't spawn an unbounded hub+goroutine+subscription (S1).
+var allowedSessions = map[string]bool{
+	"compare-monza-2023": true,
+	"compare-monza-2024": true,
+}
+
 // Gateway subscribes to a session's frame channel, seeds an in-memory hub from that
 // session's snapshot, serves WebSocket clients, and can be repointed at a different
 // session at runtime via SwitchTo (the operator toggle).
 type Gateway struct {
-	bus     *bus.Bus
-	hub     *ws.Hub
-	logger  *slog.Logger
-	baseCtx context.Context
+	bus            *bus.Bus
+	hub            *ws.Hub
+	logger         *slog.Logger
+	baseCtx        context.Context
+	allowedOrigins []string // WS origin allowlist, applied to every hub this gateway creates
 
 	mu      sync.Mutex
 	session string
 	cancel  context.CancelFunc // cancels the active consume goroutine
+	gen     int                // bumped per SwitchTo; the toggle consume applies only while current (C2)
 
 	regMu    sync.Mutex         // guards registry
 	registry map[string]*ws.Hub // read-only per-session hubs for /ws?session=<key>
@@ -35,17 +44,17 @@ type Gateway struct {
 
 // NewGateway subscribes BEFORE reading the snapshot (Tech §2.5 ordering), seeds the
 // hub, and starts forwarding frames for the initial session.
-func NewGateway(ctx context.Context, b *bus.Bus, session string, logger *slog.Logger) (*Gateway, error) {
-	g := &Gateway{bus: b, logger: logger, baseCtx: ctx, registry: make(map[string]*ws.Hub)}
+func NewGateway(ctx context.Context, b *bus.Bus, session string, logger *slog.Logger, allowedOrigins ...string) (*Gateway, error) {
+	g := &Gateway{bus: b, logger: logger, baseCtx: ctx, registry: make(map[string]*ws.Hub), allowedOrigins: allowedOrigins}
 	snap, pubsub, err := g.subscribeAndSnapshot(ctx, session)
 	if err != nil {
 		return nil, err
 	}
-	g.hub = ws.NewHub(snap)
+	g.hub = ws.NewHub(snap, g.allowedOrigins...)
 	g.session = session
 	cctx, cancel := context.WithCancel(ctx)
 	g.cancel = cancel
-	go g.consume(cctx, g.hub, pubsub)
+	go g.consume(cctx, g.hub, pubsub, g.gen)
 	return g, nil
 }
 
@@ -85,12 +94,16 @@ func (g *Gateway) SwitchTo(session string) error {
 	g.hub.Reset(snap)
 	cctx, cancel := context.WithCancel(g.baseCtx)
 	g.cancel = cancel
+	g.gen++
 	g.session = session
-	go g.consume(cctx, g.hub, pubsub)
+	go g.consume(cctx, g.hub, pubsub, g.gen)
 	return nil
 }
 
-func (g *Gateway) consume(ctx context.Context, hub *ws.Hub, pubsub *redis.PubSub) {
+// consume forwards frames from pubsub into hub. gen<0 marks an ungated registry hub (never
+// switched); otherwise a frame is applied only while g.gen still equals gen — so a SwitchTo
+// that cancels this goroutine can't race a stale frame onto the just-reset hub (C2).
+func (g *Gateway) consume(ctx context.Context, hub *ws.Hub, pubsub *redis.PubSub, gen int) {
 	defer pubsub.Close()
 	ch := pubsub.Channel()
 	for {
@@ -106,7 +119,19 @@ func (g *Gateway) consume(ctx context.Context, hub *ws.Hub, pubsub *redis.PubSub
 				g.logger.Warn("bad frame", "err", err)
 				continue
 			}
-			hub.ApplyFrame(fr)
+			if gen < 0 { // registry hub: not subject to switching
+				hub.ApplyFrame(fr)
+				continue
+			}
+			g.mu.Lock()
+			current := g.gen == gen
+			if current {
+				hub.ApplyFrame(fr) // under g.mu so a concurrent SwitchTo can't interleave
+			}
+			g.mu.Unlock()
+			if !current {
+				return
+			}
 		}
 	}
 }
@@ -123,9 +148,9 @@ func (g *Gateway) getOrCreateHub(session string) (*ws.Hub, error) {
 	if err != nil {
 		return nil, err
 	}
-	hub := ws.NewHub(snap)
+	hub := ws.NewHub(snap, g.allowedOrigins...)
 	g.registry[session] = hub
-	go g.consume(g.baseCtx, hub, pubsub)
+	go g.consume(g.baseCtx, hub, pubsub, -1) // registry hubs are never switched
 	return hub, nil
 }
 
@@ -138,6 +163,10 @@ func (g *Gateway) wsHandler(w http.ResponseWriter, r *http.Request) {
 		hub := g.hub
 		g.mu.Unlock()
 		hub.ServeWS(w, r)
+		return
+	}
+	if !allowedSessions[session] {
+		http.Error(w, "unknown session", http.StatusBadRequest)
 		return
 	}
 	hub, err := g.getOrCreateHub(session)
@@ -168,6 +197,12 @@ func (g *Gateway) handleControl(w http.ResponseWriter, r *http.Request) {
 		g.mu.Unlock()
 		writeJSON(w, map[string]string{"source": cur})
 	case http.MethodPost:
+		// Reject cross-site state-changing POSTs (browsers send Sec-Fetch-Site). Non-browser
+		// clients omit it and are allowed; pair with a shared secret if ever internet-exposed.
+		if site := r.Header.Get("Sec-Fetch-Site"); site != "" && site != "same-origin" && site != "none" {
+			http.Error(w, "cross-site control request rejected", http.StatusForbidden)
+			return
+		}
 		var body struct {
 			Source string `json:"source"`
 		}

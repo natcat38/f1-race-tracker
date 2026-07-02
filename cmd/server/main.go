@@ -46,14 +46,16 @@ func main() {
 			os.Exit(1)
 		}
 	case "gateway":
-		gw, err := app.NewGateway(ctx, b, cfg.Session, logger)
+		gw, err := app.NewGateway(ctx, b, cfg.Session, logger, cfg.AllowedOrigins...)
 		if err != nil {
 			logger.Error("gateway init", "err", err)
 			os.Exit(1)
 		}
 		mux := http.NewServeMux()
 		gw.Mount(mux, http.FileServer(http.FS(web.FS())))
-		srv := &http.Server{Addr: cfg.Addr, Handler: mux}
+		// ReadHeaderTimeout guards against slow-header (Slowloris) requests; no WriteTimeout
+		// because WebSocket connections are long-lived.
+		srv := &http.Server{Addr: cfg.Addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 		go func() {
 			<-ctx.Done()
 			sh, cancel := context.WithTimeout(context.Background(), 5*time.Second)

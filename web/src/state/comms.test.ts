@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { stepComms } from './comms';
+import { stepComms, isAllowedClip } from './comms';
 import type { RadioMessage } from './race';
 
 const tl: RadioMessage[] = [
@@ -31,5 +31,19 @@ describe('stepComms', () => {
   test('multiple crossed in one step fire in time order', () => {
     const { fired } = stepComms({ lastClock: 50 }, 250, tl, false);
     expect(fired.map((m) => m.timeMs)).toEqual([100, 200]);
+  });
+});
+
+describe('isAllowedClip', () => {
+  test('accepts https formula1.com and subdomains', () => {
+    expect(isAllowedClip('https://livetiming.formula1.com/static/x/a.mp3')).toBe(true);
+    expect(isAllowedClip('https://formula1.com/a.mp3')).toBe(true);
+  });
+  test('rejects non-https, other hosts, suffix tricks, and malformed URLs', () => {
+    expect(isAllowedClip('http://livetiming.formula1.com/a.mp3')).toBe(false);
+    expect(isAllowedClip('https://evil.example.com/a.mp3')).toBe(false);
+    expect(isAllowedClip('https://notformula1.com/a.mp3')).toBe(false);
+    expect(isAllowedClip('javascript:alert(1)')).toBe(false);
+    expect(isAllowedClip('not a url')).toBe(false);
   });
 });

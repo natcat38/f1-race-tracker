@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RaceState, RadioMessage } from '../state/race';
-import { stepComms, isStale, type CommsCursor } from '../state/comms';
+import { stepComms, isStale, isAllowedClip, type CommsCursor } from '../state/comms';
 
 const HISTORY_MAX = 6;
 
@@ -25,8 +25,11 @@ export function useComms(state: RaceState) {
     const audio = audioRef.current;
     if (!audio || nowPlayingRef.current) return;
     let next = queueRef.current.shift();
-    // Drop clips that have fallen too far behind the race clock (kept in history).
-    while (next && isStale(next, clockRef.current)) next = queueRef.current.shift();
+    // Skip clips that are stale vs the race clock or have a disallowed URL (kept in history).
+    while (next && (isStale(next, clockRef.current) || !isAllowedClip(next.clip))) {
+      if (!isAllowedClip(next.clip)) console.warn('comms: skipping clip with disallowed URL', next.clip);
+      next = queueRef.current.shift();
+    }
     if (!next) return;
     nowPlayingRef.current = next;
     setNowPlaying(next);
@@ -97,6 +100,10 @@ export function useComms(state: RaceState) {
   function replay(msg: RadioMessage) {
     const audio = audioRef.current;
     if (!audio) return;
+    if (!isAllowedClip(msg.clip)) {
+      console.warn('comms: refusing to replay clip with disallowed URL', msg.clip);
+      return;
+    }
     queueRef.current = []; // manual replay jumps the queue
     nowPlayingRef.current = msg;
     setNowPlaying(msg);

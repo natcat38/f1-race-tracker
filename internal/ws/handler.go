@@ -9,7 +9,7 @@ import (
 // ServeWS upgrades to WebSocket, sends the snapshot, then streams frames.
 func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		OriginPatterns: []string{"*"}, // same-origin in prod; permissive for dev
+		OriginPatterns: h.originPatterns, // configured allowlist; empty => same-origin only
 	})
 	if err != nil {
 		return
