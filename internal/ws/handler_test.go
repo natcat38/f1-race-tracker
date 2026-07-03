@@ -23,7 +23,7 @@ func (h *Hub) clientCount() int {
 // ServeWS's read loop detects the close and runs the deferred Unregister. Locks in
 // the clean-disconnect path so it can't silently regress into a client leak.
 func TestServeWS_DisconnectUnregisters(t *testing.T) {
-	h := NewHub(model.NewSnapshot("demo", "replay", "Synthetic"))
+	h := NewHub(model.NewSnapshot("demo", "replay", "Synthetic"), testLogger())
 	srv := httptest.NewServer(http.HandlerFunc(h.ServeWS))
 	defer srv.Close()
 
@@ -67,7 +67,7 @@ func TestClient_CloseClosesUnderlyingConn(t *testing.T) {
 	}
 	defer clientConn.CloseNow()
 
-	cl := newClient(<-connCh)
+	cl := newClient(<-connCh, testLogger())
 	cl.close()
 
 	if _, _, err := clientConn.Read(ctx); err == nil {
@@ -78,7 +78,7 @@ func TestClient_CloseClosesUnderlyingConn(t *testing.T) {
 // S2: ServeWS honors the configured origin allowlist — a disallowed Origin is rejected,
 // an allowed one connects.
 func TestServeWS_EnforcesOriginAllowlist(t *testing.T) {
-	h := NewHub(model.NewSnapshot("demo", "replay", "x"), "goodhost.example")
+	h := NewHub(model.NewSnapshot("demo", "replay", "x"), testLogger(), "goodhost.example")
 	srv := httptest.NewServer(http.HandlerFunc(h.ServeWS))
 	defer srv.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -98,6 +98,47 @@ func TestServeWS_EnforcesOriginAllowlist(t *testing.T) {
 		t.Fatalf("allowed origin should connect: %v", err)
 	}
 	_ = conn.CloseNow()
+}
+
+// The client never legitimately sends data (the read loop exists only to detect
+// close) — a custom, low SetReadLimit means an oversized message from a client
+// is rejected rather than accepted up to the library's 32KiB default.
+func TestServeWS_EnforcesReadLimit(t *testing.T) {
+	h := NewHub(model.NewSnapshot("demo", "replay", "x"), testLogger())
+	srv := httptest.NewServer(http.HandlerFunc(h.ServeWS))
+	defer srv.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conn, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(srv.URL, "http"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.CloseNow()
+	if _, _, err := conn.Read(ctx); err != nil { // drain the seed snapshot
+		t.Fatal(err)
+	}
+
+	// 1024 bytes: comfortably under the library's 32KiB default (so this only
+	// fails once a smaller custom limit is enforced), comfortably over the
+	// small limit this app needs.
+	big := make([]byte, 1024)
+	if err := conn.Write(ctx, websocket.MessageText, big); err != nil {
+		t.Fatal(err)
+	}
+
+	// A short, separate deadline: a hung/unenforced read must fail fast here
+	// rather than this test "passing" by exhausting the outer 5s timeout —
+	// that would be true whether or not the limit is actually enforced.
+	readCtx, readCancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer readCancel()
+	_, _, readErr := conn.Read(readCtx)
+	if readErr == nil {
+		t.Fatal("expected the server to close the connection after an oversized message")
+	}
+	if status := websocket.CloseStatus(readErr); status != websocket.StatusMessageTooBig {
+		t.Errorf("close status = %v (err=%v), want StatusMessageTooBig", status, readErr)
+	}
 }
 
 func waitFor(t *testing.T, cond func() bool, msg string) {

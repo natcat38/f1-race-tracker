@@ -104,7 +104,7 @@ for num in session.drivers:
             'team': mapped_team,
         }
     except Exception as e:
-        print(f"  Warning: couldn't get driver info for {num}: {e}")
+        print(f"  Warning: couldn't get driver info for {num}: {type(e).__name__}: {e}")
 
 print(f"Driver info ({len(driver_info)} drivers):")
 for num, info in sorted(driver_info.items()):
@@ -132,7 +132,7 @@ try:
     )
     print(f"Team radio: {len(captures)} captures in session, {len(radio_clips)} in window")
 except Exception as e:
-    print(f"  Warning: team radio fetch failed ({e}); clip will have no radio")
+    print(f"  Warning: team radio fetch failed ({type(e).__name__}: {e}); clip will have no radio")
 
 # ---------------------------------------------------------------------------
 # Collect all position data and determine coordinate bounds
@@ -254,7 +254,7 @@ for num in session.drivers:
         sample_xy = [normalise(row['X'], row['Y']) for _, row in driver_lap_pos.iterrows()]
         lap_traces[inum] = build_lap_trace(sample_ts, sample_xy, _outline_xy)
     except Exception as e:
-        print(f"  Warning: no lap trace for {num}: {e}")
+        print(f"  Warning: no lap trace for {num}: {type(e).__name__}: {e}")
 
 print(f"Lap traces baked for {len(lap_traces)} drivers")
 
@@ -302,6 +302,10 @@ print("\nBuilding timing lookup (laps / sectors / tyre)...")
 
 # driver_num -> list of (becomes_current_time_s, fields_dict), sorted by time.
 timing_lookup = {}
+# driver_num -> (start_times, (tyre, tyreAge) tuples) for a step_value lookup.
+# Tyre becomes current at lap START, which — unlike lap completion below — is
+# always strictly ascending across a driver's laps, so bisection is safe here.
+tyre_lookup = {}
 for num in session.drivers:
     inum = int(num)
     if inum not in driver_info:
@@ -310,6 +314,7 @@ for num in session.drivers:
     if len(drv) == 0:
         continue
     events = []
+    tyre_starts, tyre_values = [], []
     best_ms = 0
     for _, lap in drv.iterrows():
         start_s = lap['LapStartTime'].total_seconds() if not pd.isna(lap['LapStartTime']) else None
@@ -320,9 +325,9 @@ for num in session.drivers:
             best_ms = last_ms if best_ms == 0 else min(best_ms, last_ms)
         compound = lap['Compound'] if not pd.isna(lap['Compound']) else ''
         tyre_age = int(lap['TyreLife']) if not pd.isna(lap['TyreLife']) else 0
+        tyre_starts.append(start_s)
+        tyre_values.append((str(compound).upper() if compound else '', tyre_age))
         events.append((start_s, {
-            'tyre': str(compound).upper() if compound else '',
-            'tyreAge': tyre_age,
             'complete_at': start_s + (last_ms / 1000.0) if last_ms > 0 else start_s,
             'lastLapMs': last_ms,
             'bestLapMs': best_ms,
@@ -332,16 +337,21 @@ for num in session.drivers:
         }))
     events.sort(key=lambda e: e[0])
     timing_lookup[inum] = events
+    tyre_lookup[inum] = (tyre_starts, tyre_values)
 
 
 def get_timing(driver_num, t_s):
     """Pit-wall numbers for a driver at session time t_s (step lookup)."""
+    starts, values = tyre_lookup.get(driver_num, ([], []))
+    tyre, tyre_age = step_value(starts, values, t_s, ('', 0))
+
+    # Lap/sector times become current at lap COMPLETION (start + duration), which
+    # isn't rigorously guaranteed non-decreasing the way lap start is (missing or
+    # anomalous LapTime data can distort it) — kept as a linear scan rather than
+    # step_value's bisection, which assumes strictly sorted input.
     events = timing_lookup.get(driver_num, [])
-    tyre, tyre_age = '', 0
     last_ms = best_ms = s1 = s2 = s3 = 0
     for start_s, f in events:
-        if start_s <= t_s:
-            tyre, tyre_age = f['tyre'], f['tyreAge']
         if f['complete_at'] <= t_s:
             last_ms, best_ms = f['lastLapMs'], f['bestLapMs']
             s1, s2, s3 = f['s1Ms'], f['s2Ms'], f['s3Ms']
@@ -460,7 +470,7 @@ for num in session.drivers:
         # All five succeeded — assign atomically.
         tel = {'speed': _speed, 'gear': _gear, 'throttle': _throttle, 'brake': _brake, 'drs': _drs}
     except Exception as e:
-        print(f"  Warning: no telemetry for {num} ({driver_info[inum]['code']}): {e}")
+        print(f"  Warning: no telemetry for {num} ({driver_info[inum]['code']}): {type(e).__name__}: {e}")
 
     driver_frames[inum] = {
         'x': x_interp,

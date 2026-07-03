@@ -50,6 +50,30 @@ type Msg =
   | { type: 'snapshot'; data: SnapshotData }
   | { type: 'frame'; data: FrameData };
 
+// parseMsg validates an unknown parsed-JSON value against the Msg shape before
+// it's trusted as wire data, rejecting a malformed or evolved payload (missing
+// fields, wrong type, unknown message type) instead of letting it flow into
+// applyMessage as an unchecked cast.
+export function parseMsg(raw: unknown): Msg | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const d = r.data;
+  if (typeof d !== 'object' || d === null) return null;
+  const data = d as Record<string, unknown>;
+
+  if (r.type === 'snapshot') {
+    if (typeof data.session !== 'string' || typeof data.mode !== 'string' || typeof data.label !== 'string') return null;
+    if (typeof data.cars !== 'object' || data.cars === null) return null;
+    if (typeof data.timeMs !== 'number' || typeof data.rev !== 'number') return null;
+    return { type: 'snapshot', data: data as unknown as SnapshotData };
+  }
+  if (r.type === 'frame') {
+    if (typeof data.rev !== 'number' || typeof data.timeMs !== 'number') return null;
+    return { type: 'frame', data: data as unknown as FrameData };
+  }
+  return null;
+}
+
 // applyMessage folds a snapshot or frame into state. Frames with rev <= current
 // are ignored (idempotent — mirrors the Go Apply, Tech §2.6).
 export function applyMessage(s: RaceState, msg: Msg): RaceState {

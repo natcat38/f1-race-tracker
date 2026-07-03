@@ -18,5 +18,5 @@ separate web host. See the repo root `README.md` for the full architecture.
 
 - `src/realtime/` — reconnecting WebSocket client
 - `src/state/` — pure reducers over the wire contract (`race`, `comms`, `ghost`)
-- `src/components/` — map, timing tower, standings, comms, compare, ghost, telemetry
+- `src/components/` — map, timing tower, standings, comms, compare, ghost, telemetry, race control
 - `src/hooks/` — car-position smoothing, comms cursor

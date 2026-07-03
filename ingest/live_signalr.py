@@ -473,7 +473,8 @@ def _run_live_signalr(r, session: str, label: str) -> None:
         elif topic == 'Position.z':
             try:
                 samples = _decode_position_payload(payload)
-            except Exception:
+            except Exception as exc:
+                _log.warning(f"Position.z decode error: {exc}")
                 return
             now = time.monotonic()
             for sample in samples:
@@ -561,8 +562,8 @@ def _dispatch_message(msg, callback) -> None:
             for topic, payload in msg.result.items():
                 try:
                     callback(topic, payload)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _log.error(f"handler failed for topic={topic}: {exc}")
             return
     except ImportError:
         pass
@@ -574,8 +575,8 @@ def _dispatch_message(msg, callback) -> None:
             try:
                 if isinstance(item, (list, tuple)) and len(item) >= 2:
                     callback(str(item[0]), item[1])
-            except Exception:
-                pass
+            except Exception as exc:
+                _log.error(f"handler failed for item={item!r}: {exc}")
 
 
 # ---------------------------------------------------------------------------

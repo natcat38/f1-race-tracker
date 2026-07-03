@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -10,6 +11,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/coder/websocket"
 
 	"github.com/natcat38/f1-race-tracker/internal/model"
 	"github.com/natcat38/f1-race-tracker/internal/ws"
@@ -147,6 +150,96 @@ func TestSwitchTo_ConcurrentSwitchAndPublish(t *testing.T) {
 	g.mu.Unlock()
 	if final != "live" {
 		t.Errorf("final session = %q, want live", final)
+	}
+}
+
+// C2 (deterministic): a frame delivered to a STALE generation's consume goroutine
+// after SwitchTo has already bumped g.gen must never reach the hub. Unlike
+// TestSwitchTo_ConcurrentSwitchAndPublish (a stress loop that only proves "no
+// panic/race under -race"), this pins down the actual regression: the frame is
+// dropped, not merely delivered without crashing.
+func TestConsume_DropsFrameFromStaleGeneration(t *testing.T) {
+	b := testBus(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	for _, s := range []string{"replay", "live"} {
+		seed := model.NewSnapshot(s, "replay", s)
+		if err := b.Publish(ctx, seed, model.Frame{SessionKey: s, Rev: 0}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	g, err := NewGateway(ctx, b, "replay", logger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	staleGen := g.gen // 0, captured before the switch
+
+	// Switch away from "replay": bumps g.gen to 1 and resets the (shared) hub to
+	// the "live" snapshot — the moment a still-in-flight stale-generation frame
+	// must no longer be able to land.
+	if err := g.SwitchTo("live"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Fresh subscription to the OLD session's channel, standing in for whatever
+	// the stale generation's own consume goroutine already held. Publish one
+	// frame carrying a marker car that must never reach the hub.
+	snap, pubsub, err := g.subscribeAndSnapshot(ctx, "replay")
+	if err != nil {
+		t.Fatal(err)
+	}
+	poisoned := model.Frame{SessionKey: "replay", Rev: snap.Rev + 1, Cars: []model.CarState{{DriverNum: 999, Code: "XXX"}}}
+	if err := b.Publish(ctx, snap, poisoned); err != nil {
+		t.Fatal(err)
+	}
+
+	// Drive consume directly with the STALE gen captured pre-switch — exactly
+	// what a goroutine spawned before SwitchTo would still be running with. It
+	// must detect the mismatch against the now-current g.gen and return without
+	// ever calling hub.ApplyFrame.
+	done := make(chan struct{})
+	go func() { g.consume(ctx, g.hub, pubsub, staleGen); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("consume did not return after a stale-generation frame")
+	}
+
+	// The only externally-observable surface from this package is a real WS
+	// client: connect fresh and confirm the seeded snapshot has no trace of the
+	// poisoned car (and is still "live"'s, not corrupted by "replay" data).
+	mux := http.NewServeMux()
+	g.Mount(mux, nil)
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	conn, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(srv.URL, "http")+"/ws", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	_, data, err := conn.Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var env struct {
+		Type string          `json:"type"`
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(data, &env); err != nil {
+		t.Fatal(err)
+	}
+	var got model.Snapshot
+	if err := json.Unmarshal(env.Data, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.SessionKey != "live" {
+		t.Fatalf("hub snapshot session = %q, want live (stale frame corrupted the switch)", got.SessionKey)
+	}
+	if _, ok := got.Cars[999]; ok {
+		t.Fatalf("stale-generation frame reached the hub: cars=%+v", got.Cars)
 	}
 }
 

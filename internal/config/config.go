@@ -1,13 +1,25 @@
 package config
 
 import (
+	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
 )
 
+// Role selects which process this binary runs as (see cmd/server/main.go).
+type Role string
+
+const (
+	RoleGateway Role = "gateway"
+	RoleReplay  Role = "replay"
+)
+
+func (r Role) Valid() bool { return r == RoleGateway || r == RoleReplay }
+
 type Config struct {
-	Role           string
+	Role           Role
 	RedisURL       string
 	Session        string
 	ClipFile       string
@@ -17,9 +29,18 @@ type Config struct {
 	AllowedOrigins []string // WebSocket origin allowlist (coder/websocket OriginPatterns)
 }
 
+// Validate reports an error for an unusable config. Call before any side effects
+// (e.g. dialing Redis) so a bad ROLE fails at the boundary, not after setup.
+func (c Config) Validate() error {
+	if !c.Role.Valid() {
+		return fmt.Errorf("config: invalid ROLE %q (want %q or %q)", c.Role, RoleGateway, RoleReplay)
+	}
+	return nil
+}
+
 func Load() Config {
 	return Config{
-		Role:           env("ROLE", "gateway"),
+		Role:           Role(env("ROLE", string(RoleGateway))),
 		RedisURL:       env("REDIS_URL", "redis://localhost:6379"),
 		Session:        env("SESSION_KEY", "demo"),
 		ClipFile:       env("CLIP_FILE", "data/replays/monza-2024-race.jsonl"),
@@ -59,6 +80,7 @@ func envFloat(k string, def float64) float64 {
 		if f, err := strconv.ParseFloat(v, 64); err == nil {
 			return f
 		}
+		slog.Warn("unparseable env value, using default", "key", k, "value", v, "default", def)
 	}
 	return def
 }

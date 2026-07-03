@@ -41,3 +41,17 @@ func TestLoad_PhaseWallclockIsPresenceNotTruthiness(t *testing.T) {
 		t.Error(`PHASE_WALLCLOCK="false" still enables the flag (presence check) — expected true`)
 	}
 }
+
+func TestValidate_AcceptsKnownRoles(t *testing.T) {
+	for _, r := range []Role{RoleGateway, RoleReplay} {
+		if err := (Config{Role: r}).Validate(); err != nil {
+			t.Errorf("Role %q should be valid, got err: %v", r, err)
+		}
+	}
+}
+
+func TestValidate_RejectsUnknownRole(t *testing.T) {
+	if err := (Config{Role: "bogus"}).Validate(); err == nil {
+		t.Error("expected an error for an unknown ROLE, got nil")
+	}
+}

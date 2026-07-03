@@ -1,5 +1,5 @@
 import { describe, it, expect, test } from 'vitest';
-import { emptyState, applyMessage, type RaceState } from './race';
+import { emptyState, applyMessage, parseMsg, type RaceState } from './race';
 
 const snapMsg = {
   type: 'snapshot' as const,
@@ -115,6 +115,39 @@ test('a frame does not clobber lapTrace', () => {
   });
   const s1 = applyMessage(s0, { type: 'frame', data: { rev: 2, timeMs: 100, cars: [] } });
   expect(s1.lapTrace[1]).toEqual([0, 100, 200]);
+});
+
+describe('parseMsg', () => {
+  it('accepts a well-formed snapshot message', () => {
+    const raw = { type: 'snapshot', data: { session: 'x', mode: 'replay', label: 'L', cars: {}, timeMs: 0, rev: 1 } };
+    expect(parseMsg(raw)).toEqual(raw);
+  });
+
+  it('accepts a well-formed frame message', () => {
+    const raw = { type: 'frame', data: { rev: 2, timeMs: 100, cars: [] } };
+    expect(parseMsg(raw)).toEqual(raw);
+  });
+
+  it('rejects null and non-objects', () => {
+    expect(parseMsg(null)).toBeNull();
+    expect(parseMsg('snapshot')).toBeNull();
+    expect(parseMsg(42)).toBeNull();
+  });
+
+  it('rejects a missing or unknown type', () => {
+    expect(parseMsg({ data: {} })).toBeNull();
+    expect(parseMsg({ type: 'error', data: {} })).toBeNull();
+  });
+
+  it('rejects a snapshot missing required fields', () => {
+    expect(parseMsg({ type: 'snapshot', data: { session: 'x', mode: 'replay', label: 'L', timeMs: 0, rev: 1 } })).toBeNull(); // no cars
+    expect(parseMsg({ type: 'snapshot' })).toBeNull(); // no data at all
+  });
+
+  it('rejects a frame with the wrong field types', () => {
+    expect(parseMsg({ type: 'frame', data: { rev: '2', timeMs: 100, cars: [] } })).toBeNull(); // rev as string
+    expect(parseMsg({ type: 'frame', data: { rev: 2 } })).toBeNull(); // no timeMs
+  });
 });
 
 describe('race-control messages', () => {

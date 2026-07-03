@@ -31,6 +31,7 @@ A **real-time F1 race visualisation**: a Python ingestion layer feeds normalised
 
 **Phase 2 — Pit-Wall Timing Dashboard (later):**
 - The detailed timing screen — gaps, intervals, last/best laps, tyre stints, sector times, telemetry readouts — the "pit wall" view. Reuses the entire pipeline; adds richer data and UI.
+- A **race control feed** — flags, safety car, and investigation messages alongside the timing tower.
 
 **Phase 3 — Team-Radio Comms (later):**
 - The driver ↔ race-engineer **team radio** played alongside the race (the audio is freely available), as a toggleable layer.

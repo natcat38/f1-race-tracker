@@ -50,7 +50,7 @@ func NewGateway(ctx context.Context, b *bus.Bus, session string, logger *slog.Lo
 	if err != nil {
 		return nil, err
 	}
-	g.hub = ws.NewHub(snap, g.allowedOrigins...)
+	g.hub = ws.NewHub(snap, g.logger, g.allowedOrigins...)
 	g.session = session
 	cctx, cancel := context.WithCancel(ctx)
 	g.cancel = cancel
@@ -148,7 +148,7 @@ func (g *Gateway) getOrCreateHub(session string) (*ws.Hub, error) {
 	if err != nil {
 		return nil, err
 	}
-	hub := ws.NewHub(snap, g.allowedOrigins...)
+	hub := ws.NewHub(snap, g.logger, g.allowedOrigins...)
 	g.registry[session] = hub
 	go g.consume(g.baseCtx, hub, pubsub, -1) // registry hubs are never switched
 	return hub, nil
@@ -223,5 +223,9 @@ func (g *Gateway) handleControl(w http.ResponseWriter, r *http.Request) {
 
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
+	// ponytail: v is always a small static map[string]string here; an encode error
+	// would mean the client vanished mid-write, which the client already learns
+	// from its own broken response. Not logged to avoid a logger dependency for
+	// a failure mode with no operator action to take.
 	_ = json.NewEncoder(w).Encode(v)
 }

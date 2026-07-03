@@ -51,8 +51,10 @@ On first run, FastF1 downloads ~50 MB of session data and caches it under `cache
 
 The output is JSONL (one JSON object per line):
 
-- **Line 1 (header):** `{"track":[{"x":float,"y":float},...], "label":"...", "maxRev":int}`
+- **Line 1 (header):** `{"track":[{"x":float,"y":float},...], "label":"...", "maxRev":int, "radio":[{"timeMs":int,"driverNum":int,"clip":"https://..."}], "lapTrace":{"<driverNum>":[ms,...]}}`
 - **Lines 2–N (frames):** `{"timeMs":int, "frame":{"rev":int,"timeMs":int,"cars":[...]}}`
+
+`radio` (Phase 3) is a list of team-radio clip references falling inside the baked window; `lapTrace` (Phase 4) maps each driver's number to a cumulative-ms pace curve over their fastest accurate lap, used by the cross-year ghost overlay.
 
 Each car: `{"driverNum":int,"code":"VER","team":"Red Bull","pos":int,"p":{"x":float,"y":float},"status":"OnTrack"}`
 

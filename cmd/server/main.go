@@ -21,6 +21,10 @@ import (
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	cfg := config.Load()
+	if err := cfg.Validate(); err != nil {
+		logger.Error(err.Error())
+		os.Exit(1)
+	}
 
 	opt, err := redis.ParseURL(cfg.RedisURL)
 	if err != nil {
@@ -33,7 +37,7 @@ func main() {
 	defer stop()
 
 	switch cfg.Role {
-	case "replay":
+	case config.RoleReplay:
 		src, err := replay.Load(cfg.ClipFile, cfg.Speed)
 		if err != nil {
 			logger.Error("load clip", "err", err)
@@ -45,7 +49,7 @@ func main() {
 			logger.Error("writer stopped", "err", err)
 			os.Exit(1)
 		}
-	case "gateway":
+	case config.RoleGateway:
 		gw, err := app.NewGateway(ctx, b, cfg.Session, logger, cfg.AllowedOrigins...)
 		if err != nil {
 			logger.Error("gateway init", "err", err)
@@ -54,13 +58,18 @@ func main() {
 		mux := http.NewServeMux()
 		gw.Mount(mux, http.FileServer(http.FS(web.FS())))
 		// ReadHeaderTimeout guards against slow-header (Slowloris) requests; no WriteTimeout
-		// because WebSocket connections are long-lived.
-		srv := &http.Server{Addr: cfg.Addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+		// because WebSocket connections are long-lived. IdleTimeout only bounds the
+		// plain-HTTP surface (static SPA, /healthz, /control/source) between keep-alive
+		// requests — a WebSocket conn is hijacked out of net/http's control once
+		// upgraded, so this doesn't affect (and can't wrongly reap) an open WS client.
+		srv := &http.Server{Addr: cfg.Addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 120 * time.Second}
 		go func() {
 			<-ctx.Done()
 			sh, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			_ = srv.Shutdown(sh)
+			if err := srv.Shutdown(sh); err != nil {
+				logger.Warn("graceful shutdown did not complete cleanly", "err", err)
+			}
 		}()
 		logger.Info("gateway listening", "addr", cfg.Addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
