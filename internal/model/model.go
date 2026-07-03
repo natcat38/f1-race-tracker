@@ -49,7 +49,7 @@ type Snapshot struct {
 	Mode       string               `json:"mode"`  // "live" | "replay"
 	Label      string               `json:"label"` // "Synthetic · Demo"
 	Track      []Point              `json:"track,omitempty"`
-	Cars       map[int]CarState     `json:"cars"`
+	Cars       map[int]CarState     `json:"cars"` // marshals with string keys (JSON has no int keys); see web/src/state/race.ts's mirroring Record<number, Car>
 	Messages   []RaceControlMessage `json:"messages,omitempty"`
 	Radio      []RadioMessage       `json:"radio,omitempty"`
 	LapTrace   map[int][]int        `json:"lapTrace,omitempty"`

@@ -3,4 +3,6 @@ WORKDIR /app
 COPY ingest/requirements-live.txt ./
 RUN pip install --no-cache-dir -r requirements-live.txt
 COPY ingest/live.py ./
+RUN useradd --no-create-home --uid 1000 appuser
+USER appuser
 ENTRYPOINT ["python", "live.py"]

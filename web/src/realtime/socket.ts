@@ -24,7 +24,14 @@ export function connectRace(
     ws = new WebSocket(url);
     ws.onopen = () => { backoff = 500; };
     ws.onmessage = (ev) => {
-      state = applyMessage(state, JSON.parse(ev.data));
+      let next: RaceState;
+      try {
+        next = applyMessage(state, JSON.parse(ev.data));
+      } catch (err) {
+        console.error('connectRace: dropping malformed message', err);
+        return;
+      }
+      state = next;
       if (!live) {
         live = true;
         onStatus?.('live');

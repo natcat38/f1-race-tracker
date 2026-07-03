@@ -41,7 +41,8 @@ def starting_rev(r, session):
         return 0
     try:
         return int(json.loads(raw).get("rev", 0))
-    except (ValueError, json.JSONDecodeError):
+    except (ValueError, json.JSONDecodeError) as e:
+        print(f"live: corrupt snapshot at {snap_key(session)}, starting from rev 0: {e}", file=sys.stderr)
         return 0
 
 

@@ -1,2 +1,7 @@
+# signalrcore 1.0.2 (latest) hard-pins the vulnerable msgpack==1.1.2 (GHSA-6v7p-g79w-8964);
+# 0.8.8 is the newest version compatible with the patched msgpack>=1.2.1 in requirements.txt.
+# The live-SignalR path (live_signalr.py) is exploratory/unverified against a real session
+# either way and unused by the demo; the one direct low-level import this repo makes
+# (signalrcore.messages.completion_message.CompletionMessage) still resolves at 0.8.8.
 redis==8.0.0
-signalrcore==1.0.2
+signalrcore==0.8.8

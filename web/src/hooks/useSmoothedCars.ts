@@ -3,7 +3,8 @@ import type { Car, RaceState, Point } from '../state/race';
 
 // Returns cars with positions interpolated at display refresh rate.
 // Cars glide from their previous position to their current position over one
-// frame interval (~100 ms at 10 Hz), keeping motion smooth at 60 fps.
+// frame interval (~100 ms at 10 Hz), keeping motion smooth at the display's
+// native refresh rate.
 export function useSmoothedCars(state: RaceState): Car[] {
   const from = useRef<Record<number, Point>>({});
   const to = useRef<Record<number, Point>>({});
@@ -30,7 +31,8 @@ export function useSmoothedCars(state: RaceState): Car[] {
 
   // Interpolate at display refresh rate. Refs are read inside the rAF callback
   // (not during render), which the react-hooks rules require; the result is
-  // published to state so the component re-renders ~60 fps with smooth motion.
+  // published to state so the component re-renders at the display's native
+  // refresh rate with smooth motion.
   useEffect(() => {
     let raf = 0;
     const loop = () => {

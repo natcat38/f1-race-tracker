@@ -4,7 +4,6 @@ Run BEFORE record.py to understand the actual data shapes,
 coordinate ranges, and available fields.
 """
 import fastf1
-import numpy as np
 
 fastf1.Cache.enable_cache('cache')  # gitignored
 

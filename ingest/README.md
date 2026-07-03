@@ -117,8 +117,11 @@ The replay runs at real-time pace using the recorded timestamps.
 
 ### Running in true-live mode during a session
 
+`--live` alone only checks that a real connection *would* be attempted (see
+below); the actual SignalR connection needs the double opt-in `LIVE=1`:
+
 ```bash
-.venv/Scripts/python ingest/live.py --live --session live --label "British GP 2026"
+LIVE=1 .venv/Scripts/python ingest/live.py --live --session live --label "British GP 2026"
 ```
 
 Set `CAPTURE_OUT=myfile.txt` to also save the stream to a file while publishing.
@@ -127,7 +130,7 @@ Set `CAPTURE_OUT=myfile.txt` to also save the stream to a file while publishing.
 
 ```bash
 # Should print True with no errors
-NO_LIVE=1 .venv/Scripts/python -c "import sys; sys.path.insert(0,'ingest'); import live_signalr; print(callable(live_signalr.run_live))"
+.venv/Scripts/python -c "import sys; sys.path.insert(0,'ingest'); import live_signalr; print(callable(live_signalr.run_live))"
 ```
 
 ### Normalization bounds

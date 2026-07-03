@@ -32,6 +32,7 @@ from pathlib import Path
 from fastf1 import _api
 from radio import extract_radio
 from ghost import build_lap_trace
+from resample import nearest_index, step_value
 
 # ---------------------------------------------------------------------------
 # Args
@@ -266,29 +267,23 @@ print(f"Lap traces baked for {len(lap_traces)} drivers")
 print("\nBuilding running order lookup...")
 
 # For each driver, get (LapStartTime, Position) pairs so we can do a step lookup.
-order_lookup = {}  # driver_num -> list of (session_time_seconds, position)
+order_lookup = {}  # driver_num -> (times, positions), parallel lists ascending by time
 for num in session.drivers:
     inum = int(num)
     drv_laps = session.laps.pick_drivers(num)[['LapStartTime', 'Position']].dropna()
     if len(drv_laps) == 0:
         continue
-    order_lookup[inum] = [
-        (t.total_seconds(), int(p))
-        for t, p in zip(drv_laps['LapStartTime'], drv_laps['Position'])
-    ]
+    order_lookup[inum] = (
+        [t.total_seconds() for t in drv_laps['LapStartTime']],
+        [int(p) for p in drv_laps['Position']],
+    )
 
 def get_position(driver_num, session_time_s):
     """Return driver's running position at a given session time (step lookup)."""
-    entries = order_lookup.get(driver_num, [])
-    if not entries:
+    times, positions = order_lookup.get(driver_num, ([], []))
+    if not positions:
         return 99  # unknown
-    pos = entries[0][1]
-    for t, p in entries:
-        if t <= session_time_s:
-            pos = p
-        else:
-            break
-    return pos
+    return step_value(times, positions, session_time_s, positions[0])
 
 # ---------------------------------------------------------------------------
 # Per-driver timing lookup: at session time T, the "current" pit-wall numbers.
@@ -372,24 +367,22 @@ def _lap_fraction(nx, ny):
     return int(np.argmin(d)) / len(_track_xy)
 
 # Lap-number step lookup per driver (from laps 'LapNumber').
-lapnum_lookup = {}
+lapnum_lookup = {}  # driver_num -> (times, lap_numbers), parallel lists ascending by time
 for num in session.drivers:
     inum = int(num)
     if inum not in driver_info:
         continue
     drv = session.laps.pick_drivers(num)[['LapStartTime', 'LapNumber']].dropna()
-    lapnum_lookup[inum] = [(t.total_seconds(), int(n)) for t, n in
-                           zip(drv['LapStartTime'], drv['LapNumber'])]
+    lapnum_lookup[inum] = (
+        [t.total_seconds() for t in drv['LapStartTime']],
+        [int(n) for n in drv['LapNumber']],
+    )
 
 def _lap_number(driver_num, t_s):
-    entries = lapnum_lookup.get(driver_num, [])
-    n = entries[0][1] if entries else 1
-    for t, ln in entries:
-        if t <= t_s:
-            n = ln
-        else:
-            break
-    return n
+    times, lapnums = lapnum_lookup.get(driver_num, ([], []))
+    if not lapnums:
+        return 1
+    return step_value(times, lapnums, t_s, lapnums[0])
 
 # Field pace: median completed lap time (ms) across the field; fallback 90s.
 _all_laps_ms = [_ms(t) for t in session.laps['LapTime'] if not pd.isna(t)]
@@ -439,8 +432,10 @@ for num in session.drivers:
     x_interp = np.interp(t_grid_s, t_s, x_raw)
     y_interp = np.interp(t_grid_s, t_s, y_raw)
 
-    # Status: use nearest-neighbor (find closest time for each grid point)
-    t_indices = np.searchsorted(t_s, t_grid_s, side='left').clip(0, len(t_s) - 1)
+    # Status: true nearest-neighbour lookup (closest time to each grid point —
+    # see ingest/resample.py; a bare searchsorted would give the next time
+    # at-or-after the grid point instead, biasing status forward in time).
+    t_indices = np.array([nearest_index(t_s, q) for q in t_grid_s])
     status_interp = status_raw[t_indices]
 
     # Telemetry: resample car_data onto the same grid (nearest-neighbour in time).
@@ -450,7 +445,10 @@ for num in session.drivers:
     try:
         cd = session.car_data[num]
         cd_t = cd['SessionTime'].dt.total_seconds().values
-        idx = np.searchsorted(cd_t, t_grid_s, side='left').clip(0, len(cd_t) - 1)
+        # True nearest-neighbour (see ingest/resample.py) — a bare searchsorted
+        # picks the next sample at-or-after the grid point, shifting telemetry
+        # forward in time by up to one sample period vs. the position data.
+        idx = np.array([nearest_index(cd_t, q) for q in t_grid_s])
         _speed    = cd['Speed'].values[idx].astype(int)
         _gear     = cd['nGear'].values[idx].astype(int)
         _throttle = cd['Throttle'].values[idx].astype(int)
@@ -602,7 +600,7 @@ size_mb = size_bytes / (1024 * 1024)
 print(f"File size: {size_mb:.2f} MB ({size_bytes:,} bytes)")
 
 if size_mb > 25.0:
-    print(f"WARNING: File exceeds 25 MB! Consider trimming the window or reducing Hz.")
+    print("WARNING: File exceeds 25 MB! Consider trimming the window or reducing Hz.")
 
 # ---------------------------------------------------------------------------
 # Contract validation

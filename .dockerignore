@@ -1,0 +1,12 @@
+.git/
+.venv/
+node_modules/
+web/dist/
+web/.vite/
+cache/
+.fastf1/
+*.exe
+*.test
+*.out
+.playwright-mcp/
+*.png
