@@ -148,6 +148,19 @@ describe('parseMsg', () => {
     expect(parseMsg({ type: 'frame', data: { rev: '2', timeMs: 100, cars: [] } })).toBeNull(); // rev as string
     expect(parseMsg({ type: 'frame', data: { rev: 2 } })).toBeNull(); // no timeMs
   });
+
+  it('rejects a frame whose cars/messages are present but not arrays', () => {
+    expect(parseMsg({ type: 'frame', data: { rev: 2, timeMs: 100, cars: {} } })).toBeNull();
+    expect(parseMsg({ type: 'frame', data: { rev: 2, timeMs: 100, messages: 'x' } })).toBeNull();
+  });
+
+  it('rejects a snapshot whose array fields are the wrong type', () => {
+    const base = { session: 'x', mode: 'replay', label: 'L', cars: {}, timeMs: 0, rev: 1 };
+    expect(parseMsg({ type: 'snapshot', data: { ...base, messages: 'x' } })).toBeNull();
+    expect(parseMsg({ type: 'snapshot', data: { ...base, radio: {} } })).toBeNull();
+    expect(parseMsg({ type: 'snapshot', data: { ...base, track: 'nope' } })).toBeNull();
+    expect(parseMsg({ type: 'snapshot', data: { ...base, cars: [] } })).toBeNull(); // array cars is wrong shape for a snapshot
+  });
 });
 
 describe('race-control messages', () => {

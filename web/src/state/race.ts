@@ -63,12 +63,23 @@ export function parseMsg(raw: unknown): Msg | null {
 
   if (r.type === 'snapshot') {
     if (typeof data.session !== 'string' || typeof data.mode !== 'string' || typeof data.label !== 'string') return null;
-    if (typeof data.cars !== 'object' || data.cars === null) return null;
+    // Snapshot cars is a Record<number,Car> (object keyed by driverNum) — an array would be
+    // spread into the wrong shape, so reject it explicitly.
+    if (typeof data.cars !== 'object' || data.cars === null || Array.isArray(data.cars)) return null;
     if (typeof data.timeMs !== 'number' || typeof data.rev !== 'number') return null;
+    // Optional array fields, when present, must be arrays: applyMessage assigns them straight
+    // through and downstream code (RaceControl/Comms) iterates them, so a wrong-typed value
+    // would crash the render rather than being rejected here.
+    if (data.messages !== undefined && !Array.isArray(data.messages)) return null;
+    if (data.radio !== undefined && !Array.isArray(data.radio)) return null;
+    if (data.track !== undefined && !Array.isArray(data.track)) return null;
     return { type: 'snapshot', data: data as unknown as SnapshotData };
   }
   if (r.type === 'frame') {
     if (typeof data.rev !== 'number' || typeof data.timeMs !== 'number') return null;
+    // applyMessage iterates cars and spreads messages — reject a present-but-non-array value.
+    if (data.cars !== undefined && !Array.isArray(data.cars)) return null;
+    if (data.messages !== undefined && !Array.isArray(data.messages)) return null;
     return { type: 'frame', data: data as unknown as FrameData };
   }
   return null;

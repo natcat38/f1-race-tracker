@@ -55,6 +55,7 @@ func main() {
 			logger.Error("gateway init", "err", err)
 			os.Exit(1)
 		}
+		gw.SetAllowedSessions(cfg.AllowedSessions) // no-op unless ALLOWED_SESSIONS overrides the default lanes
 		mux := http.NewServeMux()
 		gw.Mount(mux, http.FileServer(http.FS(web.FS())))
 		// ReadHeaderTimeout guards against slow-header (Slowloris) requests; no WriteTimeout

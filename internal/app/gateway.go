@@ -16,22 +16,21 @@ import (
 
 var allowedSources = map[string]bool{"replay": true, "live": true}
 
-// allowedSessions bounds the /ws?session=<key> registry to the known compare lanes, so an
-// arbitrary session value can't spawn an unbounded hub+goroutine+subscription (S1).
-var allowedSessions = map[string]bool{
-	"compare-monza-2023": true,
-	"compare-monza-2024": true,
-}
+// defaultAllowedSessions bounds the /ws?session=<key> registry to the known compare lanes when
+// ALLOWED_SESSIONS isn't set, so an arbitrary session value can't spawn an unbounded
+// hub+goroutine+subscription (S1). Override for other lanes via SetAllowedSessions (config).
+var defaultAllowedSessions = []string{"compare-monza-2023", "compare-monza-2024"}
 
 // Gateway subscribes to a session's frame channel, seeds an in-memory hub from that
 // session's snapshot, serves WebSocket clients, and can be repointed at a different
 // session at runtime via SwitchTo (the operator toggle).
 type Gateway struct {
-	bus            *bus.Bus
-	hub            *ws.Hub
-	logger         *slog.Logger
-	baseCtx        context.Context
-	allowedOrigins []string // WS origin allowlist, applied to every hub this gateway creates
+	bus             *bus.Bus
+	hub             *ws.Hub
+	logger          *slog.Logger
+	baseCtx         context.Context
+	allowedOrigins  []string        // WS origin allowlist, applied to every hub this gateway creates
+	allowedSessions map[string]bool // /ws?session= registry allowlist (S1); set before serving
 
 	mu      sync.Mutex
 	session string
@@ -45,7 +44,7 @@ type Gateway struct {
 // NewGateway subscribes BEFORE reading the snapshot (Tech §2.5 ordering), seeds the
 // hub, and starts forwarding frames for the initial session.
 func NewGateway(ctx context.Context, b *bus.Bus, session string, logger *slog.Logger, allowedOrigins ...string) (*Gateway, error) {
-	g := &Gateway{bus: b, logger: logger, baseCtx: ctx, registry: make(map[string]*ws.Hub), allowedOrigins: allowedOrigins}
+	g := &Gateway{bus: b, logger: logger, baseCtx: ctx, registry: make(map[string]*ws.Hub), allowedOrigins: allowedOrigins, allowedSessions: toSet(defaultAllowedSessions)}
 	snap, pubsub, err := g.subscribeAndSnapshot(ctx, session)
 	if err != nil {
 		return nil, err
@@ -56,6 +55,24 @@ func NewGateway(ctx context.Context, b *bus.Bus, session string, logger *slog.Lo
 	g.cancel = cancel
 	go g.consume(cctx, g.hub, pubsub, g.gen)
 	return g, nil
+}
+
+// SetAllowedSessions overrides the /ws?session= registry allowlist (the S1 bound). Call before
+// serving (single-goroutine startup); a nil/empty list leaves the default compare-lane set.
+func (g *Gateway) SetAllowedSessions(sessions []string) {
+	if len(sessions) == 0 {
+		return
+	}
+	g.allowedSessions = toSet(sessions)
+}
+
+// toSet builds a membership set from a slice.
+func toSet(items []string) map[string]bool {
+	m := make(map[string]bool, len(items))
+	for _, s := range items {
+		m[s] = true
+	}
+	return m
 }
 
 // subscribeAndSnapshot preserves subscribe-before-snapshot ordering (Tech §2.5): any
@@ -165,7 +182,7 @@ func (g *Gateway) wsHandler(w http.ResponseWriter, r *http.Request) {
 		hub.ServeWS(w, r)
 		return
 	}
-	if !allowedSessions[session] {
+	if !g.allowedSessions[session] {
 		http.Error(w, "unknown session", http.StatusBadRequest)
 		return
 	}
