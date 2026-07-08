@@ -23,6 +23,12 @@ def build_lap_trace(sample_ts, sample_xy, track_xy):
     n = len(track_xy)
     t0 = sample_ts[0]
     reached = [None] * n
+    # ponytail: O(len(sample_ts) * len(track_xy)) brute-force nearest-point search,
+    # run once per driver per clip bake (record.py) — fine at today's ~150 track
+    # points and one lap's samples (well under a second total). If TRACK_POINTS
+    # or sample density grows enough to matter, switch to a spatial index (e.g.
+    # a k-d tree) or bisection against a precomputed cumulative-arc-length
+    # parameterization of the outline.
     for ts, (sx, sy) in zip(sample_ts, sample_xy):
         bi, bd = 0, None
         for i, (tx, ty) in enumerate(track_xy):

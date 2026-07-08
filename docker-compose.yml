@@ -1,7 +1,8 @@
 services:
   redis:
     image: redis:7-alpine
-    ports: ["6379:6379"]
+    # No host port: services reach Redis over the compose network (redis://redis:6379).
+    # Nothing outside the compose network needs it, so it isn't exposed to the host/LAN.
 
   replay:                      # REPLAY lane → session "replay" (Monza, the default clip)
     build: .

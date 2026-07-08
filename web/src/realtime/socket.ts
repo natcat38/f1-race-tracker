@@ -1,4 +1,4 @@
-import { applyMessage, emptyState, type RaceState } from '../state/race';
+import { applyMessage, emptyState, parseMsg, type RaceState } from '../state/race';
 
 export type ConnStatus = 'connecting' | 'live' | 'reconnecting';
 
@@ -24,7 +24,19 @@ export function connectRace(
     ws = new WebSocket(url);
     ws.onopen = () => { backoff = 500; };
     ws.onmessage = (ev) => {
-      state = applyMessage(state, JSON.parse(ev.data));
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(ev.data);
+      } catch (err) {
+        console.error('connectRace: dropping malformed message', err);
+        return;
+      }
+      const msg = parseMsg(parsed);
+      if (!msg) {
+        console.error('connectRace: dropping message with invalid shape', parsed);
+        return;
+      }
+      state = applyMessage(state, msg);
       if (!live) {
         live = true;
         onStatus?.('live');
@@ -35,9 +47,12 @@ export function connectRace(
       if (closed) return;
       onStatus?.('reconnecting');
       setTimeout(open, backoff);
-      backoff = Math.min(backoff * 2, 8000); // exponential backoff (Tech §2.6)
+      backoff = Math.min(backoff * 2, 8000); // exponential backoff, capped at 8s (Task 7 acceptance)
     };
-    ws.onerror = () => ws?.close();
+    ws.onerror = (ev) => {
+      console.error('connectRace: socket error', ev);
+      ws?.close();
+    };
   }
   open();
 

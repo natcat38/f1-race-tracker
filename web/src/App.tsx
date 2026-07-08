@@ -7,6 +7,7 @@ import { TelemetryPanel } from './components/TelemetryPanel';
 import { StatusBadge } from './components/StatusBadge';
 import { SourceToggle } from './components/SourceToggle';
 import { Comms } from './components/Comms';
+import { RaceControl } from './components/RaceControl';
 import { Compare } from './components/Compare';
 import { Ghost } from './components/Ghost';
 
@@ -83,6 +84,10 @@ export default function App() {
         <div>
           <h3 style={{ margin: '0 0 8px' }}>Comms</h3>
           <Comms state={state} />
+        </div>
+        <div>
+          <h3 style={{ margin: '0 0 8px' }}>Race Control</h3>
+          <RaceControl state={state} />
         </div>
       </div>
     </div>

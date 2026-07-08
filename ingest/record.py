@@ -32,6 +32,7 @@ from pathlib import Path
 from fastf1 import _api
 from radio import extract_radio
 from ghost import build_lap_trace
+from resample import nearest_index, step_value
 
 # ---------------------------------------------------------------------------
 # Args
@@ -60,7 +61,7 @@ TRACK_POINTS = 150  # number of track outline points
 WINDOW_START_S = 3300   # 55 min into session
 WINDOW_END_S   = 3750   # 62.5 min  (7.5-min window)
 
-# FastF1 team name → frontend colour map key (from web/src/components/Map.tsx teamColour)
+# FastF1 team name → frontend colour map key (from web/src/components/teamColours.ts)
 TEAM_MAP = {
     'Red Bull Racing': 'Red Bull',
     'Ferrari':         'Ferrari',
@@ -103,7 +104,7 @@ for num in session.drivers:
             'team': mapped_team,
         }
     except Exception as e:
-        print(f"  Warning: couldn't get driver info for {num}: {e}")
+        print(f"  Warning: couldn't get driver info for {num}: {type(e).__name__}: {e}")
 
 print(f"Driver info ({len(driver_info)} drivers):")
 for num, info in sorted(driver_info.items()):
@@ -131,7 +132,7 @@ try:
     )
     print(f"Team radio: {len(captures)} captures in session, {len(radio_clips)} in window")
 except Exception as e:
-    print(f"  Warning: team radio fetch failed ({e}); clip will have no radio")
+    print(f"  Warning: team radio fetch failed ({type(e).__name__}: {e}); clip will have no radio")
 
 # ---------------------------------------------------------------------------
 # Collect all position data and determine coordinate bounds
@@ -253,7 +254,7 @@ for num in session.drivers:
         sample_xy = [normalise(row['X'], row['Y']) for _, row in driver_lap_pos.iterrows()]
         lap_traces[inum] = build_lap_trace(sample_ts, sample_xy, _outline_xy)
     except Exception as e:
-        print(f"  Warning: no lap trace for {num}: {e}")
+        print(f"  Warning: no lap trace for {num}: {type(e).__name__}: {e}")
 
 print(f"Lap traces baked for {len(lap_traces)} drivers")
 
@@ -266,29 +267,23 @@ print(f"Lap traces baked for {len(lap_traces)} drivers")
 print("\nBuilding running order lookup...")
 
 # For each driver, get (LapStartTime, Position) pairs so we can do a step lookup.
-order_lookup = {}  # driver_num -> list of (session_time_seconds, position)
+order_lookup = {}  # driver_num -> (times, positions), parallel lists ascending by time
 for num in session.drivers:
     inum = int(num)
     drv_laps = session.laps.pick_drivers(num)[['LapStartTime', 'Position']].dropna()
     if len(drv_laps) == 0:
         continue
-    order_lookup[inum] = [
-        (t.total_seconds(), int(p))
-        for t, p in zip(drv_laps['LapStartTime'], drv_laps['Position'])
-    ]
+    order_lookup[inum] = (
+        [t.total_seconds() for t in drv_laps['LapStartTime']],
+        [int(p) for p in drv_laps['Position']],
+    )
 
 def get_position(driver_num, session_time_s):
     """Return driver's running position at a given session time (step lookup)."""
-    entries = order_lookup.get(driver_num, [])
-    if not entries:
+    times, positions = order_lookup.get(driver_num, ([], []))
+    if not positions:
         return 99  # unknown
-    pos = entries[0][1]
-    for t, p in entries:
-        if t <= session_time_s:
-            pos = p
-        else:
-            break
-    return pos
+    return step_value(times, positions, session_time_s, positions[0])
 
 # ---------------------------------------------------------------------------
 # Per-driver timing lookup: at session time T, the "current" pit-wall numbers.
@@ -307,6 +302,10 @@ print("\nBuilding timing lookup (laps / sectors / tyre)...")
 
 # driver_num -> list of (becomes_current_time_s, fields_dict), sorted by time.
 timing_lookup = {}
+# driver_num -> (start_times, (tyre, tyreAge) tuples) for a step_value lookup.
+# Tyre becomes current at lap START, which — unlike lap completion below — is
+# always strictly ascending across a driver's laps, so bisection is safe here.
+tyre_lookup = {}
 for num in session.drivers:
     inum = int(num)
     if inum not in driver_info:
@@ -315,6 +314,7 @@ for num in session.drivers:
     if len(drv) == 0:
         continue
     events = []
+    tyre_starts, tyre_values = [], []
     best_ms = 0
     for _, lap in drv.iterrows():
         start_s = lap['LapStartTime'].total_seconds() if not pd.isna(lap['LapStartTime']) else None
@@ -325,9 +325,9 @@ for num in session.drivers:
             best_ms = last_ms if best_ms == 0 else min(best_ms, last_ms)
         compound = lap['Compound'] if not pd.isna(lap['Compound']) else ''
         tyre_age = int(lap['TyreLife']) if not pd.isna(lap['TyreLife']) else 0
+        tyre_starts.append(start_s)
+        tyre_values.append((str(compound).upper() if compound else '', tyre_age))
         events.append((start_s, {
-            'tyre': str(compound).upper() if compound else '',
-            'tyreAge': tyre_age,
             'complete_at': start_s + (last_ms / 1000.0) if last_ms > 0 else start_s,
             'lastLapMs': last_ms,
             'bestLapMs': best_ms,
@@ -337,16 +337,21 @@ for num in session.drivers:
         }))
     events.sort(key=lambda e: e[0])
     timing_lookup[inum] = events
+    tyre_lookup[inum] = (tyre_starts, tyre_values)
 
 
 def get_timing(driver_num, t_s):
     """Pit-wall numbers for a driver at session time t_s (step lookup)."""
+    starts, values = tyre_lookup.get(driver_num, ([], []))
+    tyre, tyre_age = step_value(starts, values, t_s, ('', 0))
+
+    # Lap/sector times become current at lap COMPLETION (start + duration), which
+    # isn't rigorously guaranteed non-decreasing the way lap start is (missing or
+    # anomalous LapTime data can distort it) — kept as a linear scan rather than
+    # step_value's bisection, which assumes strictly sorted input.
     events = timing_lookup.get(driver_num, [])
-    tyre, tyre_age = '', 0
     last_ms = best_ms = s1 = s2 = s3 = 0
     for start_s, f in events:
-        if start_s <= t_s:
-            tyre, tyre_age = f['tyre'], f['tyreAge']
         if f['complete_at'] <= t_s:
             last_ms, best_ms = f['lastLapMs'], f['bestLapMs']
             s1, s2, s3 = f['s1Ms'], f['s2Ms'], f['s3Ms']
@@ -372,24 +377,22 @@ def _lap_fraction(nx, ny):
     return int(np.argmin(d)) / len(_track_xy)
 
 # Lap-number step lookup per driver (from laps 'LapNumber').
-lapnum_lookup = {}
+lapnum_lookup = {}  # driver_num -> (times, lap_numbers), parallel lists ascending by time
 for num in session.drivers:
     inum = int(num)
     if inum not in driver_info:
         continue
     drv = session.laps.pick_drivers(num)[['LapStartTime', 'LapNumber']].dropna()
-    lapnum_lookup[inum] = [(t.total_seconds(), int(n)) for t, n in
-                           zip(drv['LapStartTime'], drv['LapNumber'])]
+    lapnum_lookup[inum] = (
+        [t.total_seconds() for t in drv['LapStartTime']],
+        [int(n) for n in drv['LapNumber']],
+    )
 
 def _lap_number(driver_num, t_s):
-    entries = lapnum_lookup.get(driver_num, [])
-    n = entries[0][1] if entries else 1
-    for t, ln in entries:
-        if t <= t_s:
-            n = ln
-        else:
-            break
-    return n
+    times, lapnums = lapnum_lookup.get(driver_num, ([], []))
+    if not lapnums:
+        return 1
+    return step_value(times, lapnums, t_s, lapnums[0])
 
 # Field pace: median completed lap time (ms) across the field; fallback 90s.
 _all_laps_ms = [_ms(t) for t in session.laps['LapTime'] if not pd.isna(t)]
@@ -439,8 +442,10 @@ for num in session.drivers:
     x_interp = np.interp(t_grid_s, t_s, x_raw)
     y_interp = np.interp(t_grid_s, t_s, y_raw)
 
-    # Status: use nearest-neighbor (find closest time for each grid point)
-    t_indices = np.searchsorted(t_s, t_grid_s, side='left').clip(0, len(t_s) - 1)
+    # Status: true nearest-neighbour lookup (closest time to each grid point —
+    # see ingest/resample.py; a bare searchsorted would give the next time
+    # at-or-after the grid point instead, biasing status forward in time).
+    t_indices = np.array([nearest_index(t_s, q) for q in t_grid_s])
     status_interp = status_raw[t_indices]
 
     # Telemetry: resample car_data onto the same grid (nearest-neighbour in time).
@@ -450,7 +455,10 @@ for num in session.drivers:
     try:
         cd = session.car_data[num]
         cd_t = cd['SessionTime'].dt.total_seconds().values
-        idx = np.searchsorted(cd_t, t_grid_s, side='left').clip(0, len(cd_t) - 1)
+        # True nearest-neighbour (see ingest/resample.py) — a bare searchsorted
+        # picks the next sample at-or-after the grid point, shifting telemetry
+        # forward in time by up to one sample period vs. the position data.
+        idx = np.array([nearest_index(cd_t, q) for q in t_grid_s])
         _speed    = cd['Speed'].values[idx].astype(int)
         _gear     = cd['nGear'].values[idx].astype(int)
         _throttle = cd['Throttle'].values[idx].astype(int)
@@ -462,7 +470,7 @@ for num in session.drivers:
         # All five succeeded — assign atomically.
         tel = {'speed': _speed, 'gear': _gear, 'throttle': _throttle, 'brake': _brake, 'drs': _drs}
     except Exception as e:
-        print(f"  Warning: no telemetry for {num} ({driver_info[inum]['code']}): {e}")
+        print(f"  Warning: no telemetry for {num} ({driver_info[inum]['code']}): {type(e).__name__}: {e}")
 
     driver_frames[inum] = {
         'x': x_interp,
@@ -602,7 +610,7 @@ size_mb = size_bytes / (1024 * 1024)
 print(f"File size: {size_mb:.2f} MB ({size_bytes:,} bytes)")
 
 if size_mb > 25.0:
-    print(f"WARNING: File exceeds 25 MB! Consider trimming the window or reducing Hz.")
+    print("WARNING: File exceeds 25 MB! Consider trimming the window or reducing Hz.")
 
 # ---------------------------------------------------------------------------
 # Contract validation

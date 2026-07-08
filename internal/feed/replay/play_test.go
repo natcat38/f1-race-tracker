@@ -85,6 +85,42 @@ func TestReplay_HeaderAndMonotonicRevAcrossLoop(t *testing.T) {
 	}
 }
 
+func TestLoad_RejectsBadInput(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+	}{
+		{"empty file", ``},
+		{"bad header json", "{not json\n"},
+		{"header only, no frames", `{"label":"L","maxRev":1}` + "\n"},
+		{"bad frame line", `{"label":"L","maxRev":1}` + "\n" + "{bad}\n"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if _, err := Load(writeTemp(t, c.body), 1); err == nil {
+				t.Errorf("expected error for %q", c.name)
+			}
+		})
+	}
+}
+
+func TestLoad_SpeedAndMaxRevFallbacks(t *testing.T) {
+	// No maxRev in header, speed given as 0.
+	body := `{"label":"L"}
+{"timeMs":0,"frame":{"rev":4,"timeMs":0,"cars":[{"driverNum":1}]}}
+`
+	src, err := Load(writeTemp(t, body), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if src.max != 4 { // maxRev omitted -> last line's Rev
+		t.Errorf("maxRev fallback = %d, want 4", src.max)
+	}
+	if src.speed != 1 { // speed <= 0 -> 1
+		t.Errorf("speed = %v, want 1", src.speed)
+	}
+}
+
 func TestLoadParsesRadioFromHeader(t *testing.T) {
 	clip := `{"track":[{"x":0.1,"y":0.2}],"label":"T","maxRev":1,"radio":[{"timeMs":3300500,"driverNum":1,"clip":"https://x/VER.mp3"}]}
 {"timeMs":3300000,"frame":{"rev":1,"timeMs":3300000,"cars":[{"driverNum":1,"code":"VER","team":"Red Bull","pos":1,"p":{"x":0.1,"y":0.2},"status":"OnTrack"}]}}

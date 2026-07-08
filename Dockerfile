@@ -15,8 +15,8 @@ COPY . .
 COPY --from=web /web/dist ./web/dist
 RUN CGO_ENABLED=0 go build -o /server ./cmd/server
 
-# Minimal runtime image
-FROM gcr.io/distroless/static-debian12
+# Minimal runtime image — :nonroot runs as an unprivileged UID by default
+FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /server /server
 COPY --from=build /src/data /data
 ENV CLIP_FILE=/data/replays/monza-2024-race.jsonl

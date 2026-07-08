@@ -6,28 +6,37 @@ type Point struct {
 	Y float64 `json:"y"`
 }
 
+// CarStatus is the small closed set of values CarState.Status carries.
+type CarStatus string
+
+const (
+	StatusOnTrack CarStatus = "OnTrack"
+	StatusPit     CarStatus = "Pit"
+	StatusOut     CarStatus = "Out"
+)
+
 type CarState struct {
-	DriverNum int    `json:"driverNum"`
-	Code      string `json:"code"` // "VER"
-	Team      string `json:"team"`
-	Pos       int    `json:"pos"`            // running order
-	P         Point  `json:"p"`              // track-space coordinate, scaled to [0,1]
-	Status    string `json:"status"`         // "OnTrack" | "Pit" | "Out"
-	Tyre      string `json:"tyre,omitempty"` // Phase 2: compound, e.g. "SOFT"
-	TyreAge   int    `json:"tyreAge,omitempty"`
-	LastLapMs int    `json:"lastLapMs,omitempty"`
-	BestLapMs int    `json:"bestLapMs,omitempty"`
-	S1Ms      int    `json:"s1Ms,omitempty"`
-	S2Ms      int    `json:"s2Ms,omitempty"`
-	S3Ms      int    `json:"s3Ms,omitempty"`
-	GapMs     int    `json:"gapMs,omitempty"`   // to leader; best-effort, derived at record time
-	GapLaps   int    `json:"gapLaps,omitempty"` // whole laps behind leader; FE shows "+1 LAP" when >= 1
-	IntMs     int    `json:"intMs,omitempty"`   // interval to car ahead; best-effort
-	Speed     int    `json:"speed,omitempty"`
-	Gear      int    `json:"gear,omitempty"`
-	Throttle  int    `json:"throttle,omitempty"` // 0-100
-	Brake     int    `json:"brake,omitempty"`    // 0-100
-	DRS       bool   `json:"drs,omitempty"`
+	DriverNum int       `json:"driverNum"`
+	Code      string    `json:"code"` // "VER"
+	Team      string    `json:"team"`
+	Pos       int       `json:"pos"` // running order
+	P         Point     `json:"p"`   // track-space coordinate, scaled to [0,1]
+	Status    CarStatus `json:"status"`
+	Tyre      string    `json:"tyre,omitempty"` // Phase 2: compound, e.g. "SOFT"
+	TyreAge   int       `json:"tyreAge,omitempty"`
+	LastLapMs int       `json:"lastLapMs,omitempty"`
+	BestLapMs int       `json:"bestLapMs,omitempty"`
+	S1Ms      int       `json:"s1Ms,omitempty"`
+	S2Ms      int       `json:"s2Ms,omitempty"`
+	S3Ms      int       `json:"s3Ms,omitempty"`
+	GapMs     int       `json:"gapMs,omitempty"`   // to leader; best-effort, derived at record time
+	GapLaps   int       `json:"gapLaps,omitempty"` // whole laps behind leader; FE shows "+1 LAP" when >= 1
+	IntMs     int       `json:"intMs,omitempty"`   // interval to car ahead; best-effort
+	Speed     int       `json:"speed,omitempty"`
+	Gear      int       `json:"gear,omitempty"`
+	Throttle  int       `json:"throttle,omitempty"` // 0-100
+	Brake     int       `json:"brake,omitempty"`    // 0-100
+	DRS       bool      `json:"drs,omitempty"`
 }
 
 type RaceControlMessage struct {
@@ -44,12 +53,20 @@ type RadioMessage struct {
 	Clip      string `json:"clip"`      // full https URL to the .mp3 on livetiming.formula1.com
 }
 
+// Mode is the small closed set of values Snapshot.Mode carries.
+type Mode string
+
+const (
+	ModeLive   Mode = "live"
+	ModeReplay Mode = "replay"
+)
+
 type Snapshot struct {
 	SessionKey string               `json:"session"`
-	Mode       string               `json:"mode"`  // "live" | "replay"
+	Mode       Mode                 `json:"mode"`
 	Label      string               `json:"label"` // "Synthetic · Demo"
 	Track      []Point              `json:"track,omitempty"`
-	Cars       map[int]CarState     `json:"cars"`
+	Cars       map[int]CarState     `json:"cars"` // marshals with string keys (JSON has no int keys); see web/src/state/race.ts's mirroring Record<number, Car>
 	Messages   []RaceControlMessage `json:"messages,omitempty"`
 	Radio      []RadioMessage       `json:"radio,omitempty"`
 	LapTrace   map[int][]int        `json:"lapTrace,omitempty"`
@@ -58,6 +75,10 @@ type Snapshot struct {
 }
 
 type Frame struct {
+	// SessionKey and T are part of the wire contract mirrored by ingest/live.py's
+	// build_frame() but are not read back by any current Go or TS consumer — they
+	// ride along as passenger fields for the Python mirror and future latency
+	// introspection (T = publish wall-time), not dead code to prune.
 	SessionKey string               `json:"session"`
 	Rev        int64                `json:"rev"`
 	T          int64                `json:"t"`      // publish wall-time, unix ms
@@ -66,7 +87,9 @@ type Frame struct {
 	Messages   []RaceControlMessage `json:"messages,omitempty"`
 }
 
-// NewSnapshot returns an empty snapshot ready to receive frames.
+// NewSnapshot returns an empty snapshot ready to receive frames. mode is a plain
+// string (not Mode) so callers — notably the Source interface's Mode() string —
+// don't need to change; it's converted at this one boundary.
 func NewSnapshot(session, mode, label string) *Snapshot {
-	return &Snapshot{SessionKey: session, Mode: mode, Label: label, Cars: make(map[int]CarState)}
+	return &Snapshot{SessionKey: session, Mode: Mode(mode), Label: label, Cars: make(map[int]CarState)}
 }

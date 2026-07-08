@@ -1,0 +1,30 @@
+{
+  "session": "contract-test",
+  "mode": "replay",
+  "label": "Contract Fixture",
+  "track": [{"x": 0.1, "y": 0.2}, {"x": 0.9, "y": 0.8}],
+  "cars": {
+    "1": {
+      "driverNum": 1, "code": "VER", "team": "Red Bull", "pos": 1,
+      "p": {"x": 0.5, "y": 0.5}, "status": "OnTrack",
+      "tyre": "SOFT", "tyreAge": 5, "lastLapMs": 81234, "bestLapMs": 80950,
+      "s1Ms": 26100, "s2Ms": 28200, "s3Ms": 26900,
+      "speed": 312, "gear": 7, "throttle": 100, "brake": 0, "drs": true
+    },
+    "44": {
+      "driverNum": 44, "code": "HAM", "team": "Mercedes", "pos": 2,
+      "p": {"x": 0.4, "y": 0.6}, "status": "Pit"
+    }
+  },
+  "messages": [
+    {"rev": 1, "t": 1000, "category": "Flag", "message": "GREEN FLAG"}
+  ],
+  "radio": [
+    {"timeMs": 3300500, "driverNum": 1, "clip": "https://livetiming.formula1.com/clip.mp3"}
+  ],
+  "lapTrace": {
+    "1": [0, 100, 200, 300]
+  },
+  "timeMs": 3300000,
+  "rev": 42
+}

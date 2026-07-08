@@ -51,8 +51,10 @@ On first run, FastF1 downloads ~50 MB of session data and caches it under `cache
 
 The output is JSONL (one JSON object per line):
 
-- **Line 1 (header):** `{"track":[{"x":float,"y":float},...], "label":"...", "maxRev":int}`
+- **Line 1 (header):** `{"track":[{"x":float,"y":float},...], "label":"...", "maxRev":int, "radio":[{"timeMs":int,"driverNum":int,"clip":"https://..."}], "lapTrace":{"<driverNum>":[ms,...]}}`
 - **Lines 2–N (frames):** `{"timeMs":int, "frame":{"rev":int,"timeMs":int,"cars":[...]}}`
+
+`radio` (Phase 3) is a list of team-radio clip references falling inside the baked window; `lapTrace` (Phase 4) maps each driver's number to a cumulative-ms pace curve over their fastest accurate lap, used by the cross-year ghost overlay.
 
 Each car: `{"driverNum":int,"code":"VER","team":"Red Bull","pos":int,"p":{"x":float,"y":float},"status":"OnTrack"}`
 
@@ -117,8 +119,11 @@ The replay runs at real-time pace using the recorded timestamps.
 
 ### Running in true-live mode during a session
 
+`--live` alone only checks that a real connection *would* be attempted (see
+below); the actual SignalR connection needs the double opt-in `LIVE=1`:
+
 ```bash
-.venv/Scripts/python ingest/live.py --live --session live --label "British GP 2026"
+LIVE=1 .venv/Scripts/python ingest/live.py --live --session live --label "British GP 2026"
 ```
 
 Set `CAPTURE_OUT=myfile.txt` to also save the stream to a file while publishing.
@@ -127,7 +132,7 @@ Set `CAPTURE_OUT=myfile.txt` to also save the stream to a file while publishing.
 
 ```bash
 # Should print True with no errors
-NO_LIVE=1 .venv/Scripts/python -c "import sys; sys.path.insert(0,'ingest'); import live_signalr; print(callable(live_signalr.run_live))"
+.venv/Scripts/python -c "import sys; sys.path.insert(0,'ingest'); import live_signalr; print(callable(live_signalr.run_live))"
 ```
 
 ### Normalization bounds

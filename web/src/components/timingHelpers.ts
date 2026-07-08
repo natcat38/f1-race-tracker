@@ -10,7 +10,7 @@ export function fmtLap(ms: number | undefined): string {
 }
 
 // fmtSec renders a sector time (ms) as ss.SSS (no minutes — sectors are < 60s).
-function fmtSec(ms: number | undefined): string {
+export function fmtSec(ms: number | undefined): string {
   if (!ms || ms <= 0) return '—';
   return (ms / 1000).toFixed(3);
 }
@@ -94,5 +94,3 @@ export function sectorColour(
   if (v === personalBest) return GREEN;
   return undefined;
 }
-
-export { fmtSec };

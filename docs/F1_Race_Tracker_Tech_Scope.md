@@ -247,7 +247,7 @@ Spin the hub against in-memory Redis (`miniredis`) + a fake writer. Assert: a la
 **File:** `cmd/loadtest/*`, `BENCHMARKS.md`, `README.md` · **Effort:** 1.5 d
 
 ### Task 14.1 — Go WS load harness + numbers
-Open thousands of concurrent connections against a multi-gateway setup while watching `/metrics`; record sustained connections + p50/p99 + setup in `BENCHMARKS.md`. This proves the horizontal-scale claim.
+Open thousands of concurrent connections against a single gateway while watching `/metrics`; record sustained connections + p50/p99 + setup in `BENCHMARKS.md`. This measures the single-gateway ceiling — see ADR-0001 for why multi-gateway is deferred rather than benchmarked here.
 
 ### Task 14.2 — README + demo recording
 Architecture diagram (§2.1), GIF of the map + the two-year comparison, `docker compose up` instructions, the benchmark headline.

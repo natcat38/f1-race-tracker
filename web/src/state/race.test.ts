@@ -1,5 +1,5 @@
 import { describe, it, expect, test } from 'vitest';
-import { emptyState, applyMessage, type RaceState } from './race';
+import { emptyState, applyMessage, parseMsg, type RaceState } from './race';
 
 const snapMsg = {
   type: 'snapshot' as const,
@@ -85,6 +85,26 @@ test('snapshot carries lapTrace; emptyState defaults it', () => {
   expect(s.lapTrace[1]).toEqual([0, 100, 200]);
 });
 
+test('snapshotSeq increments on every snapshot but not on frames', () => {
+  // Lets consumers (useComms) tell a reconnect/fresh-connect snapshot apart from
+  // steady-state frames, instead of relying on "have I ever seen a rev yet".
+  const s0 = emptyState();
+  expect(s0.snapshotSeq).toBe(0);
+  const s1 = applyMessage(s0, {
+    type: 'snapshot',
+    data: { session: 'replay', mode: 'replay', label: 'M', cars: {}, timeMs: 0, rev: 5 },
+  });
+  expect(s1.snapshotSeq).toBe(1);
+  const s2 = applyMessage(s1, { type: 'frame', data: { rev: 6, timeMs: 100, cars: [] } });
+  expect(s2.snapshotSeq).toBe(1); // frame does not bump it
+  // A second snapshot (e.g. a reconnect) bumps it again, even if rev goes backwards.
+  const s3 = applyMessage(s2, {
+    type: 'snapshot',
+    data: { session: 'replay', mode: 'replay', label: 'M', cars: {}, timeMs: 0, rev: 1 },
+  });
+  expect(s3.snapshotSeq).toBe(2);
+});
+
 test('a frame does not clobber lapTrace', () => {
   const s0 = applyMessage(emptyState(), {
     type: 'snapshot',
@@ -95,4 +115,112 @@ test('a frame does not clobber lapTrace', () => {
   });
   const s1 = applyMessage(s0, { type: 'frame', data: { rev: 2, timeMs: 100, cars: [] } });
   expect(s1.lapTrace[1]).toEqual([0, 100, 200]);
+});
+
+describe('parseMsg', () => {
+  it('accepts a well-formed snapshot message', () => {
+    const raw = { type: 'snapshot', data: { session: 'x', mode: 'replay', label: 'L', cars: {}, timeMs: 0, rev: 1 } };
+    expect(parseMsg(raw)).toEqual(raw);
+  });
+
+  it('accepts a well-formed frame message', () => {
+    const raw = { type: 'frame', data: { rev: 2, timeMs: 100, cars: [] } };
+    expect(parseMsg(raw)).toEqual(raw);
+  });
+
+  it('rejects null and non-objects', () => {
+    expect(parseMsg(null)).toBeNull();
+    expect(parseMsg('snapshot')).toBeNull();
+    expect(parseMsg(42)).toBeNull();
+  });
+
+  it('rejects a missing or unknown type', () => {
+    expect(parseMsg({ data: {} })).toBeNull();
+    expect(parseMsg({ type: 'error', data: {} })).toBeNull();
+  });
+
+  it('rejects a snapshot missing required fields', () => {
+    expect(parseMsg({ type: 'snapshot', data: { session: 'x', mode: 'replay', label: 'L', timeMs: 0, rev: 1 } })).toBeNull(); // no cars
+    expect(parseMsg({ type: 'snapshot' })).toBeNull(); // no data at all
+  });
+
+  it('rejects a frame with the wrong field types', () => {
+    expect(parseMsg({ type: 'frame', data: { rev: '2', timeMs: 100, cars: [] } })).toBeNull(); // rev as string
+    expect(parseMsg({ type: 'frame', data: { rev: 2 } })).toBeNull(); // no timeMs
+  });
+
+  it('rejects a frame whose cars/messages are present but not arrays', () => {
+    expect(parseMsg({ type: 'frame', data: { rev: 2, timeMs: 100, cars: {} } })).toBeNull();
+    expect(parseMsg({ type: 'frame', data: { rev: 2, timeMs: 100, messages: 'x' } })).toBeNull();
+  });
+
+  it('rejects a snapshot whose array fields are the wrong type', () => {
+    const base = { session: 'x', mode: 'replay', label: 'L', cars: {}, timeMs: 0, rev: 1 };
+    expect(parseMsg({ type: 'snapshot', data: { ...base, messages: 'x' } })).toBeNull();
+    expect(parseMsg({ type: 'snapshot', data: { ...base, radio: {} } })).toBeNull();
+    expect(parseMsg({ type: 'snapshot', data: { ...base, track: 'nope' } })).toBeNull();
+    expect(parseMsg({ type: 'snapshot', data: { ...base, cars: [] } })).toBeNull(); // array cars is wrong shape for a snapshot
+  });
+});
+
+describe('race-control messages', () => {
+  it('emptyState starts with no messages', () => {
+    expect(emptyState().messages).toEqual([]);
+  });
+
+  it('a snapshot carries its messages', () => {
+    const s = applyMessage(emptyState(), {
+      type: 'snapshot',
+      data: {
+        session: 'replay', mode: 'replay', label: 'M', cars: {}, timeMs: 0, rev: 1,
+        messages: [{ rev: 1, t: 0, category: 'Flag', message: 'GREEN FLAG' }],
+      },
+    });
+    expect(s.messages).toHaveLength(1);
+    expect(s.messages[0].message).toBe('GREEN FLAG');
+  });
+
+  it('a frame appends messages without clobbering existing ones', () => {
+    const s0 = applyMessage(emptyState(), {
+      type: 'snapshot',
+      data: {
+        session: 'replay', mode: 'replay', label: 'M', cars: {}, timeMs: 0, rev: 1,
+        messages: [{ rev: 1, t: 0, category: 'Flag', message: 'GREEN FLAG' }],
+      },
+    });
+    const s1 = applyMessage(s0, {
+      type: 'frame',
+      data: { rev: 2, timeMs: 100, cars: [], messages: [{ rev: 2, t: 100, category: 'Flag', message: 'YELLOW FLAG', driver: 44 }] },
+    });
+    expect(s1.messages).toHaveLength(2);
+    expect(s1.messages[1]).toEqual({ rev: 2, t: 100, category: 'Flag', message: 'YELLOW FLAG', driver: 44 });
+  });
+
+  it('a frame with no messages leaves the list unchanged', () => {
+    const s0 = applyMessage(emptyState(), {
+      type: 'snapshot',
+      data: {
+        session: 'replay', mode: 'replay', label: 'M', cars: {}, timeMs: 0, rev: 1,
+        messages: [{ rev: 1, t: 0, category: 'Flag', message: 'GREEN FLAG' }],
+      },
+    });
+    const s1 = applyMessage(s0, { type: 'frame', data: { rev: 2, timeMs: 100, cars: [] } });
+    expect(s1.messages).toEqual(s0.messages);
+  });
+
+  it('caps the rolling message buffer at 30, mirroring internal/model/apply.go', () => {
+    let s = applyMessage(emptyState(), {
+      type: 'snapshot',
+      data: { session: 'replay', mode: 'replay', label: 'M', cars: {}, timeMs: 0, rev: 1 },
+    });
+    for (let i = 0; i < 35; i++) {
+      s = applyMessage(s, {
+        type: 'frame',
+        data: { rev: 2 + i, timeMs: i, cars: [], messages: [{ rev: 2 + i, t: i, category: 'Flag', message: `msg-${i}` }] },
+      });
+    }
+    expect(s.messages).toHaveLength(30);
+    expect(s.messages[0].message).toBe('msg-5'); // oldest 5 dropped
+    expect(s.messages[29].message).toBe('msg-34');
+  });
 });

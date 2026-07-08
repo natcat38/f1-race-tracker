@@ -4,7 +4,11 @@ True-live FastF1 SignalR ingest mode (exploratory, session-only).
 WARNING: This module only produces real data during a live F1 session.
 Outside a session the SignalR endpoint returns no position/timing stream.
 The module is guarded: if CAPTURE_FILE env var points to a saved capture
-it replays that file; otherwise it logs and exits 0 cleanly.
+it replays that file (no network). Otherwise, reaching a real SignalR
+connection needs a DOUBLE opt-in — the --live CLI flag (checked in live.py)
+AND LIVE=1 (checked here) — so a bare `--live` invocation from an automated
+harness or a copy-pasted command can never silently dial out; absent LIVE=1
+it logs and exits 0 cleanly (structural-check mode).
 
 ---------------------------------------------------------------------------
 MESSAGE SHAPE RESEARCH (source: fastf1._api + fastf1.livetiming source,
@@ -99,6 +103,8 @@ Invoked from live.py when --live is passed:
 
 Environment variables:
   CAPTURE_FILE   path to a saved SignalR capture .txt file (for offline replay)
+  LIVE           set to '1' to allow a real SignalR connection attempt (double
+                 opt-in alongside --live); unset/other = structural-check mode
   SESSION_KEY    Redis session key (set by live.py, not read here)
 
 Record a capture during a real session:
@@ -106,6 +112,9 @@ Record a capture during a real session:
 
 Then replay offline:
   CAPTURE_FILE=capture.txt python ingest/live.py --live --session test
+
+Connect to a real live session:
+  LIVE=1 python ingest/live.py --live --session test
 """
 
 import json
@@ -115,7 +124,6 @@ import sys
 import time
 import zlib
 import base64
-from datetime import datetime, timezone
 
 # FastF1 imports — safe at module level because live.py imports us lazily
 # (only when --live is passed). These do NOT trigger data downloads.
@@ -412,8 +420,6 @@ def _run_live_signalr(r, session: str, label: str) -> None:
         _log.error("Install requirements-live.txt: pip install -r ingest/requirements-live.txt")
         sys.exit(1)
 
-    import threading
-
     capture_out = os.environ.get('CAPTURE_OUT', f'capture-{session}.txt')
     _log.info(f"Connecting to F1 live-timing SignalR stream; saving capture to {capture_out}")
     _log.info("NOTE: This only streams data during a live F1 session.")
@@ -467,16 +473,11 @@ def _run_live_signalr(r, session: str, label: str) -> None:
         elif topic == 'Position.z':
             try:
                 samples = _decode_position_payload(payload)
-            except Exception:
+            except Exception as exc:
+                _log.warning(f"Position.z decode error: {exc}")
                 return
             now = time.monotonic()
             for sample in samples:
-                ts_str = sample.get('Timestamp', '')
-                try:
-                    time_ms = _parse_timestamp_ms(ts_str)
-                except Exception:
-                    time_ms = int(time.time() * 1000)
-
                 for num_str, coords in sample.get('Entries', {}).items():
                     if not isinstance(coords, dict):
                         continue
@@ -561,8 +562,8 @@ def _dispatch_message(msg, callback) -> None:
             for topic, payload in msg.result.items():
                 try:
                     callback(topic, payload)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _log.error(f"handler failed for topic={topic}: {exc}")
             return
     except ImportError:
         pass
@@ -574,8 +575,8 @@ def _dispatch_message(msg, callback) -> None:
             try:
                 if isinstance(item, (list, tuple)) and len(item) >= 2:
                     callback(str(item[0]), item[1])
-            except Exception:
-                pass
+            except Exception as exc:
+                _log.error(f"handler failed for item={item!r}: {exc}")
 
 
 # ---------------------------------------------------------------------------
@@ -643,20 +644,6 @@ def _safe_int(s: str) -> int:
         return 0
 
 
-def _parse_timestamp_ms(ts: str) -> int:
-    """Parse ISO 8601 UTC timestamp to milliseconds since epoch."""
-    # '2024-09-01T13:01:00.123Z' -> int ms
-    ts = ts.rstrip('Z')
-    # Right-pad fractional seconds to 6 digits
-    if '.' in ts:
-        base, frac = ts.split('.', 1)
-        frac = (frac + '000000')[:6]
-        ts = f"{base}.{frac}"
-    dt = datetime.strptime(ts, '%Y-%m-%dT%H:%M:%S.%f')
-    dt = dt.replace(tzinfo=timezone.utc)
-    return int(dt.timestamp() * 1000)
-
-
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
@@ -672,19 +659,23 @@ def run_live(r, session: str, label: str | None) -> None:
         label:   human-readable label for the snapshot (e.g. 'British GP 2026')
 
     Behaviour:
-        1. If env var CAPTURE_FILE is set and the file exists → replay offline.
-        2. Else if env var LIVE=1 is set (or no CAPTURE_FILE set but we're in
-           live mode) → attempt SignalR connection.
-        3. If neither condition holds → log and return 0 (structural-check mode).
+        1. If env var CAPTURE_FILE is set and the file exists → replay offline
+           (no network; always allowed).
+        2. Else, only if LIVE=1 is set, attempt a real SignalR connection.
+           Reaching this function already requires the explicit --live CLI
+           flag; LIVE=1 is a second, deliberate opt-in so a bare --live
+           invocation can never silently dial out.
+        3. Otherwise → log and return (structural-check mode).
 
     Environment:
-        CAPTURE_FILE  path to a saved capture file (for offline replay)
+        CAPTURE_FILE  path to a saved capture file (for offline replay; no network)
         CAPTURE_OUT   where to save a new capture during live mode (default:
                       capture-<session>.txt)
-        NO_LIVE       set to '1' to skip live connection attempt (useful for tests)
+        LIVE          set to '1' to allow the real SignalR connection attempt
+                      (double opt-in alongside --live; unset/other = skip)
     """
     capture_file = os.environ.get('CAPTURE_FILE', '')
-    no_live = os.environ.get('NO_LIVE', '0') == '1'
+    live_enabled = os.environ.get('LIVE', '0') == '1'
 
     if capture_file and os.path.exists(capture_file):
         _log.info(f"CAPTURE_FILE={capture_file} → offline replay mode")
@@ -694,14 +685,13 @@ def run_live(r, session: str, label: str | None) -> None:
     if capture_file and not os.path.exists(capture_file):
         _log.warning(f"CAPTURE_FILE={capture_file!r} does not exist — skipping replay")
 
-    if no_live:
-        _log.info("NO_LIVE=1 set — skipping live connection (structural check mode)")
+    if not live_enabled:
+        _log.info("LIVE=1 not set — skipping live connection (structural check mode)")
         _log.info("run_live is callable and would connect during a real session.")
         return
 
     # Attempt live connection
-    _log.info("No capture file found → attempting live SignalR connection")
+    _log.info("LIVE=1 set → attempting live SignalR connection")
     _log.info("NOTE: This only works during a live F1 session.")
     _log.info("Outside a session: the stream will time out after ~120 s with no data.")
-    _log.info("To skip: set NO_LIVE=1")
     _run_live_signalr(r, session, label)

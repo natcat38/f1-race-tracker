@@ -3,6 +3,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	"github.com/natcat38/f1-race-tracker/internal/bus"
@@ -38,8 +39,15 @@ func (wr *Writer) Run(ctx context.Context, session string) error {
 	// Continue Rev above any snapshot a previous run (or a different source on this
 	// session key) left in Redis, so a restart never emits a Rev the gateway/clients
 	// already passed — which Apply would silently drop, freezing the board.
+	// GetSnapshot returns (nil,nil) when no snapshot exists yet; any non-nil err is a
+	// real Redis failure. Fail fast rather than guessing base=0, which would risk
+	// re-emitting a Rev clients already passed and freezing the board.
+	existing, err := wr.bus.GetSnapshot(ctx, session)
+	if err != nil {
+		return fmt.Errorf("writer: read existing snapshot for %q: %w", session, err)
+	}
 	var base int64
-	if existing, err := wr.bus.GetSnapshot(ctx, session); err == nil && existing != nil {
+	if existing != nil {
 		base = existing.Rev
 	}
 	snap := model.NewSnapshot(session, wr.src.Mode(), wr.src.Label())
