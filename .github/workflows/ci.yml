@@ -72,7 +72,10 @@ jobs:
         with:
           go-version-file: go.mod
       - name: govulncheck (Go)
-        run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.3 ./...
+        # Intentionally @latest, not pinned: `go run` compiles govulncheck with the repo's Go
+        # toolchain (go.mod = 1.26), and older pinned releases fail to build under it
+        # ("invalid array length ..."). Tracking latest keeps it toolchain-compatible.
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
