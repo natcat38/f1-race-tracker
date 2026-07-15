@@ -296,3 +296,31 @@
 .navlink:hover {
   text-decoration: underline;
 }
+
+/* Motion — opt-in only: nothing here plays unless the user hasn't asked to
+   reduce motion. One orchestrated moment (panel mount stagger) plus a quiet
+   chip transition; nothing else animates. */
+
+@media (prefers-reduced-motion: no-preference) {
+  .panel {
+    animation: panel-in 240ms ease-out both;
+  }
+
+  .board-top .panel:nth-child(2),
+  .board-bottom .panel:nth-child(2) {
+    animation-delay: 60ms;
+  }
+
+  .board-bottom .panel:nth-child(3) {
+    animation-delay: 120ms;
+  }
+
+  @keyframes panel-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .chip {
+    transition: background 200ms, color 200ms;
+  }
+}
