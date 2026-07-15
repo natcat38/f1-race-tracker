@@ -4,43 +4,27 @@ import type { RaceState } from '../state/race';
 interface Props {
   status: ConnStatus;
   state: RaceState;
+  staleSec?: number;
 }
 
-const badgeStyle: React.CSSProperties = {
-  display: 'inline-block',
-  padding: '2px 10px',
-  borderRadius: 6,
-  fontFamily: 'monospace',
-  fontSize: 13,
-  fontWeight: 600,
-  letterSpacing: '0.04em',
-};
+const STALE_THRESHOLD_SEC = 4;
 
-export function StatusBadge({ status, state }: Props) {
+export function StatusBadge({ status, state, staleSec }: Props) {
   if (status === 'reconnecting') {
-    return (
-      <span style={{ ...badgeStyle, background: '#7c3f00', color: '#ffb347' }}>
-        ↺ Reconnecting…
-      </span>
-    );
+    return <span className="chip chip-reconnect">↺ Reconnecting…</span>;
   }
   if (state.rev === 0) {
+    return <span className="chip chip-warm">⏳ Warming up the timing feed…</span>;
+  }
+  if ((staleSec ?? 0) >= STALE_THRESHOLD_SEC) {
     return (
-      <span style={{ ...badgeStyle, background: '#1a1a2e', color: '#888' }}>
-        ⏳ Warming up the timing feed…
+      <span className="chip chip-stall">
+        ⚠ Waiting for timing data — last frame {staleSec}s ago
       </span>
     );
   }
   if (state.mode === 'live') {
-    return (
-      <span style={{ ...badgeStyle, background: '#1a3a1a', color: '#52E252' }}>
-        ● LIVE
-      </span>
-    );
+    return <span className="chip chip-live">● LIVE</span>;
   }
-  return (
-    <span style={{ ...badgeStyle, background: '#1a2a3a', color: '#64C4FF' }}>
-      ▶ REPLAY
-    </span>
-  );
+  return <span className="chip chip-replay">▶ REPLAY</span>;
 }
