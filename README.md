@@ -2,18 +2,20 @@
 
 ![Live lane — Silverstone 2024 on the track map](docs/assets/live-lane.png)
 
-A real-time F1 race tracker built as a polyglot stack — Python ingests position data, Redis is the seam, a Go gateway fans it out over WebSocket, and a React SPA renders an interactive track map updating at 10 Hz. The design is track-map-first: car positions on circuit are the primary view.
+An F1 race tracker that puts you on the pit wall — watch the cars on circuit, read the gaps, tyres, sector times and team radio like a race engineer, and dig into where a car is losing time. Built as a polyglot stack: Python ingests position data, Redis is the seam, a Go gateway fans it out over WebSocket, and a React SPA renders an interactive track map updating at 10 Hz. The design is track-map-first: car positions on circuit are the primary view.
 
 **One gateway sustained 1,000 concurrent WebSocket viewers at 10 Hz** — p99 fan-out latency of 48 ms, zero dropped clients, on a single laptop. See [BENCHMARKS.md](BENCHMARKS.md).
 
 ### What this demonstrates
 
-- **A polyglot seam done right** — Python and Go publish byte-identical JSON to the same Redis keys; the gateway consumes either with zero code changes.
-- **Live WebSocket fan-out at scale** — one in-memory hub pushes 10 Hz frames to a thousand viewers, with backpressure that sheds milliseconds rather than dropping clients.
+The product is judged first by whether it helps you understand how the car is performing; the engineering underneath — real-time, byte-identical across two languages — is what makes that possible at scale.
+
 - **Track-map-first design** — positions on circuit are the primary view, not an afterthought table.
 - **Pit-wall timing tower** — beside the map the board shows a live timing tower with gaps/intervals, last lap, tyres, and sector times for every car; click any driver to open a per-car telemetry panel (speed, gear, throttle, brake, DRS) sourced from the same 10 Hz frame.
 - **Team-radio comms layer** — a toggleable layer that auto-plays driver↔engineer radio in sync with the replay clock, with a now-playing banner and a short replayable history. The audio streams straight from F1's public URLs at play time — nothing is committed or downloaded — so the comms audio (only) needs network access; positions and timing stay fully offline from the committed clips. See [docs/adr/0003-team-radio-streamed-not-committed.md](docs/adr/0003-team-radio-streamed-not-committed.md).
 - **Race control feed** — a rolling log of session messages (flags, safety car, investigations) alongside the timing tower, driven by the same 10 Hz frame stream.
+- **A polyglot seam done right** — Python and Go publish byte-identical JSON to the same Redis keys; the gateway consumes either with zero code changes.
+- **Live WebSocket fan-out at scale** — one in-memory hub pushes 10 Hz frames to a thousand viewers, with backpressure that sheds milliseconds rather than dropping clients.
 
 ## Run it
 
