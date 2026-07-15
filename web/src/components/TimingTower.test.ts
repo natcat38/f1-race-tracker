@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fmtLap, fmtGap, gapLabel, intLabel, bestSectors, orderCars, updatePersonalBests, sectorColour } from './timingHelpers';
+import { fmtLap, fmtGap, fmtClock, gapLabel, intLabel, bestSectors, orderCars, updatePersonalBests, sectorColour } from './timingHelpers';
 import type { Car } from '../state/race';
 
 const car = (over: Partial<Car>): Car => ({
@@ -24,32 +24,51 @@ describe('fmtGap', () => {
 
 describe('gapLabel (pit-wall)', () => {
   it('reads LEADER for the leader', () => {
-    expect(gapLabel(0, 0, true, false)).toBe('LEADER');
+    expect(gapLabel(0, 0, true, false, 90000)).toBe('LEADER');
   });
   it('shows lap deficit when lapped, pluralising', () => {
-    expect(gapLabel(92000, 1, false, false)).toBe('+1 LAP');
-    expect(gapLabel(184000, 2, false, false)).toBe('+2 LAPS');
+    expect(gapLabel(92000, 1, false, false, 90000)).toBe('+1 LAP');
+    expect(gapLabel(184000, 2, false, false, 90000)).toBe('+2 LAPS');
   });
   it('shows seconds for lead-lap cars', () => {
-    expect(gapLabel(1234, 0, false, false)).toBe('+1.234');
+    expect(gapLabel(1234, 0, false, false, 90000)).toBe('+1.234');
   });
   it('seconds mode forces seconds even when lapped', () => {
-    expect(gapLabel(92000, 1, false, true)).toBe('+92.000');
+    expect(gapLabel(92000, 1, false, true, 90000)).toBe('+92.000');
+  });
+  it('suppresses the gap before the first completed lap', () => {
+    expect(gapLabel(1234, 0, false, false, undefined)).toBe('—');
   });
 });
 
 describe('intLabel (pit-wall)', () => {
   it('dash for the leader', () => {
-    expect(intLabel(0, undefined, 0, true, false)).toBe('—');
+    expect(intLabel(0, undefined, 0, true, false, undefined, undefined)).toBe('—');
   });
   it('derives lap deficit from the gapLaps difference', () => {
-    expect(intLabel(2, 1, 5000, false, false)).toBe('+1 LAP'); // this car 2 down, car ahead 1 down
+    expect(intLabel(2, 1, 5000, false, false, 90000, 90000)).toBe('+1 LAP'); // this car 2 down, car ahead 1 down
   });
   it('shows seconds when on the same lap as the car ahead', () => {
-    expect(intLabel(1, 1, 800, false, false)).toBe('+0.800');
+    expect(intLabel(1, 1, 800, false, false, 90000, 90000)).toBe('+0.800');
   });
   it('seconds mode forces seconds', () => {
-    expect(intLabel(2, 1, 5000, false, true)).toBe('+5.000');
+    expect(intLabel(2, 1, 5000, false, true, 90000, 90000)).toBe('+5.000');
+  });
+  it('suppresses the interval until this car has completed a lap', () => {
+    expect(intLabel(1, 1, 800, false, false, undefined, 90000)).toBe('—');
+  });
+  it('suppresses the interval until the car ahead has completed a lap', () => {
+    expect(intLabel(1, 1, 800, false, false, 90000, undefined)).toBe('—');
+  });
+});
+
+describe('fmtClock', () => {
+  it('formats sub-hour as M:SS', () => {
+    expect(fmtClock(65000)).toBe('1:05');
+    expect(fmtClock(0)).toBe('0:00');
+  });
+  it('formats over an hour as H:MM:SS', () => {
+    expect(fmtClock(4325000)).toBe('1:12:05');
   });
 });
 

@@ -21,25 +21,41 @@ export function fmtGap(ms: number | undefined): string {
   return `+${(ms / 1000).toFixed(3)}`;
 }
 
+// fmtClock renders the session clock (ms) as H:MM:SS above an hour, else M:SS.
+export function fmtClock(ms: number): string {
+  const t = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+  return h > 0
+    ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+    : `${m}:${String(s).padStart(2, '0')}`;
+}
+
 const laps = (n: number) => `+${n} LAP${n > 1 ? 'S' : ''}`;
 
 // gapLabel renders the pit-wall gap to leader: LEADER for P1; "+N LAP(S)" when
-// lapped (unless secondsMode forces raw time); else the time gap.
+// lapped (unless secondsMode forces raw time); else the time gap. Suppressed
+// (em-dash) before the car has completed its first lap — the gap is meaningless
+// (and can be wildly wrong) until then.
 export function gapLabel(
   gapMs: number | undefined, gapLaps: number | undefined, isLeader: boolean, secondsMode: boolean,
+  lastLapMs: number | undefined,
 ): string {
   if (isLeader) return 'LEADER';
+  if (!lastLapMs) return '—';
   if (!secondsMode && gapLaps && gapLaps >= 1) return laps(gapLaps);
   return fmtGap(gapMs);
 }
 
 // intLabel renders the pit-wall interval to the car ahead. The lap deficit is
-// derived from the gapLaps difference (this car minus the car ahead).
+// derived from the gapLaps difference (this car minus the car ahead). Suppressed
+// (em-dash) until both this car and the car ahead have completed a lap.
 export function intLabel(
   gapLaps: number | undefined, aheadGapLaps: number | undefined,
   intMs: number | undefined, isLeader: boolean, secondsMode: boolean,
+  lastLapMs: number | undefined, aheadLastLapMs: number | undefined,
 ): string {
   if (isLeader) return '—';
+  if (!lastLapMs || !aheadLastLapMs) return '—';
   const def = (gapLaps ?? 0) - (aheadGapLaps ?? 0);
   if (!secondsMode && def >= 1) return laps(def);
   return fmtGap(intMs);
