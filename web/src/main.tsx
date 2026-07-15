@@ -1,6 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import './index.css'
+import '@fontsource/chakra-petch/400.css'
+import '@fontsource/chakra-petch/600.css'
+import '@fontsource/chakra-petch/700.css'
+import '@fontsource-variable/martian-mono/index.css'
+import './styles/tokens.css'
+import './styles/components.css'
 import App from './App.tsx'
 import { ErrorBoundary } from './ErrorBoundary.tsx'
 
