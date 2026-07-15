@@ -50,7 +50,7 @@ export function connectRace(
       backoff = Math.min(backoff * 2, 8000); // exponential backoff, capped at 8s (Task 7 acceptance)
     };
     ws.onerror = (ev) => {
-      console.error('connectRace: socket error', ev);
+      console.error('connectRace: socket error', ev.type);
       ws?.close();
     };
   }

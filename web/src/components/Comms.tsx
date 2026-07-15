@@ -1,4 +1,3 @@
-import type { CSSProperties } from 'react';
 import type { RaceState } from '../state/race';
 import { useComms } from '../hooks/useComms';
 import { teamColour } from './teamColours';
@@ -12,18 +11,15 @@ export function Comms({ state }: { state: RaceState }) {
     return state.cars[driverNum]?.code ?? String(driverNum);
   }
   function colourFor(driverNum: number) {
-    return teamColour[state.cars[driverNum]?.team ?? ''] ?? '#bbb';
+    return teamColour[state.cars[driverNum]?.team ?? ''] ?? 'var(--slate)';
   }
 
   return (
     <div style={{ display: 'grid', gap: 8 }}>
       <button
         onClick={toggle}
-        style={{
-          border: 'none', cursor: 'pointer', padding: '6px 14px', borderRadius: 8,
-          fontFamily: 'monospace', fontSize: 13, justifySelf: 'start',
-          background: enabled ? '#3671C6' : '#1a1a1a', color: enabled ? '#fff' : '#888',
-        }}
+        className={enabled ? 'btn btn-active' : 'btn'}
+        style={{ justifySelf: 'start' }}
       >
         {enabled ? '📻 Comms ON' : '📻 Comms OFF'}
       </button>
@@ -31,13 +27,13 @@ export function Comms({ state }: { state: RaceState }) {
       {enabled && nowPlaying && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
-          background: '#1a1a1a', borderRadius: 8, fontFamily: 'monospace', fontSize: 13,
+          background: 'var(--asphalt)', borderRadius: 4, fontSize: 13,
         }}>
           <span style={{ color: colourFor(nowPlaying.driverNum), fontWeight: 700 }}>
             {codeFor(nowPlaying.driverNum)}
           </span>
-          <span style={{ color: '#888' }}>radio</span>
-          <button onClick={() => replay(nowPlaying)} style={replayBtn}>↻</button>
+          <span style={{ color: 'var(--slate)' }}>radio</span>
+          <button onClick={() => replay(nowPlaying)} className="btn" style={{ border: 'none', padding: '0 4px' }}>↻</button>
         </div>
       )}
 
@@ -46,19 +42,22 @@ export function Comms({ state }: { state: RaceState }) {
           {history.map((m, i) => (
             <div key={`${m.timeMs}-${i}`} style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              fontFamily: 'monospace', fontSize: 12, color: '#aaa',
+              fontSize: 12, color: 'var(--slate)',
             }}>
               <span style={{ color: colourFor(m.driverNum), fontWeight: 700 }}>{codeFor(m.driverNum)}</span>
-              <button onClick={() => replay(m)} style={replayBtn}>▶</button>
+              <button onClick={() => replay(m)} className="btn" style={{ border: 'none', padding: '0 4px' }}>▶</button>
             </div>
           ))}
+        </div>
+      )}
+
+      {!nowPlaying && history.length === 0 && (
+        <div className="empty">
+          {enabled
+            ? 'No radio yet — clips play as the replay reaches them.'
+            : 'Radio clips play automatically when comms is on.'}
         </div>
       )}
     </div>
   );
 }
-
-const replayBtn: CSSProperties = {
-  border: 'none', cursor: 'pointer', background: 'transparent', color: '#3671C6',
-  fontSize: 13, padding: '0 4px',
-};

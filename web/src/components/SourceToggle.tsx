@@ -35,24 +35,19 @@ export function SourceToggle({ state }: { state: RaceState }) {
 
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-      <div style={{ display: 'inline-flex', gap: 4, padding: 4, background: '#1a1a1a', borderRadius: 10 }}>
-      {SOURCES.map((s) => (
-        <button
-          key={s.key}
-          onClick={() => pick(s.key)}
-          disabled={busy}
-          style={{
-            border: 'none', cursor: busy ? 'wait' : 'pointer',
-            padding: '6px 14px', borderRadius: 8, fontFamily: 'monospace', fontSize: 13,
-            background: active === s.key ? '#3671C6' : 'transparent',
-            color: active === s.key ? '#fff' : '#888',
-          }}
-        >
-          {s.label}
-        </button>
-      ))}
+      <div style={{ display: 'inline-flex', gap: 4 }}>
+        {SOURCES.map((s) => (
+          <button
+            key={s.key}
+            onClick={() => pick(s.key)}
+            disabled={busy}
+            className={active === s.key ? 'btn btn-active' : 'btn'}
+          >
+            {s.label}
+          </button>
+        ))}
       </div>
-      {error && <span style={{ color: '#e10600', fontFamily: 'monospace', fontSize: 12 }}>{error}</span>}
+      {error && <span className="src-error">{error}</span>}
     </div>
   );
 }
