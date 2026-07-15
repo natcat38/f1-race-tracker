@@ -6,20 +6,34 @@ import type { RaceState } from '../state/race';
 // this hook can't tell first-connect from a real stall.
 export function useStale(state: RaceState): number {
   const [staleSec, setStaleSec] = useState(0);
+  const [trackedRev, setTrackedRev] = useState(state.rev);
   const lastChangeRef = useRef<number | null>(null);
 
-  // Re-anchor the baseline and (re)start the ticking interval every time rev
-  // advances. While updates keep arriving faster than the interval fires,
-  // this timer is torn down and restarted before it ever ticks — it only
-  // gets to run (and raise staleSec) once updates actually stop.
+  // Reset immediately (render-time state adjustment, not an effect) the
+  // instant rev changes, so the badge snaps back to 0 the moment data
+  // resumes rather than waiting on the 1s interval below. During steady
+  // 10Hz updates rev changes far faster than that interval ticks, so
+  // relying on the interval alone to reset would leave staleSec stuck at
+  // whatever it last reached.
+  if (trackedRev !== state.rev) {
+    setTrackedRev(state.rev);
+    if (staleSec !== 0) setStaleSec(0);
+  }
+
   useEffect(() => {
     lastChangeRef.current = Date.now();
+  }, [state.rev]);
+
+  // One persistent interval for the component's lifetime — NOT torn down and
+  // rebuilt on every rev change — so it keeps ticking even while updates are
+  // arriving rapidly, and correctly keeps counting once they stop.
+  useEffect(() => {
     const id = setInterval(() => {
       const last = lastChangeRef.current;
       if (last != null) setStaleSec(Math.floor((Date.now() - last) / 1000));
     }, 1000);
     return () => clearInterval(id);
-  }, [state.rev]);
+  }, []);
 
   return staleSec;
 }
