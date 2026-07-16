@@ -6,7 +6,7 @@ export function Standings({ state }: { state: RaceState }) {
     <ol style={{ lineHeight: 1.8, margin: 0, paddingLeft: '1.4em' }}>
       {order.map((c) => (
         <li key={c.driverNum}>
-          <b style={{ color: 'var(--chalk)' }}>{c.code}</b>{' '}
+          <b>{c.code}</b>{' '}
           <span style={{ color: 'var(--slate)' }}>— {c.team}</span>
         </li>
       ))}

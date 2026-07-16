@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { connectRace } from '../realtime/socket';
 import { emptyState, type RaceState } from '../state/race';
 import { teamColour } from './teamColours';
 import { commonDrivers, deltaSeries, indexAtTime } from '../state/ghost';
-import { fmtLap } from './timingHelpers';
+import { fmtElapsed } from './timingHelpers';
 import { SIZE } from './geometry';
 import { Panel } from './Panel';
 import { StatusRail } from './StatusRail';
@@ -18,7 +18,10 @@ export function Ghost() {
   useEffect(() => connectRace(setThisYear, undefined, THIS.session), []);
   useEffect(() => connectRace(setLastYear, undefined, LAST.session), []);
 
-  const drivers = commonDrivers(thisYear.lapTrace, lastYear.lapTrace);
+  const drivers = useMemo(
+    () => commonDrivers(thisYear.lapTrace, lastYear.lapTrace),
+    [thisYear.lapTrace, lastYear.lapTrace],
+  );
   const [selected, setSelected] = useState<number | null>(null);
   // Default to the first common driver; fall back to it if a prior selection is no
   // longer present in both years (e.g. a lane reconnects with a different driver set).
@@ -70,27 +73,34 @@ export function Ghost() {
     };
     rafRef.current = requestAnimationFrame(tick);
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [loopMs, paused]);
+    // resolvedSelected is included so a driver switch always re-anchors startRef,
+    // even in the edge case where two drivers happen to share the same loopMs.
+  }, [loopMs, paused, resolvedSelected]);
 
   function scrub(v: number) {
     tMsRef.current = v;
+    startRef.current = performance.now() - v;
     setTMs(v);
   }
 
   const track = thisYear.track;
   const ready = track.length > 0 && !!traceThis && !!traceLast;
-  const trackPath = track.length
-    ? 'M ' + track.map((p) => `${p.x * SIZE},${p.y * SIZE}`).join(' L ') + ' Z'
-    : '';
+  const trackPath = useMemo(
+    () => (track.length ? 'M ' + track.map((p) => `${p.x * SIZE},${p.y * SIZE}`).join(' L ') + ' Z' : ''),
+    [track],
+  );
 
   const idxThis = ready ? indexAtTime(traceThis!, tMs) : 0;
   const idxLast = ready ? indexAtTime(traceLast!, tMs) : 0;
-  const delta = ready ? deltaSeries(traceThis!, traceLast!) : [];
+  const delta = useMemo(
+    () => (ready ? deltaSeries(traceThis!, traceLast!) : []),
+    [ready, traceThis, traceLast],
+  );
   // delta is clamped to the shorter trace; idxThis indexes the full outline, so clamp it
   // before reading delta / placing the bar cursor (no-op when the traces are equal length).
   const cursorIdx = delta.length ? Math.min(idxThis, delta.length - 1) : 0;
   const dNow = ready ? (delta[cursorIdx] ?? 0) / 1000 : 0;
-  const maxAbs = delta.reduce((m, d) => Math.max(m, Math.abs(d)), 1);
+  const maxAbs = useMemo(() => delta.reduce((m, d) => Math.max(m, Math.abs(d)), 1), [delta]);
 
   const car =
     resolvedSelected != null ? thisYear.cars[resolvedSelected] ?? lastYear.cars[resolvedSelected] : undefined;
@@ -144,7 +154,7 @@ export function Ghost() {
 
       <Panel label="Controls">
         <div className="ghost-controls">
-          <label style={{ fontSize: 14 }}>Driver</label>
+          <label style={{ fontSize: 'var(--fs-lg)' }}>Driver</label>
           <select
             value={resolvedSelected ?? ''}
             onChange={(e) => setSelected(Number(e.target.value))}
@@ -156,7 +166,7 @@ export function Ghost() {
             })}
           </select>
           {ready && (
-            <span style={{ fontSize: 18, color: dNow > 0 ? '#ff5252' : '#4caf50' }}>
+            <span style={{ fontSize: 'var(--fs-xl)', color: dNow > 0 ? '#ff5252' : '#4caf50' }}>
               {dNow > 0 ? '+' : ''}{dNow.toFixed(2)}s
             </span>
           )}
@@ -174,7 +184,7 @@ export function Ghost() {
             aria-label="Lap position"
             style={{ flex: 1, minWidth: 160 }}
           />
-          <span className="rail-clock">{fmtLap(tMs)}</span>
+          <span className="rail-clock">{fmtElapsed(tMs)}</span>
         </div>
       </Panel>
     </div>

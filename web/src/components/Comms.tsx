@@ -51,12 +51,11 @@ export function Comms({ state }: { state: RaceState }) {
         </div>
       )}
 
-      {!nowPlaying && history.length === 0 && (
-        <div className="empty">
-          {enabled
-            ? 'No radio yet — clips play as the replay reaches them.'
-            : 'Radio clips play automatically when comms is on.'}
-        </div>
+      {!enabled && (
+        <div className="empty">Radio clips play automatically when comms is on.</div>
+      )}
+      {enabled && !nowPlaying && history.length === 0 && (
+        <div className="empty">No radio yet — clips play as the replay reaches them.</div>
       )}
     </div>
   );

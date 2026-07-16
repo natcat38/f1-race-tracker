@@ -71,6 +71,7 @@ export function TimingTower({
             <tr
               key={c.driverNum}
               className="tt-row"
+              role="button"
               tabIndex={0}
               aria-selected={isSel}
               onClick={() => onSelect(c.driverNum)}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { connectRace } from '../realtime/socket';
+import { connectRace, type ConnStatus } from '../realtime/socket';
 import { emptyState, type RaceState } from '../state/race';
 import { Map } from './Map';
 import { Standings } from './Standings';
@@ -15,13 +15,14 @@ const PAIR = [
 
 function Lane({ session, year }: { session: string; year: string }) {
   const [state, setState] = useState<RaceState>(emptyState());
-  useEffect(() => connectRace(setState, undefined, session), [session]);
+  const [status, setStatus] = useState<ConnStatus>('connecting');
+  useEffect(() => connectRace(setState, setStatus, session), [session]);
   const staleSec = useStale(state);
 
   return (
     <Panel
       label={`${year} — ${state.label || '…'}`}
-      actions={<StatusBadge status={state.rev === 0 ? 'connecting' : 'live'} state={state} staleSec={staleSec} />}
+      actions={<StatusBadge status={status} state={state} staleSec={staleSec} />}
     >
       {state.rev === 0 ? (
         <div className="track-skeleton" />

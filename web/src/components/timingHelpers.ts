@@ -9,6 +9,16 @@ export function fmtLap(ms: number | undefined): string {
   return `${m}:${String(s).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
 }
 
+// fmtElapsed renders any non-negative elapsed duration as m:ss.SSS. Unlike fmtLap,
+// 0 is a real moment in time here (e.g. Ghost's playback clock at loop start),
+// not "no value yet" — so there's no absent-value guard.
+export function fmtElapsed(ms: number): string {
+  const m = Math.floor(ms / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  const millis = ms % 1000;
+  return `${m}:${String(s).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
+}
+
 // fmtSec renders a sector time (ms) as ss.SSS (no minutes — sectors are < 60s).
 export function fmtSec(ms: number | undefined): string {
   if (!ms || ms <= 0) return '—';
