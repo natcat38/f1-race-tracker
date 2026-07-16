@@ -4,4 +4,4 @@
 # either way and unused by the demo; the one direct low-level import this repo makes
 # (signalrcore.messages.completion_message.CompletionMessage) still resolves at 0.8.8.
 redis==8.0.1
-signalrcore==0.8.8
+signalrcore==1.0.2
