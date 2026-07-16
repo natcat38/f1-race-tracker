@@ -4,27 +4,17 @@ import { emptyState, type RaceState } from './state/race';
 import { Map } from './components/Map';
 import { TimingTower } from './components/TimingTower';
 import { TelemetryPanel } from './components/TelemetryPanel';
-import { StatusBadge } from './components/StatusBadge';
 import { SourceToggle } from './components/SourceToggle';
 import { Comms } from './components/Comms';
 import { RaceControl } from './components/RaceControl';
+import { Panel } from './components/Panel';
+import { StatusRail } from './components/StatusRail';
+import { useStale } from './hooks/useStale';
 import { Compare } from './components/Compare';
 import { Ghost } from './components/Ghost';
 
-const SIZE = 600;
-
 function SkeletonMap() {
-  return (
-    <div
-      style={{
-        width: SIZE, height: SIZE, background: '#111', borderRadius: 12,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: '#444', fontFamily: 'monospace', fontSize: 14,
-      }}
-    >
-      Warming up the timing feed…
-    </div>
-  );
+  return <div className="track-skeleton">Warming up the timing feed…</div>;
 }
 
 export default function App() {
@@ -32,6 +22,7 @@ export default function App() {
   const [status, setStatus] = useState<ConnStatus>('connecting');
   const [hash, setHash] = useState<string>(typeof location !== 'undefined' ? location.hash : '');
   const [selected, setSelected] = useState<number | null>(null);
+  const staleSec = useStale(state);
 
   useEffect(() => connectRace(setState, setStatus), []);
   useEffect(() => {
@@ -46,49 +37,41 @@ export default function App() {
   const showSkeleton = state.rev === 0;
 
   return (
-    <div style={{ display: 'flex', gap: 24, padding: 24, color: '#eee', background: '#0a0a0a', minHeight: '100vh' }}>
-      <div>
-        <h2 style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '0 0 12px' }}>
-          <StatusBadge status={status} state={state} />
-          {state.label ? <span style={{ color: '#aaa', fontWeight: 400, fontSize: 16 }}>{state.label}</span> : null}
-          <SourceToggle state={state} />
-          <a href="#compare" style={{ color: '#3671C6', fontSize: 13, fontWeight: 400 }}>Compare years →</a>
-          <a href="#ghost" style={{ color: '#3671C6', fontSize: 13, fontWeight: 400 }}>Ghost overlay →</a>
-        </h2>
-        {status === 'reconnecting' && !showSkeleton && (
-          <div style={{
-            position: 'relative', display: 'inline-block',
-          }}>
-            <Map state={state} />
-            <div style={{
-              position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
-              background: '#7c3f00cc', color: '#ffb347', padding: '4px 14px',
-              borderRadius: 8, fontFamily: 'monospace', fontSize: 13, fontWeight: 600,
-            }}>
-              ↺ Reconnecting…
+    <div className="page">
+      <StatusRail active="board" state={state} status={status} staleSec={staleSec}>
+        <SourceToggle state={state} />
+      </StatusRail>
+
+      <div className="board-top">
+        <Panel label="Track">
+          {status === 'reconnecting' && !showSkeleton && (
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              <Map state={state} />
+              <div className="chip chip-reconnect" style={{
+                position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
+              }}>
+                ↺ Reconnecting…
+              </div>
             </div>
-          </div>
-        )}
-        {!showSkeleton && status !== 'reconnecting' && <Map state={state} />}
-        {showSkeleton && <SkeletonMap />}
-      </div>
-      <div style={{ display: 'grid', gap: 16, alignContent: 'start' }}>
-        <div>
-          <h3 style={{ margin: '0 0 8px' }}>Timing</h3>
+          )}
+          {!showSkeleton && status !== 'reconnecting' && <Map state={state} />}
+          {showSkeleton && <SkeletonMap />}
+        </Panel>
+        <Panel label="Timing">
           <TimingTower state={state} selected={selected} onSelect={setSelected} />
-        </div>
-        <div>
-          <h3 style={{ margin: '0 0 8px' }}>Telemetry</h3>
+        </Panel>
+      </div>
+
+      <div className="board-bottom">
+        <Panel label="Telemetry">
           <TelemetryPanel car={selected != null ? state.cars[selected] : undefined} />
-        </div>
-        <div>
-          <h3 style={{ margin: '0 0 8px' }}>Comms</h3>
+        </Panel>
+        <Panel label="Comms">
           <Comms state={state} />
-        </div>
-        <div>
-          <h3 style={{ margin: '0 0 8px' }}>Race Control</h3>
+        </Panel>
+        <Panel label="Race Control">
           <RaceControl state={state} />
-        </div>
+        </Panel>
       </div>
     </div>
   );

@@ -1,7 +1,8 @@
 # Context — F1 Race Tracker glossary
 
 The shared vocabulary of this project. Use these terms exactly; avoid the listed
-synonyms. This file is a glossary, not a spec — no implementation details.
+synonyms. This file is a glossary, not a spec — no implementation details. See
+`docs/F1_Race_Tracker_Product_Scope.md` §1 for the product's stated vision.
 
 ## Lane
 
@@ -138,7 +139,9 @@ stored; only the reference (driver, session-time, clip URL) rides the **snapshot
 
 The toggleable **layer** that surfaces **team radio** during replay: a now-playing
 banner (driver attribution) and a short replayable history, switched by the comms
-toggle. It auto-plays each clip as the replay clock reaches its moment.
+toggle. It auto-plays each clip as the replay clock reaches its moment. Shown only
+on the main board — the comparison views (**compare**, **ghost overlay**) stay
+radio-free analytics surfaces.
 
 - _Use_ "comms" / "comms layer"; never "overlay" (that is the cross-year ghost view,
   below) and not "lane" (a lane is a whole stream of state, not a UI toggle).

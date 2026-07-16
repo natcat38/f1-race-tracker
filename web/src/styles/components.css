@@ -1,0 +1,321 @@
+/* Page shell */
+
+.page {
+  padding: var(--sp-4) var(--sp-6);
+  display: grid;
+  gap: var(--sp-6);
+}
+
+/* Status rail — the signature element */
+
+.rail {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--carbon);
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  flex-wrap: wrap;
+}
+
+.rail-brand {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: var(--fs-sm);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--chalk);
+  white-space: nowrap;
+}
+
+.rail-session {
+  color: var(--slate);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.rail-clock {
+  font-family: var(--data);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-lg);
+  color: var(--chalk);
+  white-space: nowrap;
+}
+
+.rail-note {
+  color: var(--slate);
+  font-size: var(--fs-sm);
+}
+
+.rail-spacer {
+  flex: 1;
+}
+
+.rail-tabs {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.rail-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--sp-1) var(--sp-3);
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  text-decoration: none;
+  color: var(--chalk);
+  font-family: var(--display);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rail-tab-active {
+  background: var(--chalk);
+  color: var(--asphalt);
+  border-color: var(--chalk);
+}
+
+.rail-tab-sub {
+  font-family: var(--data);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--slate);
+}
+
+.rail-tab-active .rail-tab-sub {
+  color: var(--asphalt);
+}
+
+/* Status chips */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 2px 10px;
+  border-radius: 4px;
+  font-family: var(--data);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.chip-live {
+  background: rgba(225, 6, 0, 0.15);
+  color: var(--onair);
+}
+
+.chip-replay {
+  background: var(--edge);
+  color: var(--chalk);
+}
+
+.chip-warm {
+  background: var(--edge);
+  color: var(--slate);
+}
+
+.chip-stall,
+.chip-reconnect {
+  background: rgba(255, 176, 0, 0.15);
+  color: var(--amber);
+}
+
+/* Panel */
+
+.panel {
+  background: var(--carbon);
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.panel-plate {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--edge);
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--slate);
+}
+
+.panel-body {
+  padding: var(--sp-3);
+}
+
+/* Buttons */
+
+.btn {
+  border: 1px solid var(--edge);
+  background: transparent;
+  color: var(--chalk);
+  cursor: pointer;
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: 4px;
+  font-family: var(--data);
+  font-size: var(--fs-md);
+}
+
+.btn:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.btn-active {
+  background: var(--chalk);
+  color: var(--asphalt);
+  border-color: var(--chalk);
+}
+
+.src-error {
+  color: var(--onair);
+  font-family: var(--data);
+  font-size: var(--fs-sm);
+}
+
+/* SVG chrome */
+
+.track-svg {
+  width: min(600px, 100%);
+  height: auto;
+  display: block;
+  background: var(--carbon);
+}
+
+.track-skeleton {
+  width: min(600px, 100%);
+  aspect-ratio: 1 / 1;
+  background: var(--carbon);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--slate);
+  font-family: var(--data);
+  font-size: var(--fs-lg);
+  text-align: center;
+  padding: var(--sp-3);
+}
+
+/* Timing tower */
+
+.tt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.tt-table th {
+  color: var(--slate);
+  text-align: left;
+  padding: 2px var(--sp-2);
+  font-weight: 400;
+}
+
+.tt-table td {
+  padding: 2px var(--sp-2);
+}
+
+.tt-row {
+  cursor: pointer;
+}
+
+.tt-row:hover {
+  background: rgba(233, 237, 241, 0.04);
+}
+
+.tt-row[aria-selected="true"] {
+  background: var(--edge);
+}
+
+/* Layout grids */
+
+.board-top {
+  display: grid;
+  grid-template-columns: minmax(0, 600px) 1fr;
+  gap: var(--sp-6);
+}
+
+.board-bottom {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(240px, 1fr));
+  gap: var(--sp-6);
+}
+
+@media (max-width: 1100px) {
+  .board-top,
+  .board-bottom {
+    grid-template-columns: 1fr;
+  }
+}
+
+.compare-lanes {
+  display: flex;
+  gap: var(--sp-6);
+  flex-wrap: wrap;
+}
+
+.ghost-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+
+/* Shared text utilities */
+
+.empty {
+  color: var(--slate);
+  font-size: var(--fs-sm);
+}
+
+.navlink {
+  color: var(--chalk);
+  text-decoration: none;
+  font-size: var(--fs-lg);
+}
+
+.navlink:hover {
+  text-decoration: underline;
+}
+
+/* Motion — opt-in only: nothing here plays unless the user hasn't asked to
+   reduce motion. One orchestrated moment (panel mount stagger) plus a quiet
+   chip transition; nothing else animates. */
+
+@media (prefers-reduced-motion: no-preference) {
+  .panel {
+    animation: panel-in 240ms ease-out both;
+  }
+
+  .board-top .panel:nth-child(2),
+  .board-bottom .panel:nth-child(2) {
+    animation-delay: 60ms;
+  }
+
+  .board-bottom .panel:nth-child(3) {
+    animation-delay: 120ms;
+  }
+
+  @keyframes panel-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .chip {
+    transition: background 200ms, color 200ms;
+  }
+}

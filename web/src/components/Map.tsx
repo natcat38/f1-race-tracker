@@ -1,8 +1,7 @@
 import type { RaceState } from '../state/race';
 import { useSmoothedCars } from '../hooks/useSmoothedCars';
 import { teamColour } from './teamColours';
-
-const SIZE = 600;
+import { SIZE } from './geometry';
 
 export function Map({ state }: { state: RaceState }) {
   const cars = useSmoothedCars(state);
@@ -10,7 +9,7 @@ export function Map({ state }: { state: RaceState }) {
     ? 'M ' + state.track.map((p) => `${p.x * SIZE},${p.y * SIZE}`).join(' L ') + ' Z'
     : '';
   return (
-    <svg width={SIZE} height={SIZE} style={{ background: '#111', borderRadius: 12 }}>
+    <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="track-svg">
       {trackPath && <path d={trackPath} fill="none" stroke="#333" strokeWidth={10} strokeLinejoin="round" />}
       {trackPath && <path d={trackPath} fill="none" stroke="#1a1a1a" strokeWidth={6} strokeLinejoin="round" />}
       {cars.map((c) => (

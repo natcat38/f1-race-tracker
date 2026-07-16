@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { connectRace } from '../realtime/socket';
 import { emptyState, type RaceState } from '../state/race';
 import { teamColour } from './teamColours';
 import { commonDrivers, deltaSeries, indexAtTime } from '../state/ghost';
+import { fmtElapsed } from './timingHelpers';
+import { SIZE } from './geometry';
+import { Panel } from './Panel';
+import { StatusRail } from './StatusRail';
 
-const SIZE = 600;
 const BAR_H = 90;
 const THIS = { session: 'compare-monza-2024', year: '2024' };
 const LAST = { session: 'compare-monza-2023', year: '2023' };
@@ -15,7 +18,10 @@ export function Ghost() {
   useEffect(() => connectRace(setThisYear, undefined, THIS.session), []);
   useEffect(() => connectRace(setLastYear, undefined, LAST.session), []);
 
-  const drivers = commonDrivers(thisYear.lapTrace, lastYear.lapTrace);
+  const drivers = useMemo(
+    () => commonDrivers(thisYear.lapTrace, lastYear.lapTrace),
+    [thisYear.lapTrace, lastYear.lapTrace],
+  );
   const [selected, setSelected] = useState<number | null>(null);
   // Default to the first common driver; fall back to it if a prior selection is no
   // longer present in both years (e.g. a lane reconnects with a different driver set).
@@ -29,35 +35,72 @@ export function Ghost() {
       ? Math.max(traceThis[traceThis.length - 1], traceLast[traceLast.length - 1]) + 800
       : 0;
 
-  // Local looping clock (the route replays the two reference laps; live frames unused).
+  // Local looping/scrubbable clock (the route replays the two reference laps;
+  // live frames unused). tMsRef mirrors tMs so pause/resume/scrub can re-anchor
+  // the rAF loop without waiting on a stale closure value.
   const [tMs, setTMs] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const tMsRef = useRef(0);
   const rafRef = useRef<number | undefined>(undefined);
-  const startRef = useRef<number>(0);
+  const startRef = useRef(0);
+
+  // Hard reset on driver switch — an "adjusting state during render" reset
+  // (not an effect), so switching drivers while paused does NOT resume
+  // playback: paused stays true, and the rAF effect below early-returns.
+  // Refs may only be written in effects/handlers, not render, so tMsRef is
+  // re-synced by the effect just below rather than written here directly.
+  const prevSelectedRef = useRef(resolvedSelected);
+  if (prevSelectedRef.current !== resolvedSelected) {
+    prevSelectedRef.current = resolvedSelected;
+    setTMs(0);
+  }
+
+  // Keep the ref mirror in sync with committed tMs state (covers both the
+  // render-time reset above and any external setTMs call).
+  useEffect(() => { tMsRef.current = tMs; }, [tMs]);
+
+  // Run/halt the loop. Re-anchor on every (re)start so resuming after a pause
+  // continues from the frozen position instead of jumping forward by however
+  // long it was paused.
   useEffect(() => {
-    if (!loopMs) return;
-    startRef.current = performance.now();
+    if (!loopMs || paused) return;
+    startRef.current = performance.now() - tMsRef.current;
     const tick = (now: number) => {
-      setTMs((now - startRef.current) % loopMs);
+      const v = (now - startRef.current) % loopMs;
+      tMsRef.current = v;
+      setTMs(v);
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [loopMs, resolvedSelected]);
+    // resolvedSelected is included so a driver switch always re-anchors startRef,
+    // even in the edge case where two drivers happen to share the same loopMs.
+  }, [loopMs, paused, resolvedSelected]);
+
+  function scrub(v: number) {
+    tMsRef.current = v;
+    startRef.current = performance.now() - v;
+    setTMs(v);
+  }
 
   const track = thisYear.track;
   const ready = track.length > 0 && !!traceThis && !!traceLast;
-  const trackPath = track.length
-    ? 'M ' + track.map((p) => `${p.x * SIZE},${p.y * SIZE}`).join(' L ') + ' Z'
-    : '';
+  const trackPath = useMemo(
+    () => (track.length ? 'M ' + track.map((p) => `${p.x * SIZE},${p.y * SIZE}`).join(' L ') + ' Z' : ''),
+    [track],
+  );
 
   const idxThis = ready ? indexAtTime(traceThis!, tMs) : 0;
   const idxLast = ready ? indexAtTime(traceLast!, tMs) : 0;
-  const delta = ready ? deltaSeries(traceThis!, traceLast!) : [];
+  const delta = useMemo(
+    () => (ready ? deltaSeries(traceThis!, traceLast!) : []),
+    [ready, traceThis, traceLast],
+  );
   // delta is clamped to the shorter trace; idxThis indexes the full outline, so clamp it
   // before reading delta / placing the bar cursor (no-op when the traces are equal length).
   const cursorIdx = delta.length ? Math.min(idxThis, delta.length - 1) : 0;
   const dNow = ready ? (delta[cursorIdx] ?? 0) / 1000 : 0;
-  const maxAbs = delta.reduce((m, d) => Math.max(m, Math.abs(d)), 1);
+  const maxAbs = useMemo(() => delta.reduce((m, d) => Math.max(m, Math.abs(d)), 1), [delta]);
 
   const car =
     resolvedSelected != null ? thisYear.cars[resolvedSelected] ?? lastYear.cars[resolvedSelected] : undefined;
@@ -70,39 +113,17 @@ export function Ghost() {
   const ghost = ready ? track[Math.min(idxLast, track.length - 1)] : undefined;
 
   return (
-    <div style={{ padding: 24, color: '#eee', background: '#0a0a0a', minHeight: '100vh' }}>
-      <h2 style={{ margin: '0 0 16px', display: 'flex', gap: 16, alignItems: 'baseline' }}>
-        <span>Ghost overlay · Monza</span>
-        <span style={{ color: '#888', fontSize: 14, fontWeight: 400 }}>
-          {THIS.year} solid vs {LAST.year} ghost · fastest lap (approx)
-        </span>
-        <a href="#" style={{ color: '#3671C6', fontSize: 14, fontWeight: 400 }}>← live board</a>
-      </h2>
+    <div className="page">
+      <StatusRail
+        active="ghost"
+        note={`${THIS.year} solid vs ${LAST.year} ghost · fastest lap (approx)`}
+      />
 
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
-        <label style={{ fontFamily: 'monospace', fontSize: 14 }}>Driver</label>
-        <select
-          value={resolvedSelected ?? ''}
-          onChange={(e) => setSelected(Number(e.target.value))}
-          style={{ background: '#1a1a1a', color: '#eee', border: '1px solid #333', padding: '4px 8px', borderRadius: 6 }}
-        >
-          {drivers.map((n) => {
-            const c = thisYear.cars[n] ?? lastYear.cars[n];
-            return <option key={n} value={n}>{c?.code ?? n}</option>;
-          })}
-        </select>
-        {ready && (
-          <span style={{ fontFamily: 'monospace', fontSize: 18, color: dNow > 0 ? '#ff5252' : '#4caf50' }}>
-            {dNow > 0 ? '+' : ''}{dNow.toFixed(2)}s
-          </span>
-        )}
-      </div>
-
-      {!ready ? (
-        <div style={{ width: SIZE, height: SIZE, background: '#111', borderRadius: 12 }} />
-      ) : (
-        <>
-          <svg width={SIZE} height={SIZE} style={{ background: '#111', borderRadius: 12 }}>
+      <Panel label="Ghost overlay">
+        {!ready ? (
+          <div className="track-skeleton">Loading reference laps…</div>
+        ) : (
+          <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="track-svg">
             <path d={trackPath} fill="none" stroke="#333" strokeWidth={10} strokeLinejoin="round" />
             <path d={trackPath} fill="none" stroke="#1a1a1a" strokeWidth={6} strokeLinejoin="round" />
             {/* ghost (last year) — translucent */}
@@ -111,9 +132,13 @@ export function Ghost() {
             <circle cx={solid!.x * SIZE} cy={solid!.y * SIZE} r={7} fill={colour} stroke="#fff" strokeWidth={1.5} />
             <text x={solid!.x * SIZE + 10} y={solid!.y * SIZE + 4} fill="#eee" fontSize={11}>{code}</text>
           </svg>
+        )}
+      </Panel>
 
-          {/* delta bar: red above the midline = this year slower, green below = faster */}
-          <svg width={SIZE} height={BAR_H} style={{ background: '#111', borderRadius: 12, marginTop: 12, display: 'block' }}>
+      {ready && (
+        <Panel label="Delta">
+          {/* red above the midline = this year slower, green below = faster */}
+          <svg viewBox={`0 0 ${SIZE} ${BAR_H}`} className="track-svg">
             <line x1={0} y1={BAR_H / 2} x2={SIZE} y2={BAR_H / 2} stroke="#444" strokeWidth={1} />
             {delta.map((d, i) => {
               const h = (Math.abs(d) / maxAbs) * (BAR_H / 2);
@@ -124,8 +149,44 @@ export function Ghost() {
             {/* playback cursor at this-year's current fraction */}
             <line x1={(cursorIdx / delta.length) * SIZE} y1={0} x2={(cursorIdx / delta.length) * SIZE} y2={BAR_H} stroke="#fff" strokeWidth={1.5} />
           </svg>
-        </>
+        </Panel>
       )}
+
+      <Panel label="Controls">
+        <div className="ghost-controls">
+          <label style={{ fontSize: 'var(--fs-lg)' }}>Driver</label>
+          <select
+            value={resolvedSelected ?? ''}
+            onChange={(e) => setSelected(Number(e.target.value))}
+            style={{ background: 'var(--asphalt)', color: 'var(--chalk)', border: '1px solid var(--edge)', padding: '4px 8px', borderRadius: 4 }}
+          >
+            {drivers.map((n) => {
+              const c = thisYear.cars[n] ?? lastYear.cars[n];
+              return <option key={n} value={n}>{c?.code ?? n}</option>;
+            })}
+          </select>
+          {ready && (
+            <span style={{ fontSize: 'var(--fs-xl)', color: dNow > 0 ? '#ff5252' : '#4caf50' }}>
+              {dNow > 0 ? '+' : ''}{dNow.toFixed(2)}s
+            </span>
+          )}
+          <button className="btn" onClick={() => setPaused((p) => !p)} disabled={!ready}>
+            {paused ? '▶ Play' : '⏸ Pause'}
+          </button>
+          <input
+            type="range"
+            min={0}
+            max={Math.max(0, loopMs - 1)}
+            step={100}
+            value={Math.floor(tMs)}
+            disabled={!ready}
+            onChange={(e) => scrub(Number(e.target.value))}
+            aria-label="Lap position"
+            style={{ flex: 1, minWidth: 160 }}
+          />
+          <span className="rail-clock">{fmtElapsed(tMs)}</span>
+        </div>
+      </Panel>
     </div>
   );
 }

@@ -1,0 +1,44 @@
+:root {
+  --asphalt: #0B0D10;  /* page background */
+  --carbon:  #14171C;  /* panel background */
+  --edge:    #232A33;  /* 1px borders, dividers */
+  --chalk:   #E9EDF1;  /* primary text */
+  --slate:   #8A94A0;  /* secondary text */
+  --amber:   #FFB000;  /* ATTENTION ONLY: stall, reconnect, flags */
+  --onair:   #E10600;  /* LIVE indicator only */
+
+  --display: 'Chakra Petch', system-ui, sans-serif;
+  --data: 'Martian Mono Variable', 'Martian Mono', ui-monospace, Consolas, monospace;
+
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-6: 24px;
+
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-lg: 14px;
+  --fs-xl: 18px;
+  --fs-hero: 28px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--asphalt);
+  color: var(--chalk);
+  font-family: var(--data);
+  font-size: var(--fs-md);
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--chalk);
+  outline-offset: 2px;
+}

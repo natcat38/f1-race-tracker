@@ -1,6 +1,6 @@
 # F1 Race Tracker — Product Scope
 
-> **Audience:** product/portfolio readers (and the recruiter who lands on the repo). Plain language, no code.
+> **Audience:** product readers; primary persona: the armchair race engineer (and the recruiter who lands on the repo, secondarily). Plain language, no code.
 > **Status:** scoped, pre-build. Reframed after design review (June 2026) into a **polyglot, track-map-first** project.
 > **Companion doc:** `F1_Race_Tracker_Tech_Scope.md`.
 
@@ -8,9 +8,9 @@
 
 ## 1. Background & Problem Statement
 
-During a Formula 1 session, the part fans care about — where the cars are on track, who's gaining on whom, the gaps, the tyres — is locked behind F1's paid app, and the free alternatives are cluttered. There's room for a **clean, real-time view of a race**: cars moving around the circuit, with a live order alongside.
+During a Formula 1 session, the part fans care about — where the cars are on track, who's gaining on whom, the gaps, the tyres — is locked behind F1's paid app, and the free alternatives are cluttered. There's room for something better: put the fan in the race engineer's seat. Not just where the cars are, but how each car is performing — gaps trending over a stint, tyre wear, sector times, radio context, and (across years) exactly where a lap is won or lost. A **clean, real-time pit-wall view of a race**: cars moving around the circuit, with the data to understand what's actually happening to each of them.
 
-For a portfolio, this is also a deliberate **system-design showpiece**. A live race view is a textbook real-time distributed-systems problem — take a streaming data source, normalise it, and fan it out to many browsers with low latency, surviving reconnects and late joiners. It's built as a **polyglot system** on purpose: **Python** for the data-heavy ingestion, **Go** for the high-performance real-time fan-out, **React** for the visualisation — a clear "I work across the stack and pick the right tool for each job" story that a recruiter can both *see running* and *read in the code*.
+Secondarily, for a portfolio, this is also a deliberate **system-design showpiece**. A live race view is a textbook real-time distributed-systems problem — take a streaming data source, normalise it, and fan it out to many browsers with low latency, surviving reconnects and late joiners. It's built as a **polyglot system** on purpose: **Python** for the data-heavy ingestion, **Go** for the high-performance real-time fan-out, **React** for the visualisation — a clear "I work across the stack and pick the right tool for each job" story that a recruiter can both *see running* and *read in the code*.
 
 **Two design realities shape everything:**
 1. **Real F1 sessions only happen on a few weekends a year.** So the system runs from **two interchangeable feeds** behind one pipeline — a **live** feed during real sessions, and a **replay** of a recorded session the rest of the time — so the view always looks alive. The source is a toggle, not a separate code path.
@@ -34,7 +34,7 @@ A **real-time F1 race visualisation**: a Python ingestion layer feeds normalised
 - A **race control feed** — flags, safety car, and investigation messages alongside the timing tower.
 
 **Phase 3 — Team-Radio Comms (later):**
-- The driver ↔ race-engineer **team radio** played alongside the race (the audio is freely available), as a toggleable layer.
+- The driver ↔ race-engineer **team radio** played alongside the race (the audio is freely available), as a toggleable layer. Radio is a single-race feature: it gives the pit-wall context of a live/replayed session. The comparison views (side-by-side and ghost overlay) deliberately exclude it — they are analysis surfaces, not race atmosphere.
 
 **Phase 4 — Cross-Year "Ghost" Overlay (later):**
 - A computed **delta** between two seasons — a "ghost" of last year's car overlaid on this year's, showing where time is won or lost. A deliberate, toggleable analytics layer (the richer cousin of Phase 1's side-by-side).
@@ -132,6 +132,8 @@ A visitor who connects after playback started **immediately sees the current car
 ## 6. How It's Run & Demoed
 
 > This replaces the original "always-on hosted site." There is **no required hosting** and **no cost**.
+
+The primary experience is the running app itself — a race engineer opens the board and reads it. The rest of this section is about how someone gets there:
 
 - **Primary artifact (what most people see):** a polished **README** with the architecture diagram, a recorded **GIF/video** of the map animating and the two-year comparison, and the **benchmark numbers**.
 - **Hands-on reviewer:** **`docker-compose up`** runs the *full real system* locally — Python ingestion + Redis + the Go gateway — so a serious reviewer sees the actual polyglot architecture, not a simplified version. The gateway is stateless by design (so it *could* run as multiple replicas), but the system currently runs and is benchmarked as a single gateway — see `docs/adr/0001-single-gateway-deferred-multigateway.md`.
