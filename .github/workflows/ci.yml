@@ -35,7 +35,7 @@ jobs:
         working-directory: web
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: npm
@@ -76,7 +76,7 @@ jobs:
         # toolchain (go.mod = 1.26), and older pinned releases fail to build under it
         # ("invalid array length ..."). Tracking latest keeps it toolchain-compatible.
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: npm
