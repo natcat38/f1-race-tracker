@@ -146,6 +146,17 @@ radio-free analytics surfaces.
 - _Use_ "comms" / "comms layer"; never "overlay" (that is the cross-year ghost view,
   below) and not "lane" (a lane is a whole stream of state, not a UI toggle).
 
+## Race control
+
+The rolling per-lane log of session messages — flags, safety car, investigations —
+shown alongside the **timing tower** on the main board. Baked from the session's
+actual race-control feed at record time, attached to whichever **frame** covers each
+message's moment, and accumulated on the **snapshot** in a rolling buffer (cap 30)
+the same way **team radio** history accumulates.
+
+- _Use_ "race control" or "the race-control feed"; not "incidents" or "flags" alone
+  (those are one **category** of message, not the whole feed).
+
 ## Ghost overlay
 
 The cross-year analytics view: one track map replaying a driver's **reference lap**

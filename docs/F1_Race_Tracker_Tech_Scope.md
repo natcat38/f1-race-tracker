@@ -264,7 +264,7 @@ Architecture diagram (§2.1), GIF of the map + the two-year comparison, `docker 
 - **Draw the track from data, not files** (§2.4) — scale coordinates to a unit box at record time.
 - **Build order is load-bearing:** plain dots end-to-end (Task 7) before the polished map (Task 8); comparison (Task 11) only after a single map works live + replay. Cut order if schedule slips: comparison first, then the live toggle (keep replay-only core + benchmark).
 - **Live is best-effort and Python-side** (Task 10) — verify FastF1's live behaviour early; never let live-hardening eat the schedule, since replay is the demo.
-- **No required hosting / no cost:** `docker compose up` runs the full real system locally (Python + Redis + the Go gateway); the benchmark measures the single gateway's fan-out under load. A multi-gateway tier is designed-for but unbuilt (ADR-0001). Deploy is an optional ~20-min bonus.
+- **No required hosting / no cost:** `docker compose up` runs the full real system locally (Python + Redis + the Go gateway); the benchmark measures the single gateway's fan-out under load. A multi-gateway tier is designed-for but unbuilt (ADR-0001).
 - **Free data only:** FastF1 (historical + free live client); OpenF1 historical as a fallback. ⚠️ OpenF1 *live* now needs a paid tier and is rate-limited — prefer FastF1 for live.
 - **Presentable repo:** `main` branch, README with the §2.1 diagram + GIF + `BENCHMARKS.md` headline, MIT `LICENSE`, green CI, Conventional Commits.
 - **Out-of-scope guardrails:** Phase 1 is the map + standings + comparison only. Pit-wall timing (Phase 2), team radio (Phase 3), and the computed ghost-overlay (Phase 4) are deferred and reuse this pipeline.
@@ -289,8 +289,9 @@ Architecture diagram (§2.1), GIF of the map + the two-year comparison, `docker 
 - **Track drawing and smoothing live in the frontend components**, not a `web/src/track/`
   module: the circuit is drawn in `web/src/components/Map.tsx` and inter-frame motion is
   smoothed in `web/src/hooks/useSmoothedCars.ts`.
-- **`cmd/genclip`** (Go) is an as-built clip baker/normaliser that produces the
-  committed `data/replays/*.jsonl` clips; it isn't named in the plan's task table.
+- **`cmd/genclip`** (Go) is a Phase-1 synthetic-clip generator (`data/replays/synthetic.jsonl`
+  only) not named in the plan's task table; the committed real-session clips (Monza
+  2023/2024, Silverstone 2024) are baked by `ingest/record.py` from FastF1 data.
 - **Tests** landed as `internal/ws/hub_test.go` plus an end-to-end
   `internal/app/integration_test.go` (the plan named `internal/ws/hub_integration_test.go`).
 - **Compose runs lane services, not one `ingest`.** `docker-compose.yml` has `redis`,
@@ -303,9 +304,10 @@ Architecture diagram (§2.1), GIF of the map + the two-year comparison, `docker 
   latency measurement (`now − frame.T`) — no `/metrics` endpoint and no multi-gateway
   setup, neither of which M1–M3 built. See
   `docs/superpowers/specs/2026-06-19-f1-m4-loadtest-benchmark-design.md` and
-  `docs/adr/0001-single-gateway-deferred-multigateway.md`. As of this writing the
-  benchmark is **designed but not yet implemented** (no `cmd/loadtest`, `bench/`, or
-  `BENCHMARKS.md` exist yet).
+  `docs/adr/0001-single-gateway-deferred-multigateway.md`. The benchmark was
+  implemented as scoped — `cmd/loadtest` and `bench/run.py` drive it, and the results
+  (1,000 concurrent viewers at 10 Hz, p99 fan-out latency 48 ms, zero dropped clients)
+  are published in [BENCHMARKS.md](../BENCHMARKS.md).
 - **CI:** `.github/workflows/ci.yml` gates every PR with: `gofmt` + `go vet` + `go test`;
   the web lint (`--max-warnings 0`) + build + test; the Python↔Go contract self-check
   (`ingest/check_live_contract.py`); a markdown link check over `README`/`CONTEXT`/`docs/`

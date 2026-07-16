@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RaceState } from '../state/race';
 import {
-  fmtLap, fmtSec, gapLabel, intLabel,
-  orderCars, bestSectors, updatePersonalBests, sectorColour,
+  fmtLap, fmtSec, fmtGap, gapLabel, intLabel,
+  orderCars, bestSectors, updatePersonalBests, sectorColour, sectorDelta,
   TYRE_COLOUR,
 } from './timingHelpers';
 import type { Bests } from './timingHelpers';
@@ -37,6 +37,8 @@ export function TimingTower({
     const c = sectorColour(v, best, pb[dn]?.[i] ?? Infinity);
     return c ? { color: c } : undefined;
   };
+  const cellDelta = (v: number | undefined, dn: number, i: number) =>
+    sectorDelta(v, pb[dn]?.[i] ?? Infinity);
 
   return (
     <div>
@@ -91,9 +93,30 @@ export function TimingTower({
               <td style={{ color: TYRE_COLOUR[c.tyre ?? ''] ?? 'var(--chalk)' }}>
                 {c.tyre ? `${c.tyre[0]}${c.tyreAge ? ` ${c.tyreAge}` : ''}` : '—'}
               </td>
-              <td style={cellColour(c.s1Ms, b1, c.driverNum, 0)}>{fmtSec(c.s1Ms)}</td>
-              <td style={cellColour(c.s2Ms, b2, c.driverNum, 1)}>{fmtSec(c.s2Ms)}</td>
-              <td style={cellColour(c.s3Ms, b3, c.driverNum, 2)}>{fmtSec(c.s3Ms)}</td>
+              <td style={cellColour(c.s1Ms, b1, c.driverNum, 0)}>
+                {fmtSec(c.s1Ms)}
+                {cellDelta(c.s1Ms, c.driverNum, 0) !== undefined && (
+                  <sup style={{ fontSize: 9, color: 'var(--slate)', marginLeft: 3 }}>
+                    {fmtGap(cellDelta(c.s1Ms, c.driverNum, 0))}
+                  </sup>
+                )}
+              </td>
+              <td style={cellColour(c.s2Ms, b2, c.driverNum, 1)}>
+                {fmtSec(c.s2Ms)}
+                {cellDelta(c.s2Ms, c.driverNum, 1) !== undefined && (
+                  <sup style={{ fontSize: 9, color: 'var(--slate)', marginLeft: 3 }}>
+                    {fmtGap(cellDelta(c.s2Ms, c.driverNum, 1))}
+                  </sup>
+                )}
+              </td>
+              <td style={cellColour(c.s3Ms, b3, c.driverNum, 2)}>
+                {fmtSec(c.s3Ms)}
+                {cellDelta(c.s3Ms, c.driverNum, 2) !== undefined && (
+                  <sup style={{ fontSize: 9, color: 'var(--slate)', marginLeft: 3 }}>
+                    {fmtGap(cellDelta(c.s3Ms, c.driverNum, 2))}
+                  </sup>
+                )}
+              </td>
             </tr>
           );
         })}

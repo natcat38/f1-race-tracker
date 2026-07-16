@@ -1,7 +1,7 @@
 # F1 Race Tracker — Product Scope
 
 > **Audience:** product readers; primary persona: the armchair race engineer (and the recruiter who lands on the repo, secondarily). Plain language, no code.
-> **Status:** scoped, pre-build. Reframed after design review (June 2026) into a **polyglot, track-map-first** project.
+> **Status:** built and shipped through Phase 4 (see [README](../README.md) and [BENCHMARKS.md](../BENCHMARKS.md) for the as-run system). Originally reframed after design review (June 2026) into a **polyglot, track-map-first** project.
 > **Companion doc:** `F1_Race_Tracker_Tech_Scope.md`.
 
 ---
@@ -137,18 +137,16 @@ The primary experience is the running app itself — a race engineer opens the b
 
 - **Primary artifact (what most people see):** a polished **README** with the architecture diagram, a recorded **GIF/video** of the map animating and the two-year comparison, and the **benchmark numbers**.
 - **Hands-on reviewer:** **`docker-compose up`** runs the *full real system* locally — Python ingestion + Redis + the Go gateway — so a serious reviewer sees the actual polyglot architecture, not a simplified version. The gateway is stateless by design (so it *could* run as multiple replicas), but the system currently runs and is benchmarked as a single gateway — see `docs/adr/0001-single-gateway-deferred-multigateway.md`.
-- **Hosted live link:** *optional and deferred.* Deploy instructions are included so it can go live in ~20 minutes, but running it 24/7 is never a requirement or a maintenance burden.
+- **Hosted live link:** *optional and deferred.* Running it 24/7 is never a requirement or a maintenance burden.
 - **The benchmark** (concurrent WebSocket connections, p50/p99 fan-out latency) is run on demand and published in `BENCHMARKS.md` — it measures how a **single gateway** holds up as concurrent viewers climb (a lower bound, since the load generator shares the host). The stateless-gateway + Redis seam is what *would* make a multi-gateway tier a config change; building and benchmarking that tier is future work (see ADR-0001).
 
 ---
 
 ## 7. Out of Scope
 
-- **Always-on public hosting** — deliberately retired; demo is README + video + local `docker-compose`. Deploy is an optional bonus.
+- **Always-on public hosting** — deliberately retired; demo is README + video + local `docker-compose`.
 - **Paid data tiers** — uses **free** F1 data only (FastF1; OpenF1 historical). Live uses FastF1's free client, best-effort.
 - **Full-race data files in the repo** — only short, curated, downsampled clips are committed; the recorder bakes more on demand.
-- **The detailed pit-wall timing screen** — Phase 2.
-- **Team-radio audio** — Phase 3. **Computed cross-year "ghost" delta** — Phase 4.
 - **User accounts / auth** — none; runs locally, single-operator.
 - **Native mobile app** — responsive web only.
 - **Automatic live-vs-replay switching** — the toggle is manual, operator-driven.

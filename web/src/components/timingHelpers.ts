@@ -120,3 +120,29 @@ export function sectorColour(
   if (v === personalBest) return GREEN;
   return undefined;
 }
+
+// sectorDelta: ms above this driver's personal-best sector, or undefined when
+// the value IS the personal best (nothing to show) or is absent/unknown.
+export function sectorDelta(v: number | undefined, personalBest: number): number | undefined {
+  if (!v || v <= 0 || personalBest === Infinity || v <= personalBest) return undefined;
+  return v - personalBest;
+}
+
+// LapHistory maps driverNum -> recent completed lap times (ms), oldest-first.
+export type LapHistory = Record<number, number[]>;
+const MAX_LAP_HISTORY = 8;
+
+// updateLapHistory appends a driver's lastLapMs when it changes from the last
+// recorded value (a real lap completion, not the 10 Hz re-broadcast of the same
+// value — see ADR-0002). Pure: returns a new map, capped to MAX_LAP_HISTORY.
+export function updateLapHistory(prev: LapHistory, cars: Car[]): LapHistory {
+  const next: LapHistory = { ...prev };
+  for (const c of cars) {
+    if (!c.lastLapMs) continue;
+    const hist = next[c.driverNum] ?? [];
+    if (hist[hist.length - 1] !== c.lastLapMs) {
+      next[c.driverNum] = [...hist, c.lastLapMs].slice(-MAX_LAP_HISTORY);
+    }
+  }
+  return next;
+}

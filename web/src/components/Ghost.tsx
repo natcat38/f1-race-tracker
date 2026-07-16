@@ -12,7 +12,7 @@ const BAR_H = 90;
 const THIS = { session: 'compare-monza-2024', year: '2024' };
 const LAST = { session: 'compare-monza-2023', year: '2023' };
 
-export function Ghost() {
+export function Ghost({ initialSelected }: { initialSelected?: number | null } = {}) {
   const [thisYear, setThisYear] = useState<RaceState>(emptyState());
   const [lastYear, setLastYear] = useState<RaceState>(emptyState());
   useEffect(() => connectRace(setThisYear, undefined, THIS.session), []);
@@ -22,7 +22,7 @@ export function Ghost() {
     () => commonDrivers(thisYear.lapTrace, lastYear.lapTrace),
     [thisYear.lapTrace, lastYear.lapTrace],
   );
-  const [selected, setSelected] = useState<number | null>(null);
+  const [selected, setSelected] = useState<number | null>(initialSelected ?? null);
   // Default to the first common driver; fall back to it if a prior selection is no
   // longer present in both years (e.g. a lane reconnects with a different driver set).
   const resolvedSelected =
@@ -119,7 +119,7 @@ export function Ghost() {
         note={`${THIS.year} solid vs ${LAST.year} ghost · fastest lap (approx)`}
       />
 
-      <Panel label="Ghost overlay">
+      <Panel label="Track">
         {!ready ? (
           <div className="track-skeleton">Loading reference laps…</div>
         ) : (
@@ -136,7 +136,7 @@ export function Ghost() {
       </Panel>
 
       {ready && (
-        <Panel label="Delta">
+        <Panel label="Delta bar">
           {/* red above the midline = this year slower, green below = faster */}
           <svg viewBox={`0 0 ${SIZE} ${BAR_H}`} className="track-svg">
             <line x1={0} y1={BAR_H / 2} x2={SIZE} y2={BAR_H / 2} stroke="#444" strokeWidth={1} />

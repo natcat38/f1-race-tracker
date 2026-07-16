@@ -75,10 +75,10 @@ type Snapshot struct {
 }
 
 type Frame struct {
-	// SessionKey and T are part of the wire contract mirrored by ingest/live.py's
-	// build_frame() but are not read back by any current Go or TS consumer — they
-	// ride along as passenger fields for the Python mirror and future latency
-	// introspection (T = publish wall-time), not dead code to prune.
+	// SessionKey rides along as a passenger field for the Python mirror
+	// (ingest/live.py's build_frame()); no Go or TS consumer reads it. T (publish
+	// wall-time, unix ms) IS read — cmd/loadtest computes fan-out latency as
+	// now - frame.T (see BENCHMARKS.md) — so it is not dead code to prune.
 	SessionKey string               `json:"session"`
 	Rev        int64                `json:"rev"`
 	T          int64                `json:"t"`      // publish wall-time, unix ms

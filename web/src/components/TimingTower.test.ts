@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { fmtLap, fmtGap, fmtClock, gapLabel, intLabel, bestSectors, orderCars, updatePersonalBests, sectorColour } from './timingHelpers';
+import {
+  fmtLap, fmtGap, fmtClock, gapLabel, intLabel, bestSectors, orderCars,
+  updatePersonalBests, sectorColour, sectorDelta, updateLapHistory,
+} from './timingHelpers';
 import type { Car } from '../state/race';
 
 const car = (over: Partial<Car>): Car => ({
@@ -100,5 +103,54 @@ describe('sectorColour', () => {
     expect(sectorColour(26100, 25900, 26100)).toBe('#3bb273'); // personal-best only
     expect(sectorColour(26500, 25900, 26100)).toBeUndefined();
     expect(sectorColour(undefined, 25900, 26100)).toBeUndefined();
+  });
+});
+
+describe('sectorDelta', () => {
+  it('returns the ms above personal best', () => {
+    expect(sectorDelta(26100, 25900)).toBe(200);
+  });
+  it('undefined when the value ties or beats personal best', () => {
+    expect(sectorDelta(25900, 25900)).toBeUndefined();
+    expect(sectorDelta(25800, 25900)).toBeUndefined();
+  });
+  it('undefined when there is no personal best yet', () => {
+    expect(sectorDelta(26100, Infinity)).toBeUndefined();
+  });
+  it('undefined when the value is absent or zero', () => {
+    expect(sectorDelta(undefined, 25900)).toBeUndefined();
+    expect(sectorDelta(0, 25900)).toBeUndefined();
+  });
+});
+
+describe('updateLapHistory', () => {
+  it('records a new lastLapMs the first time it appears', () => {
+    const h = updateLapHistory({}, [car({ driverNum: 1, lastLapMs: 81000 })]);
+    expect(h[1]).toEqual([81000]);
+  });
+  it('appends only when lastLapMs actually changes (ignores 10 Hz re-broadcast)', () => {
+    let h = updateLapHistory({}, [car({ driverNum: 1, lastLapMs: 81000 })]);
+    h = updateLapHistory(h, [car({ driverNum: 1, lastLapMs: 81000 })]); // same value, no new lap
+    h = updateLapHistory(h, [car({ driverNum: 1, lastLapMs: 80500 })]); // new lap
+    expect(h[1]).toEqual([81000, 80500]);
+  });
+  it('ignores cars with no lastLapMs yet', () => {
+    const h = updateLapHistory({}, [car({ driverNum: 1 })]);
+    expect(h[1]).toBeUndefined();
+  });
+  it('caps history at the last 8 laps', () => {
+    let h: ReturnType<typeof updateLapHistory> = {};
+    for (let i = 0; i < 10; i++) {
+      h = updateLapHistory(h, [car({ driverNum: 1, lastLapMs: 80000 + i })]);
+    }
+    expect(h[1]).toHaveLength(8);
+    expect(h[1][0]).toBe(80002); // oldest two laps (80000, 80001) dropped
+    expect(h[1][7]).toBe(80009);
+  });
+  it('is pure — does not mutate the previous map', () => {
+    const prev = { 1: [81000] };
+    const next = updateLapHistory(prev, [car({ driverNum: 1, lastLapMs: 80500 })]);
+    expect(prev[1]).toEqual([81000]);
+    expect(next[1]).toEqual([81000, 80500]);
   });
 });

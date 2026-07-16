@@ -1,4 +1,5 @@
 import type { Car } from '../state/race';
+import { fmtLap } from './timingHelpers';
 
 function Bar({ label, value }: { label: string; value: number }) {
   return (
@@ -12,7 +13,27 @@ function Bar({ label, value }: { label: string; value: number }) {
   );
 }
 
-export function TelemetryPanel({ car }: { car: Car | undefined }) {
+// Sparkline: one bar per completed lap, red = slower than previous lap,
+// green = faster — the stint-degradation squint test.
+function Sparkline({ values }: { values: number[] }) {
+  if (values.length < 2) return null;
+  const min = Math.min(...values), max = Math.max(...values);
+  const span = max - min || 1;
+  return (
+    <svg width={values.length * 15} height={24} role="img" aria-label="Lap time trend">
+      {values.map((v, i) => {
+        const h = 4 + ((v - min) / span) * 18;
+        const slower = i > 0 && v > values[i - 1];
+        return (
+          <rect key={i} x={i * 15} y={24 - h} width={11} height={h}
+                fill={slower ? '#e1342e' : '#3bb273'} />
+        );
+      })}
+    </svg>
+  );
+}
+
+export function TelemetryPanel({ car, history }: { car: Car | undefined; history?: number[] }) {
   if (!car) {
     return <div className="empty">Select a car to see telemetry</div>;
   }
@@ -28,6 +49,13 @@ export function TelemetryPanel({ car }: { car: Car | undefined }) {
       </div>
       <Bar label="Throttle" value={car.throttle ?? 0} />
       <Bar label="Brake" value={car.brake ?? 0} />
+      {history && history.length >= 2 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+          <span style={{ width: 64, color: 'var(--slate)' }}>Laps</span>
+          <Sparkline values={history} />
+          <span>{fmtLap(history[history.length - 1])}</span>
+        </div>
+      )}
     </div>
   );
 }

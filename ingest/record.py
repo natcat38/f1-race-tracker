@@ -19,6 +19,10 @@ Default output: data/replays/monza-2024-race.jsonl
 Note: WINDOW_START_S/WINDOW_END_S define a mid-race window that works well for most
 circuits but may need tuning per circuit (e.g. if the window falls under a safety car
 or a long pit phase for a particular GP).
+
+Frame lines optionally carry "messages":[{"rev":int,"t":int,"category":"...",
+"message":"...","driver":int}] — race-control entries (flags, safety car,
+investigations) whose tick falls in this frame.
 """
 
 import fastf1
@@ -31,6 +35,7 @@ import argparse
 from pathlib import Path
 from fastf1 import _api
 from radio import extract_radio
+from race_control import extract_race_control
 from ghost import build_lap_trace
 from resample import nearest_index, step_value
 
@@ -114,6 +119,10 @@ for num, info in sorted(driver_info.items()):
 # Team radio (Phase 3): baked into the header as [{timeMs, driverNum, clip}].
 # Streamed from F1's public URL at play time, never stored (ADR-0003).
 # ---------------------------------------------------------------------------
+# t0_date is tz-naive-UTC today; tz_convert if FastF1 ever returns it tz-aware.
+_t0 = pd.Timestamp(session.t0_date)
+t0_epoch_s = (_t0.tz_convert("UTC") if _t0.tzinfo else _t0.tz_localize("UTC")).timestamp()
+
 print("\nFetching team radio...")
 radio_clips = []
 try:
@@ -123,9 +132,6 @@ try:
         caps = content.get("Captures") if isinstance(content, dict) else None
         if caps:
             captures.extend(caps.values() if isinstance(caps, dict) else caps)
-    # t0_date is tz-naive-UTC today; tz_convert if FastF1 ever returns it tz-aware.
-    _t0 = pd.Timestamp(session.t0_date)
-    t0_epoch_s = (_t0.tz_convert("UTC") if _t0.tzinfo else _t0.tz_localize("UTC")).timestamp()
     radio_clips = extract_radio(
         captures, t0_epoch_s, WINDOW_START_S, WINDOW_END_S,
         _api.base_url, session.api_path,
@@ -133,6 +139,26 @@ try:
     print(f"Team radio: {len(captures)} captures in session, {len(radio_clips)} in window")
 except Exception as e:
     print(f"  Warning: team radio fetch failed ({type(e).__name__}: {e}); clip will have no radio")
+
+# ---------------------------------------------------------------------------
+# Race control messages: baked into the frame whose tick covers each message,
+# so flags/SC/investigations replay in sync (internal/model/apply.go keeps the
+# rolling buffer on the snapshot; nothing else to do downstream).
+# ---------------------------------------------------------------------------
+print("\nFetching race control messages...")
+rc_msgs = []
+try:
+    rc_df = session.race_control_messages  # columns: Time, Category, Message, RacingNumber, ...
+    rc_rows = [
+        {'epoch_s': row['Time'].timestamp(), 'category': row.get('Category'),
+         'message': row.get('Message'), 'racingNumber': row.get('RacingNumber')}
+        for _, row in rc_df.iterrows() if not pd.isna(row['Time'])
+    ]
+    rc_msgs = extract_race_control(rc_rows, t0_epoch_s, WINDOW_START_S, WINDOW_END_S,
+                                   set(driver_info.keys()))
+    print(f"Race control: {len(rc_rows)} messages in session, {len(rc_msgs)} in window")
+except Exception as e:
+    print(f"  Warning: race control fetch failed ({type(e).__name__}: {e}); clip will have no messages")
 
 # ---------------------------------------------------------------------------
 # Collect all position data and determine coordinate bounds
@@ -488,6 +514,15 @@ print(f"Active drivers in window: {len(driver_frames)}")
 n_frames = len(t_grid_s)
 max_rev = n_frames
 
+# Map each race-control message onto the frame whose tick covers it.
+msgs_by_idx = {}
+for m in rc_msgs:
+    idx = int(nearest_index(t_grid_s, m['timeMs'] / 1000.0))
+    entry = {"rev": idx + 1, "t": m['timeMs'], "category": m['category'], "message": m['message']}
+    if m['driver'] is not None:
+        entry["driver"] = m['driver']
+    msgs_by_idx.setdefault(idx, []).append(entry)
+
 print(f"\nEmitting {n_frames} frames ({n_frames / HZ:.1f} seconds) for {len(driver_frames)} drivers...")
 print(f"Estimated output: {n_frames} lines")
 
@@ -576,33 +611,39 @@ with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
         leader_dn = by_pos[0]['driverNum'] if by_pos else None
         leader_dist = dist.get(leader_dn, 0.0)
         leader_lap = lapn.get(leader_dn, 0)
+        leader_car = by_pos[0] if by_pos else None
+        leader_has_lap = leader_car is not None and 'lastLapMs' in leader_car
         prev_dist = None
+        prev_has_lap = False
         for car in by_pos:
             dn = car['driverNum']
+            has_lap = 'lastLapMs' in car
             behind = max(0.0, leader_dist - dist[dn])      # lap units behind leader
             gap_ms = int(behind * LEADER_LAP_MS)
             gap_laps = max(0, leader_lap - lapn[dn])        # whole-lap deficit (from LapNumber)
-            if gap_ms > 0:
+            # Suppress derived times until both ends have a completed reference lap —
+            # the distance derivation is meaningless (and can be ~a lap wrong) before
+            # then. Same lastLapMs signal the FE's gapLabel/intLabel guards use.
+            if gap_ms > 0 and has_lap and leader_has_lap:
                 car['gapMs'] = gap_ms
             if gap_laps > 0:
                 car['gapLaps'] = gap_laps
-            if prev_dist is not None:
+            if prev_dist is not None and has_lap and prev_has_lap:
                 int_ms = int(max(0.0, prev_dist - dist[dn]) * LEADER_LAP_MS)
-                if int_ms > 0:
+                # ponytail: clamp — an interval >= a lap is a lap-deficit case, not a time
+                if 0 < int_ms < LEADER_LAP_MS:
                     car['intMs'] = int_ms
             prev_dist = dist[dn]
+            prev_has_lap = has_lap
 
-        frame_line = {
-            "timeMs": time_ms,
-            "frame": {
-                "rev": rev,
-                "timeMs": time_ms,
-                "cars": cars,
-            }
-        }
+        frame = {"rev": rev, "timeMs": time_ms, "cars": cars}
+        if i in msgs_by_idx:
+            frame["messages"] = msgs_by_idx[i]
+        frame_line = {"timeMs": time_ms, "frame": frame}
         f.write(json.dumps(frame_line, separators=(',', ':')) + '\n')
 
 print(f"\nWrote {n_frames + 1} lines (1 header + {n_frames} frames) to: {OUTPUT_PATH}")
+print(f"  Race control: {len(rc_msgs)} messages baked")
 
 # File size check
 size_bytes = os.path.getsize(OUTPUT_PATH)

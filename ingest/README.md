@@ -47,14 +47,26 @@ The output path, `--gp`, and `--year` are the only arguments you normally need t
 
 On first run, FastF1 downloads ~50 MB of session data and caches it under `cache/` (gitignored). Subsequent runs are fast.
 
+Alongside position/timing, `record.py` also bakes real **race-control messages**
+(flags, safety car, investigations) from `session.race_control_messages` into the
+frame whose tick covers each message — attached only when the message falls inside
+the baked window, so a clip with no in-window incidents legitimately has none.
+
+`gapMs`/`intMs` are only baked once **both** cars involved (this car and the leader,
+or this car and the car ahead) have a completed reference lap in the window — a
+window that opens before any lap completes (rare, but possible around a red flag or
+mid-session restart) will show no gap/interval data at all rather than a fabricated
+distance-based guess. Re-run with a different `WINDOW_START_S`/`WINDOW_END_S` if that
+happens for a circuit you care about.
+
 ## Clip contract
 
 The output is JSONL (one JSON object per line):
 
 - **Line 1 (header):** `{"track":[{"x":float,"y":float},...], "label":"...", "maxRev":int, "radio":[{"timeMs":int,"driverNum":int,"clip":"https://..."}], "lapTrace":{"<driverNum>":[ms,...]}}`
-- **Lines 2–N (frames):** `{"timeMs":int, "frame":{"rev":int,"timeMs":int,"cars":[...]}}`
+- **Lines 2–N (frames):** `{"timeMs":int, "frame":{"rev":int,"timeMs":int,"cars":[...],"messages":[{"rev":int,"t":int,"category":"...","message":"...","driver":int}]}}` (`messages` omitted when none fall in that tick)
 
-`radio` (Phase 3) is a list of team-radio clip references falling inside the baked window; `lapTrace` (Phase 4) maps each driver's number to a cumulative-ms pace curve over their fastest accurate lap, used by the cross-year ghost overlay.
+`radio` (Phase 3) is a list of team-radio clip references falling inside the baked window; `lapTrace` (Phase 4) maps each driver's number to a cumulative-ms pace curve over their fastest accurate lap, used by the cross-year ghost overlay; `messages` (per-frame, optional) carries any race-control entries whose tick falls in that frame.
 
 Each car: `{"driverNum":int,"code":"VER","team":"Red Bull","pos":int,"p":{"x":float,"y":float},"status":"OnTrack"}`
 

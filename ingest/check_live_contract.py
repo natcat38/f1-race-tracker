@@ -23,7 +23,19 @@ def test_snapshot_and_frame_key_contract():
     assert isinstance(frame["cars"], list) and isinstance(snap["cars"], dict)
 
 
+def test_frame_messages_key_optional():
+    msg = {"rev": 7, "t": 1200, "category": "Flag", "message": "GREEN FLAG"}
+    frame = build_frame("live", 7, 1234, [], [msg])
+    assert set(frame) == FRAME_KEYS | {"messages"}, f"frame keys {set(frame)} != {FRAME_KEYS | {'messages'}}"
+    assert frame["messages"] == [msg]
+    # No messages passed (or None/empty) -> key omitted, same key set as the base contract.
+    assert build_frame("live", 7, 1234, []).keys() == FRAME_KEYS
+    assert build_frame("live", 7, 1234, [], None).keys() == FRAME_KEYS
+    assert build_frame("live", 7, 1234, [], []).keys() == FRAME_KEYS
+
+
 if __name__ == "__main__":
     test_snapshot_and_frame_key_contract()
+    test_frame_messages_key_optional()
     print("live.py contract self-check PASSED")
     sys.exit(0)

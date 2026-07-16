@@ -6,14 +6,17 @@ An F1 race tracker that puts you on the pit wall — watch the cars on circuit, 
 
 **One gateway sustained 1,000 concurrent WebSocket viewers at 10 Hz** — p99 fan-out latency of 48 ms, zero dropped clients, on a single laptop. See [BENCHMARKS.md](BENCHMARKS.md).
 
-### What this demonstrates
-
-The product is judged first by whether it helps you understand how the car is performing; the engineering underneath — real-time, byte-identical across two languages — is what makes that possible at scale.
+### What you get on the pit wall
 
 - **Track-map-first design** — positions on circuit are the primary view, not an afterthought table.
-- **Pit-wall timing tower** — beside the map the board shows a live timing tower with gaps/intervals, last lap, tyres, and sector times for every car; click any driver to open a per-car telemetry panel (speed, gear, throttle, brake, DRS) sourced from the same 10 Hz frame.
+- **Pit-wall timing tower** — beside the map the board shows a live timing tower with gaps/intervals, last lap, tyres, and sector times for every car; click any driver to open a per-car telemetry panel (speed, gear, throttle, brake, DRS, and a lap-time trend sparkline) sourced from the same 10 Hz frame.
+- **Sector and lap-pace signal** — session-best and personal-best sector shading, plus a magnitude chip showing exactly how far off personal best a sector is, so a driver "losing time" is visible, not just flagged.
 - **Team-radio comms layer** — a toggleable layer that auto-plays driver↔engineer radio in sync with the replay clock, with a now-playing banner and a short replayable history. The audio streams straight from F1's public URLs at play time — nothing is committed or downloaded — so the comms audio (only) needs network access; positions and timing stay fully offline from the committed clips. See [docs/adr/0003-team-radio-streamed-not-committed.md](docs/adr/0003-team-radio-streamed-not-committed.md).
-- **Race control feed** — a rolling log of session messages (flags, safety car, investigations) alongside the timing tower, driven by the same 10 Hz frame stream.
+- **Race control feed** — a rolling log of real session messages (flags, safety car, investigations), baked from the session's actual race-control feed and replayed in sync alongside the timing tower.
+- **Ghost overlay** — a cross-year lap comparison: this year's reference lap solid, last year's translucent, with a red/green delta bar showing exactly where a lap is won or lost round the circuit.
+
+The product is judged first by whether it helps you understand how the car is performing. The engineering underneath — real-time, byte-identical across two languages — is what makes that possible at scale:
+
 - **A polyglot seam done right** — Python and Go publish byte-identical JSON to the same Redis keys; the gateway consumes either with zero code changes.
 - **Live WebSocket fan-out at scale** — one in-memory hub pushes 10 Hz frames to a thousand viewers, with backpressure that sheds milliseconds rather than dropping clients.
 

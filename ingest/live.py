@@ -10,10 +10,12 @@ Modes:
 Redis contract:
   SET     snapshot:<session> = {"session","mode","label","track":[{x,y}],
                                 "radio":[{timeMs,driverNum,clip}],"lapTrace":{...},
-                                "cars":{"1":{...}},"timeMs","rev"}
-  PUBLISH frames:<session>   = {"session","rev","t","timeMs","cars":[{...}]}
+                                "cars":{"1":{...}},"timeMs","rev","messages":[{...}]}
+  PUBLISH frames:<session>   = {"session","rev","t","timeMs","cars":[{...}],"messages":[{...}]}
   Car = {"driverNum":int,"code":str,"team":str,"pos":int,"p":{"x":float,"y":float},"status":str}
   Go marshals map[int]CarState with STRING keys, so snapshot.cars is keyed by str(driverNum).
+  "messages" (race-control entries: rev, t, category, message, driver?) is optional on
+  both snapshot and frame, mirroring internal/model/apply.go's rolling buffer (cap 30).
   SET before PUBLISH (a subscriber seeing a frame can trust the stored snapshot).
 """
 import argparse
@@ -54,11 +56,14 @@ def build_snapshot(session, label, track, radio, lap_trace, rev):
     }
 
 
-def build_frame(session, rev, time_ms, cars):
-    return {
+def build_frame(session, rev, time_ms, cars, messages=None):
+    frame = {
         "session": session, "rev": rev,
         "t": int(time.time() * 1000), "timeMs": time_ms, "cars": cars,
     }
+    if messages:
+        frame["messages"] = messages
+    return frame
 
 
 def publish_clip(r, session, clip_path, label_override):
@@ -90,9 +95,12 @@ def publish_clip(r, session, clip_path, label_override):
             cars = fr["cars"]
             for c in cars:  # fold into the running snapshot (string keys, per Go)
                 snapshot["cars"][str(c["driverNum"])] = c
+            msgs = fr.get("messages")
+            if msgs:  # mirror model.Apply's rolling race-control buffer (cap 30)
+                snapshot["messages"] = (snapshot.get("messages", []) + msgs)[-30:]
             snapshot["timeMs"] = fr["timeMs"]
             snapshot["rev"] = rev
-            frame = build_frame(session, rev, fr["timeMs"], cars)
+            frame = build_frame(session, rev, fr["timeMs"], cars, msgs)
             r.set(snap_key(session), json.dumps(snapshot, separators=(",", ":")))
             r.publish(frames_chan(session), json.dumps(frame, separators=(",", ":")))
 

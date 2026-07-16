@@ -10,6 +10,7 @@ import { RaceControl } from './components/RaceControl';
 import { Panel } from './components/Panel';
 import { StatusRail } from './components/StatusRail';
 import { useStale } from './hooks/useStale';
+import { useLapHistory } from './hooks/useLapHistory';
 import { Compare } from './components/Compare';
 import { Ghost } from './components/Ghost';
 
@@ -23,6 +24,7 @@ export default function App() {
   const [hash, setHash] = useState<string>(typeof location !== 'undefined' ? location.hash : '');
   const [selected, setSelected] = useState<number | null>(null);
   const staleSec = useStale(state);
+  const lapHistory = useLapHistory(state);
 
   useEffect(() => connectRace(setState, setStatus), []);
   useEffect(() => {
@@ -32,7 +34,7 @@ export default function App() {
   }, []);
 
   if (hash === '#compare') return <Compare />;
-  if (hash === '#ghost') return <Ghost />;
+  if (hash === '#ghost') return <Ghost initialSelected={selected} />;
 
   const showSkeleton = state.rev === 0;
 
@@ -64,7 +66,10 @@ export default function App() {
 
       <div className="board-bottom">
         <Panel label="Telemetry">
-          <TelemetryPanel car={selected != null ? state.cars[selected] : undefined} />
+          <TelemetryPanel
+            car={selected != null ? state.cars[selected] : undefined}
+            history={selected != null ? lapHistory[selected] : undefined}
+          />
         </Panel>
         <Panel label="Comms">
           <Comms state={state} />
