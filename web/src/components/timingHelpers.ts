@@ -134,15 +134,19 @@ const MAX_LAP_HISTORY = 8;
 
 // updateLapHistory appends a driver's lastLapMs when it changes from the last
 // recorded value (a real lap completion, not the 10 Hz re-broadcast of the same
-// value — see ADR-0002). Pure: returns a new map, capped to MAX_LAP_HISTORY.
+// value — see ADR-0002). Pure: returns a new map capped to MAX_LAP_HISTORY, or
+// `prev` itself (same reference) when no driver's history actually changed —
+// most of the 10 ticks/sec between lap completions — so callers can bail out
+// via reference equality instead of re-rendering on a no-op update.
 export function updateLapHistory(prev: LapHistory, cars: Car[]): LapHistory {
-  const next: LapHistory = { ...prev };
+  let next: LapHistory | undefined;
   for (const c of cars) {
     if (!c.lastLapMs) continue;
-    const hist = next[c.driverNum] ?? [];
+    const hist = prev[c.driverNum] ?? [];
     if (hist[hist.length - 1] !== c.lastLapMs) {
+      next ??= { ...prev };
       next[c.driverNum] = [...hist, c.lastLapMs].slice(-MAX_LAP_HISTORY);
     }
   }
-  return next;
+  return next ?? prev;
 }

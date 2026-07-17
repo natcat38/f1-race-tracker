@@ -16,7 +16,6 @@ function Bar({ label, value }: { label: string; value: number }) {
 // Sparkline: one bar per completed lap, red = slower than previous lap,
 // green = faster — the stint-degradation squint test.
 function Sparkline({ values }: { values: number[] }) {
-  if (values.length < 2) return null;
   const min = Math.min(...values), max = Math.max(...values);
   const span = max - min || 1;
   return (

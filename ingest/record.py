@@ -120,8 +120,16 @@ for num, info in sorted(driver_info.items()):
 # Streamed from F1's public URL at play time, never stored (ADR-0003).
 # ---------------------------------------------------------------------------
 # t0_date is tz-naive-UTC today; tz_convert if FastF1 ever returns it tz-aware.
-_t0 = pd.Timestamp(session.t0_date)
-t0_epoch_s = (_t0.tz_convert("UTC") if _t0.tzinfo else _t0.tz_localize("UTC")).timestamp()
+# FastF1 can leave t0_date unset (None -> NaT) on sessions with no telemetry/position
+# data even when session.load() otherwise "succeeds" — degrade to no radio/race-control
+# rather than crashing the whole bake (extract_radio/extract_race_control will each
+# raise on a None t0_epoch_s, which their own callers already catch and warn on).
+try:
+    _t0 = pd.Timestamp(session.t0_date)
+    t0_epoch_s = (_t0.tz_convert("UTC") if _t0.tzinfo else _t0.tz_localize("UTC")).timestamp()
+except (ValueError, TypeError) as e:
+    print(f"  Warning: session t0_date unavailable ({type(e).__name__}: {e}); team radio and race control will be empty")
+    t0_epoch_s = None
 
 print("\nFetching team radio...")
 radio_clips = []

@@ -153,4 +153,9 @@ describe('updateLapHistory', () => {
     expect(prev[1]).toEqual([81000]);
     expect(next[1]).toEqual([81000, 80500]);
   });
+  it('returns the same reference when no driver\'s history changed (10 Hz no-op tick)', () => {
+    const prev = updateLapHistory({}, [car({ driverNum: 1, lastLapMs: 81000 })]);
+    const next = updateLapHistory(prev, [car({ driverNum: 1, lastLapMs: 81000 })]);
+    expect(next).toBe(prev);
+  });
 });

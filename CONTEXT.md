@@ -151,8 +151,9 @@ radio-free analytics surfaces.
 The rolling per-lane log of session messages — flags, safety car, investigations —
 shown alongside the **timing tower** on the main board. Baked from the session's
 actual race-control feed at record time, attached to whichever **frame** covers each
-message's moment, and accumulated on the **snapshot** in a rolling buffer (cap 30)
-the same way **team radio** history accumulates.
+message's moment, and accumulated on the **snapshot** incrementally as those frames
+play — a genuine rolling buffer (cap 30), unlike **team radio**'s reference list,
+which rides the snapshot whole and fixed from the very first frame.
 
 - _Use_ "race control" or "the race-control feed"; not "incidents" or "flags" alone
   (those are one **category** of message, not the whole feed).

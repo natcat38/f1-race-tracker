@@ -93,30 +93,19 @@ export function TimingTower({
               <td style={{ color: TYRE_COLOUR[c.tyre ?? ''] ?? 'var(--chalk)' }}>
                 {c.tyre ? `${c.tyre[0]}${c.tyreAge ? ` ${c.tyreAge}` : ''}` : '—'}
               </td>
-              <td style={cellColour(c.s1Ms, b1, c.driverNum, 0)}>
-                {fmtSec(c.s1Ms)}
-                {cellDelta(c.s1Ms, c.driverNum, 0) !== undefined && (
-                  <sup style={{ fontSize: 9, color: 'var(--slate)', marginLeft: 3 }}>
-                    {fmtGap(cellDelta(c.s1Ms, c.driverNum, 0))}
-                  </sup>
-                )}
-              </td>
-              <td style={cellColour(c.s2Ms, b2, c.driverNum, 1)}>
-                {fmtSec(c.s2Ms)}
-                {cellDelta(c.s2Ms, c.driverNum, 1) !== undefined && (
-                  <sup style={{ fontSize: 9, color: 'var(--slate)', marginLeft: 3 }}>
-                    {fmtGap(cellDelta(c.s2Ms, c.driverNum, 1))}
-                  </sup>
-                )}
-              </td>
-              <td style={cellColour(c.s3Ms, b3, c.driverNum, 2)}>
-                {fmtSec(c.s3Ms)}
-                {cellDelta(c.s3Ms, c.driverNum, 2) !== undefined && (
-                  <sup style={{ fontSize: 9, color: 'var(--slate)', marginLeft: 3 }}>
-                    {fmtGap(cellDelta(c.s3Ms, c.driverNum, 2))}
-                  </sup>
-                )}
-              </td>
+              {([[c.s1Ms, b1, 0], [c.s2Ms, b2, 1], [c.s3Ms, b3, 2]] as const).map(([v, best, i]) => {
+                const d = cellDelta(v, c.driverNum, i);
+                return (
+                  <td key={i} style={cellColour(v, best, c.driverNum, i)}>
+                    {fmtSec(v)}
+                    {d !== undefined && (
+                      <sup style={{ fontSize: 9, color: 'var(--slate)', marginLeft: 3 }}>
+                        {fmtGap(d)}
+                      </sup>
+                    )}
+                  </td>
+                );
+              })}
             </tr>
           );
         })}

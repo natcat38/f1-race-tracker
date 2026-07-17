@@ -41,7 +41,7 @@ type CarState struct {
 
 type RaceControlMessage struct {
 	Rev      int64  `json:"rev"`
-	T        int64  `json:"t"`
+	T        int64  `json:"t"` // session-relative ms (mirrors Frame.TimeMs) — NOT wall-clock like Frame.T
 	Category string `json:"category"`
 	Message  string `json:"message"`
 	Driver   *int   `json:"driver,omitempty"`
