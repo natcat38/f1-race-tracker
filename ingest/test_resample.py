@@ -1,4 +1,4 @@
-from resample import nearest_index, step_value
+from resample import in_window_ms, nearest_index, step_value
 
 
 def test_nearest_index_picks_closer_neighbour_not_ceiling():
@@ -35,3 +35,10 @@ def test_step_value_holds_last_value_at_or_before_t():
 
 def test_step_value_empty_returns_default():
     assert step_value([], [], 5, 'default') == 'default'
+
+
+def test_in_window_ms_half_open():
+    assert in_window_ms(3300000, 3300, 3750) is True   # at lower bound: included
+    assert in_window_ms(3749999, 3300, 3750) is True   # just under upper bound
+    assert in_window_ms(3750000, 3300, 3750) is False  # at upper bound: excluded
+    assert in_window_ms(3299999, 3300, 3750) is False  # just before lower bound

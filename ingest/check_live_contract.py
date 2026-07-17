@@ -4,7 +4,7 @@ Collectable by pytest (`pytest ingest`) AND runnable directly
 (`python ingest/check_live_contract.py`) for the CI contract job.
 """
 import sys
-from live import build_snapshot, build_frame
+from live import build_snapshot, build_frame, fold_messages
 
 SNAP_KEYS = {"session", "mode", "label", "track", "radio", "lapTrace", "cars", "timeMs", "rev"}
 FRAME_KEYS = {"session", "rev", "t", "timeMs", "cars"}
@@ -34,8 +34,22 @@ def test_frame_messages_key_optional():
     assert build_frame("live", 7, 1234, [], []).keys() == FRAME_KEYS
 
 
+def test_fold_messages_caps_at_30():
+    existing = [{"rev": i} for i in range(28)]
+    new = [{"rev": 28}, {"rev": 29}]
+    folded = fold_messages(existing, new)
+    assert len(folded) == 30, f"expected 30, got {len(folded)}"
+    assert folded[0]["rev"] == 0 and folded[-1]["rev"] == 29
+
+    # Pushing 5 more past the cap drops the oldest, keeping the newest 30.
+    folded = fold_messages(folded, [{"rev": 30}, {"rev": 31}, {"rev": 32}, {"rev": 33}, {"rev": 34}])
+    assert len(folded) == 30
+    assert folded[0]["rev"] == 5 and folded[-1]["rev"] == 34
+
+
 if __name__ == "__main__":
     test_snapshot_and_frame_key_contract()
     test_frame_messages_key_optional()
+    test_fold_messages_caps_at_30()
     print("live.py contract self-check PASSED")
     sys.exit(0)

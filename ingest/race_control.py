@@ -4,6 +4,7 @@ Kept free of fastf1/pandas so it is unit-testable and importable in the CI
 contract job (which installs only `redis`). The recorder does the FastF1 fetch
 and tz handling, then hands plain dicts here.
 """
+from resample import in_window_ms
 
 
 def extract_race_control(rows, t0_epoch_s, window_start_s, window_end_s, known_driver_nums):
@@ -20,7 +21,7 @@ def extract_race_control(rows, t0_epoch_s, window_start_s, window_end_s, known_d
         if not cat or not msg:
             continue
         time_ms = round((row['epoch_s'] - t0_epoch_s) * 1000)
-        if not (window_start_s * 1000 <= time_ms < window_end_s * 1000):
+        if not in_window_ms(time_ms, window_start_s, window_end_s):
             continue
         driver = None
         try:

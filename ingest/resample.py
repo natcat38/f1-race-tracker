@@ -31,3 +31,12 @@ def step_value(times, values, t, default):
     """
     i = bisect.bisect_right(times, t) - 1
     return values[i] if i >= 0 else default
+
+
+def in_window_ms(time_ms, window_start_s, window_end_s):
+    """True if time_ms (session-relative ms) falls in the baked window
+    [window_start_s, window_end_s) seconds — half-open, so a message/capture
+    exactly at the upper bound is excluded. Shared by radio.py and
+    race_control.py so the boundary convention can't silently drift between them.
+    """
+    return window_start_s * 1000 <= time_ms < window_end_s * 1000

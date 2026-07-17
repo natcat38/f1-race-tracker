@@ -66,6 +66,12 @@ def build_frame(session, rev, time_ms, cars, messages=None):
     return frame
 
 
+def fold_messages(existing, new, cap=30):
+    """Append new race-control messages onto existing and cap the rolling
+    buffer, mirroring internal/model/apply.go's Apply()."""
+    return (existing + new)[-cap:]
+
+
 def publish_clip(r, session, clip_path, label_override):
     with open(clip_path, "r", encoding="utf-8") as f:
         header = json.loads(f.readline())
@@ -96,8 +102,8 @@ def publish_clip(r, session, clip_path, label_override):
             for c in cars:  # fold into the running snapshot (string keys, per Go)
                 snapshot["cars"][str(c["driverNum"])] = c
             msgs = fr.get("messages")
-            if msgs:  # mirror model.Apply's rolling race-control buffer (cap 30)
-                snapshot["messages"] = (snapshot.get("messages", []) + msgs)[-30:]
+            if msgs:
+                snapshot["messages"] = fold_messages(snapshot.get("messages", []), msgs)
             snapshot["timeMs"] = fr["timeMs"]
             snapshot["rev"] = rev
             frame = build_frame(session, rev, fr["timeMs"], cars, msgs)
