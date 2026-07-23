@@ -45,6 +45,19 @@ To bake a different circuit:
 
 The output path, `--gp`, and `--year` are the only arguments you normally need to change. `--label` overrides the display label if the default (`"<GP> <year> · Race"`) is not what you want.
 
+To target a specific lap range instead of the default mid-race window (e.g. to
+land on a real pit-stop phase), pass `--start-lap`/`--end-lap`; the window is
+derived from the leader's `LapStartTime` for those laps:
+
+```bash
+.venv/Scripts/python ingest/record.py data/replays/monza-2024-race.jsonl \
+  --gp Monza --year 2024 --start-lap 13 --end-lap 17
+```
+
+Inspect `session.laps[~session.laps['PitInTime'].isna()]` first to find a
+green-flag window with real pit stops in it — the script doesn't guess this
+for you.
+
 On first run, FastF1 downloads ~50 MB of session data and caches it under `cache/` (gitignored). Subsequent runs are fast.
 
 Alongside position/timing, `record.py` also bakes real **race-control messages**
@@ -63,12 +76,12 @@ happens for a circuit you care about.
 
 The output is JSONL (one JSON object per line):
 
-- **Line 1 (header):** `{"track":[{"x":float,"y":float},...], "label":"...", "maxRev":int, "radio":[{"timeMs":int,"driverNum":int,"clip":"https://..."}], "lapTrace":{"<driverNum>":[ms,...]}}`
-- **Lines 2–N (frames):** `{"timeMs":int, "frame":{"rev":int,"timeMs":int,"cars":[...],"messages":[{"rev":int,"t":int,"category":"...","message":"...","driver":int}]}}` (`messages` omitted when none fall in that tick)
+- **Line 1 (header):** `{"track":[{"x":float,"y":float},...], "label":"...", "maxRev":int, "radio":[{"timeMs":int,"driverNum":int,"clip":"https://..."}], "lapTrace":{"<driverNum>":[ms,...]}, "totalLaps":int, "stints":{"<driverNum>":[{"compound":"SOFT","startLap":int,"endLap":int}]}}`
+- **Lines 2–N (frames):** `{"timeMs":int, "frame":{"rev":int,"timeMs":int,"cars":[...],"messages":[{"rev":int,"t":int,"category":"...","message":"...","driver":int}],"weather":{"airTempC":float,"trackTempC":float,"rainfall":bool}}}` (`messages`/`weather` omitted when not applicable to that tick)
 
-`radio` (Phase 3) is a list of team-radio clip references falling inside the baked window; `lapTrace` (Phase 4) maps each driver's number to a cumulative-ms pace curve over their fastest accurate lap, used by the cross-year ghost overlay; `messages` (per-frame, optional) carries any race-control entries whose tick falls in that frame.
+`radio` (Phase 3) is a list of team-radio clip references falling inside the baked window; `lapTrace` (Phase 4) maps each driver's number to a cumulative-ms pace curve over their fastest accurate lap, used by the cross-year ghost overlay; `totalLaps` is the session's full race distance; `stints` is each driver's **whole-race** tyre-stint plan (compound + lap range per stint), not windowed like the frame stream — the strategy chart shows the full plan even though the replay window only covers part of it; `messages` (per-frame, optional) carries any race-control entries whose tick falls in that frame; `weather` (per-frame, optional) carries the current air/track temp and rainfall, attached only when the sample changes from the last-emitted one.
 
-Each car: `{"driverNum":int,"code":"VER","team":"Red Bull","pos":int,"p":{"x":float,"y":float},"status":"OnTrack"}`
+Each car: `{"driverNum":int,"code":"VER","team":"Red Bull","pos":int,"lap":int,"p":{"x":float,"y":float},"status":"OnTrack"}` — `status` is `"OnTrack"`, `"Pit"` (derived from `PitInTime`/`PitOutTime`, not the position-data `Status` field — see Notes below), or `"Out"`.
 
 Coordinates are normalised to `[0,1]`. Team strings match the frontend colour map in `web/src/components/Map.tsx`.
 
@@ -94,6 +107,7 @@ Edit the top of `record.py` to adjust:
 - FastF1 position data is in millimetres (X range ~12,000 mm at Monza = ~12 m? — actually in local track coordinate system, ~metres scaled).
 - Y is flipped (`1.0 - normalised_y`) so the track renders upright in SVG (SVG y-axis grows downward).
 - Running order (`pos`) is derived from lap-level `Position` data with step interpolation — accurate to within one lap interval.
+- **Pit status is derived from lap timing, not position status.** FastF1's `pos_data['Status']` column reads `"OnTrack"` for the entire session in every session checked so far, even during a confirmed pit stop — it does not reliably tag pit lane. `status: "Pit"` is instead derived from each lap's `PitInTime`/`PitOutTime`, which are reliable.
 - `cache/` is gitignored. Delete it to force a re-download.
 
 ---

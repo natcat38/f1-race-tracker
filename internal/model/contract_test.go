@@ -27,6 +27,9 @@ func TestGoldenSnapshotContract(t *testing.T) {
 	if s.Rev != 42 || s.TimeMs != 3300000 {
 		t.Fatalf("rev/timeMs mismatched: rev=%d timeMs=%d", s.Rev, s.TimeMs)
 	}
+	if s.TotalLaps != 53 {
+		t.Fatalf("totalLaps mismatched: %d", s.TotalLaps)
+	}
 	if len(s.Track) != 2 || s.Track[1].X != 0.9 {
 		t.Fatalf("track mismatched: %+v", s.Track)
 	}
@@ -37,6 +40,9 @@ func TestGoldenSnapshotContract(t *testing.T) {
 	c1 := s.Cars[1]
 	if c1.DriverNum != 1 || c1.Code != "VER" || c1.Team != "Red Bull" || c1.Status != StatusOnTrack {
 		t.Fatalf("car 1 identity/status mismatched: %+v", c1)
+	}
+	if c1.Lap != 12 {
+		t.Fatalf("car 1 lap mismatched: %+v", c1)
 	}
 	if c1.Tyre != "SOFT" || c1.TyreAge != 5 || c1.LastLapMs != 81234 || c1.BestLapMs != 80950 {
 		t.Fatalf("car 1 timing fields mismatched: %+v", c1)
@@ -56,5 +62,12 @@ func TestGoldenSnapshotContract(t *testing.T) {
 	}
 	if len(s.LapTrace[1]) != 4 {
 		t.Fatalf("lapTrace mismatched: %+v", s.LapTrace)
+	}
+
+	if len(s.Stints[1]) != 2 || s.Stints[1][1].Compound != "HARD" || s.Stints[1][1].StartLap != 15 {
+		t.Fatalf("stints mismatched: %+v", s.Stints)
+	}
+	if s.Weather == nil || s.Weather.TrackTempC != 41.2 || s.Weather.AirTempC != 28.5 || s.Weather.Rainfall {
+		t.Fatalf("weather mismatched: %+v", s.Weather)
 	}
 }

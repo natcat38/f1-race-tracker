@@ -18,6 +18,9 @@ func Apply(s *Snapshot, f Frame) (*Snapshot, bool) {
 			s.Messages = s.Messages[len(s.Messages)-maxMessages:]
 		}
 	}
+	if f.Weather != nil {
+		s.Weather = f.Weather
+	}
 	s.TimeMs = f.TimeMs
 	s.Rev = f.Rev
 	return s, true

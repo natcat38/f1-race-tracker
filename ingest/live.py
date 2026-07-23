@@ -48,21 +48,24 @@ def starting_rev(r, session):
         return 0
 
 
-def build_snapshot(session, label, track, radio, lap_trace, rev):
+def build_snapshot(session, label, track, radio, lap_trace, stints, total_laps, rev):
     return {
         "session": session, "mode": "live", "label": label,
-        "track": track, "radio": radio, "lapTrace": lap_trace,
+        "track": track, "radio": radio, "lapTrace": lap_trace, "totalLaps": total_laps,
+        "stints": stints,
         "cars": {}, "timeMs": 0, "rev": rev,
     }
 
 
-def build_frame(session, rev, time_ms, cars, messages=None):
+def build_frame(session, rev, time_ms, cars, messages=None, weather=None):
     frame = {
         "session": session, "rev": rev,
         "t": int(time.time() * 1000), "timeMs": time_ms, "cars": cars,
     }
     if messages:
         frame["messages"] = messages
+    if weather is not None:
+        frame["weather"] = weather
     return frame
 
 
@@ -83,8 +86,10 @@ def publish_clip(r, session, clip_path, label_override):
     track = header.get("track", [])
     radio = header.get("radio", [])
     lap_trace = header.get("lapTrace", {})
+    total_laps = header.get("totalLaps", 0)
+    stints = header.get("stints", {})
     label = label_override or header.get("label", "Live")
-    snapshot = build_snapshot(session, label, track, radio, lap_trace, starting_rev(r, session))
+    snapshot = build_snapshot(session, label, track, radio, lap_trace, stints, total_laps, starting_rev(r, session))
     rev = snapshot["rev"]
     base_ms = lines[0]["timeMs"]
     print(f"live: streaming {len(lines)} frames of '{label}' to session '{session}' (start rev {rev})")
@@ -104,9 +109,12 @@ def publish_clip(r, session, clip_path, label_override):
             msgs = fr.get("messages")
             if msgs:
                 snapshot["messages"] = fold_messages(snapshot.get("messages", []), msgs)
+            weather = fr.get("weather")
+            if weather is not None:
+                snapshot["weather"] = weather
             snapshot["timeMs"] = fr["timeMs"]
             snapshot["rev"] = rev
-            frame = build_frame(session, rev, fr["timeMs"], cars, msgs)
+            frame = build_frame(session, rev, fr["timeMs"], cars, msgs, weather)
             r.set(snap_key(session), json.dumps(snapshot, separators=(",", ":")))
             r.publish(frames_chan(session), json.dumps(frame, separators=(",", ":")))
 

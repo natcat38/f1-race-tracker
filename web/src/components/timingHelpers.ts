@@ -13,9 +13,12 @@ export function fmtLap(ms: number | undefined): string {
 // 0 is a real moment in time here (e.g. Ghost's playback clock at loop start),
 // not "no value yet" — so there's no absent-value guard.
 export function fmtElapsed(ms: number): string {
-  const m = Math.floor(ms / 60000);
-  const s = Math.floor((ms % 60000) / 1000);
-  const millis = ms % 1000;
+  // Ghost's tMs is a raw performance.now() delta, so it's a float — floor it
+  // first or `ms % 1000` leaves a fractional millis that prints as garbage digits.
+  const whole = Math.floor(ms);
+  const m = Math.floor(whole / 60000);
+  const s = Math.floor((whole % 60000) / 1000);
+  const millis = whole % 1000;
   return `${m}:${String(s).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
 }
 
@@ -76,6 +79,22 @@ export const TYRE_COLOUR: Record<string, string> = {
   INTERMEDIATE: '#3bb273', WET: '#3671C6',
 };
 
+// tyreLabel is the single compact tyre readout shared by TimingTower and
+// Standings (previously formatted inconsistently between the two: "S 5" vs "S5").
+export function tyreLabel(tyre?: string, age?: number): string {
+  if (!tyre) return '—';
+  return `${tyre[0]}${age ? age : ''}`;
+}
+
+// statusLabel renders the Gap-cell override for a car that's not on a flying
+// lap: "IN PIT" while in the pit lane, "OUT" once retired. undefined for a
+// car that's on track, so the caller falls back to the normal gap/int display.
+export function statusLabel(status: string): string | undefined {
+  if (status === 'Pit') return 'IN PIT';
+  if (status === 'Out') return 'OUT';
+  return undefined;
+}
+
 // orderCars returns the cars sorted by running position.
 export function orderCars(cars: RaceState['cars']): Car[] {
   return Object.values(cars).sort((a, b) => a.pos - b.pos);
@@ -126,6 +145,43 @@ export function sectorColour(
 export function sectorDelta(v: number | undefined, personalBest: number): number | undefined {
   if (!v || v <= 0 || personalBest === Infinity || v <= personalBest) return undefined;
   return v - personalBest;
+}
+
+// sectorDeltaVs: signed ms this car's sector is slower (+) or faster (-) than
+// a reference car's same sector — the "how much am I losing to them, right
+// now" question a race engineer actually asks, as opposed to sectorDelta's
+// against-your-own-best framing.
+export function sectorDeltaVs(v: number | undefined, ref: number | undefined): number | undefined {
+  if (!v || v <= 0 || !ref || ref <= 0) return undefined;
+  return v - ref;
+}
+
+// fmtSigned renders a signed ms delta as "+0.312" / "-0.145".
+export function fmtSigned(ms: number): string {
+  const sign = ms < 0 ? '-' : '+';
+  return `${sign}${(Math.abs(ms) / 1000).toFixed(3)}`;
+}
+
+// GapHistory maps driverNum -> {lap: last lap counted, gaps: recent gapMs
+// readings, oldest-first} — the "closing/opening" trend a race engineer
+// watches lap over lap, as opposed to the instantaneous Gap column.
+export type GapHistory = Record<number, { lap: number; gaps: number[] }>;
+const MAX_GAP_HISTORY = 8;
+
+// updateGapHistory appends a driver's gapMs once per completed lap (detected
+// via c.lap incrementing), mirroring updateLapHistory's reference-equality
+// bail-out when nothing actually changed this tick.
+export function updateGapHistory(prev: GapHistory, cars: Car[]): GapHistory {
+  let next: GapHistory | undefined;
+  for (const c of cars) {
+    if (c.lap == null) continue;
+    const entry = prev[c.driverNum];
+    if (entry && c.lap <= entry.lap) continue;
+    next ??= { ...prev };
+    const gaps = [...(entry?.gaps ?? []), c.gapMs ?? 0].slice(-MAX_GAP_HISTORY);
+    next[c.driverNum] = { lap: c.lap, gaps };
+  }
+  return next ?? prev;
 }
 
 // LapHistory maps driverNum -> recent completed lap times (ms), oldest-first.

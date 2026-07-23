@@ -1,5 +1,5 @@
 import type { Car } from '../state/race';
-import { fmtLap } from './timingHelpers';
+import { fmtLap, fmtGap } from './timingHelpers';
 
 function Bar({ label, value }: { label: string; value: number }) {
   return (
@@ -14,12 +14,14 @@ function Bar({ label, value }: { label: string; value: number }) {
 }
 
 // Sparkline: one bar per completed lap, red = slower than previous lap,
-// green = faster — the stint-degradation squint test.
+// green = faster — the stint-degradation squint test. Reused for the gap
+// trend too, where the same colouring reads as "closing" (green) vs
+// "opening" (red).
 function Sparkline({ values }: { values: number[] }) {
   const min = Math.min(...values), max = Math.max(...values);
   const span = max - min || 1;
   return (
-    <svg width={values.length * 15} height={24} role="img" aria-label="Lap time trend">
+    <svg width={values.length * 15} height={24} role="img" aria-label="Trend">
       {values.map((v, i) => {
         const h = 4 + ((v - min) / span) * 18;
         const slower = i > 0 && v > values[i - 1];
@@ -32,12 +34,11 @@ function Sparkline({ values }: { values: number[] }) {
   );
 }
 
-export function TelemetryPanel({ car, history }: { car: Car | undefined; history?: number[] }) {
-  if (!car) {
-    return <div className="empty">Select a car to see telemetry</div>;
-  }
+function CarTelemetry({ car, history, gapHistory }: {
+  car: Car; history?: number[]; gapHistory?: number[];
+}) {
   return (
-    <div style={{ display: 'grid', gap: 8, minWidth: 240 }}>
+    <div style={{ display: 'grid', gap: 8, minWidth: 200 }}>
       <div style={{ fontSize: 14 }}>
         <b>{car.code}</b> <span style={{ color: 'var(--slate)' }}>{car.team}</span>
       </div>
@@ -55,6 +56,56 @@ export function TelemetryPanel({ car, history }: { car: Car | undefined; history
           <span>{fmtLap(history[history.length - 1])}</span>
         </div>
       )}
+      {gapHistory && gapHistory.length >= 2 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+          <span style={{ width: 64, color: 'var(--slate)' }}>Gap</span>
+          <Sparkline values={gapHistory} />
+          <span>{fmtGap(gapHistory[gapHistory.length - 1])}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function TelemetryPanel({
+  car, history, gapHistory, cars, rival, rivalCar, rivalHistory, rivalGapHistory, onRivalChange,
+}: {
+  car: Car | undefined;
+  history?: number[];
+  gapHistory?: number[];
+  cars?: Car[];
+  rival?: number | null;
+  rivalCar?: Car;
+  rivalHistory?: number[];
+  rivalGapHistory?: number[];
+  onRivalChange?: (driverNum: number | null) => void;
+}) {
+  if (!car) {
+    return <div className="empty">Select a car to see telemetry</div>;
+  }
+  const others = (cars ?? []).filter((c) => c.driverNum !== car.driverNum);
+  return (
+    <div style={{ display: 'grid', gap: 8 }}>
+      {others.length > 0 && onRivalChange && (
+        <label style={{ fontSize: 11, color: 'var(--slate)', display: 'flex', alignItems: 'center', gap: 6 }}>
+          vs
+          <select
+            value={rival ?? ''}
+            onChange={(e) => onRivalChange(e.target.value ? Number(e.target.value) : null)}
+            className="btn"
+            style={{ fontSize: 11 }}
+          >
+            <option value="">— none —</option>
+            {others.map((c) => (
+              <option key={c.driverNum} value={c.driverNum}>{c.code}</option>
+            ))}
+          </select>
+        </label>
+      )}
+      <div style={{ display: 'flex', gap: 16 }}>
+        <CarTelemetry car={car} history={history} gapHistory={gapHistory} />
+        {rivalCar && <CarTelemetry car={rivalCar} history={rivalHistory} gapHistory={rivalGapHistory} />}
+      </div>
     </div>
   );
 }

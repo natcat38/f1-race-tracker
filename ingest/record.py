@@ -6,19 +6,23 @@ Bakes a real F1 session into the contract read by the Go replay player.
 CONTRACT (must match internal/model/model.go + web/src/state/race.ts):
   Header line: {"track":[{"x":float,"y":float},...], "label":"...", "maxRev":int,
                 "radio":[{"timeMs":int,"driverNum":int,"clip":"https://..."}],
-                "lapTrace":{"<num>":[ms,...]}}
+                "lapTrace":{"<num>":[ms,...]},
+                "stints":{"<num>":[{"compound":"SOFT","startLap":int,"endLap":int}]}}
   Frame lines: {"timeMs":int, "frame":{"rev":int,"timeMs":int,"cars":[
                  {"driverNum":int,"code":"VER","team":"Red Bull","pos":int,
-                  "p":{"x":float,"y":float},"status":"OnTrack"}]}}
+                  "p":{"x":float,"y":float},"status":"OnTrack"}],
+                 "weather":{"airTempC":float,"trackTempC":float,"rainfall":bool}}}
 
 Usage:
-  .venv/Scripts/python.exe ingest/record.py [out] [--year YEAR] [--gp GP] [--session S] [--label LABEL]
+  .venv/Scripts/python.exe ingest/record.py [out] [--year YEAR] [--gp GP] [--session S] [--label LABEL] [--start-lap N --end-lap M]
 
 Default output: data/replays/monza-2024-race.jsonl
 
 Note: WINDOW_START_S/WINDOW_END_S define a mid-race window that works well for most
 circuits but may need tuning per circuit (e.g. if the window falls under a safety car
-or a long pit phase for a particular GP).
+or a long pit phase for a particular GP). Pass --start-lap/--end-lap to target a
+specific lap range instead (e.g. a green-flag pit-stop phase) — the window is derived
+from the leader's LapStartTime for those laps.
 
 Frame lines optionally carry "messages":[{"rev":int,"t":int,"category":"...",
 "message":"...","driver":int}] — race-control entries (flags, safety car,
@@ -49,6 +53,8 @@ _ap.add_argument("--year", type=int, default=2024)
 _ap.add_argument("--gp", default="Monza")
 _ap.add_argument("--session", default="R")
 _ap.add_argument("--label", default=None, help="defaults to '<gp> <year> · Race'")
+_ap.add_argument("--start-lap", type=int, default=None, help="bake the window starting at this lap (leader's LapStartTime)")
+_ap.add_argument("--end-lap", type=int, default=None, help="bake the window ending after this lap completes")
 _args = _ap.parse_args()
 
 OUTPUT_PATH = _args.out
@@ -91,8 +97,21 @@ fastf1.Cache.enable_cache(str(cache_dir))
 
 print(f"Loading {_args.gp} {_args.year} session '{_args.session}' (cached if already downloaded)...")
 session = fastf1.get_session(_args.year, _args.gp, _args.session)
-session.load(telemetry=True, laps=True, weather=False)
+session.load(telemetry=True, laps=True, weather=True)
 print(f"Loaded. Drivers: {session.drivers}")
+
+# Lap-window override: derive WINDOW_START_S/WINDOW_END_S from the leader's lap
+# start times instead of the fixed mid-race window, so a caller can target a
+# specific green-flag pit-stop phase (see --start-lap/--end-lap above).
+if _args.start_lap is not None and _args.end_lap is not None:
+    lap_starts = session.laps.groupby('LapNumber')['LapStartTime'].min()
+    WINDOW_START_S = int(lap_starts.loc[_args.start_lap].total_seconds())
+    _next_lap = _args.end_lap + 1
+    WINDOW_END_S = (int(lap_starts.loc[_next_lap].total_seconds())
+                     if _next_lap in lap_starts.index else WINDOW_START_S + 450)
+    print(f"Window from laps {_args.start_lap}-{_args.end_lap}: {WINDOW_START_S}s -> {WINDOW_END_S}s")
+    if WINDOW_END_S - WINDOW_START_S > 600:
+        print(f"  WARNING: window is {(WINDOW_END_S - WINDOW_START_S) / 60:.1f} min — consider a narrower lap range.")
 
 # ---------------------------------------------------------------------------
 # Build driver info map: driver_number -> {code, team}
@@ -428,10 +447,90 @@ def _lap_number(driver_num, t_s):
         return 1
     return step_value(times, lapnums, t_s, lapnums[0])
 
+# ---------------------------------------------------------------------------
+# Stints (Phase 3): whole-race tyre-stint plan per driver, baked once — not
+# windowed like the frame stream, so the strategy chart can show the full plan.
+# ---------------------------------------------------------------------------
+
+stints = {}
+for num in session.drivers:
+    inum = int(num)
+    if inum not in driver_info:
+        continue
+    drv = session.laps.pick_drivers(num)
+    out = []
+    for _, grp in drv.groupby('Stint'):
+        grp = grp.dropna(subset=['LapNumber'])
+        if grp.empty or pd.isna(grp['Compound'].iloc[0]):
+            continue
+        out.append({
+            "compound": str(grp['Compound'].iloc[0]),
+            "startLap": int(grp['LapNumber'].min()),
+            "endLap": int(grp['LapNumber'].max()),
+        })
+    if out:
+        stints[inum] = out
+print(f"Stints baked for {len(stints)} drivers")
+
+# ---------------------------------------------------------------------------
+# Pit-lane windows: the position-data 'Status' field does NOT reliably tag pit
+# lane in FastF1 (verified empty — 'OnTrack' for the entire session, even during
+# a confirmed pit stop) — so a car's Pit/Out status is derived from lap timing
+# (PitInTime/PitOutTime) instead, which is authoritative.
+# ---------------------------------------------------------------------------
+
+pit_windows = {}  # driver_num -> [(pit_in_s, pit_out_s), ...]
+for num in session.drivers:
+    inum = int(num)
+    if inum not in driver_info:
+        continue
+    drv = session.laps.pick_drivers(num).sort_values('LapNumber')
+    windows = []
+    pit_in = None
+    for _, lap in drv.iterrows():
+        if not pd.isna(lap['PitInTime']):
+            pit_in = lap['PitInTime'].total_seconds()
+        if not pd.isna(lap['PitOutTime']) and pit_in is not None:
+            windows.append((pit_in, lap['PitOutTime'].total_seconds()))
+            pit_in = None
+    if pit_in is not None:
+        windows.append((pit_in, pit_in + 30))  # no recorded out-lap; assume a typical stop
+    pit_windows[inum] = windows
+
+def _in_pit(driver_num, t_s):
+    for in_s, out_s in pit_windows.get(driver_num, []):
+        if in_s <= t_s <= out_s:
+            return True
+    return False
+
+# ---------------------------------------------------------------------------
+# Weather (Phase 3): low-rate session.weather_data step lookup (air/track temp,
+# rainfall). Attached to a frame only when it differs from the last emission.
+# ---------------------------------------------------------------------------
+
+_wx = session.weather_data
+_wx_times = [t.total_seconds() for t in _wx['Time']] if _wx is not None and not _wx.empty else []
+_wx_air = list(_wx['AirTemp']) if _wx_times else []
+_wx_track = list(_wx['TrackTemp']) if _wx_times else []
+_wx_rain = list(_wx['Rainfall']) if _wx_times else []
+
+def _weather_at(t_s):
+    if not _wx_times:
+        return None
+    idx = nearest_index(np.array(_wx_times), t_s)
+    return {
+        "airTempC": round(float(_wx_air[idx]), 1),
+        "trackTempC": round(float(_wx_track[idx]), 1),
+        "rainfall": bool(_wx_rain[idx]),
+    }
+
 # Field pace: median completed lap time (ms) across the field; fallback 90s.
 _all_laps_ms = [_ms(t) for t in session.laps['LapTime'] if not pd.isna(t)]
 _all_laps_ms = [m for m in _all_laps_ms if m > 0]
 LEADER_LAP_MS = int(np.median(_all_laps_ms)) if _all_laps_ms else 90000
+
+# Total race distance in laps — the highest lap number anyone reached this session.
+TOTAL_LAPS = int(session.laps['LapNumber'].max()) if not session.laps.empty else 0
 
 # ---------------------------------------------------------------------------
 # Resample all drivers onto common 10 Hz grid over the window
@@ -545,10 +644,13 @@ with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
         "maxRev": max_rev,
         "radio": radio_clips,
         "lapTrace": lap_traces,
+        "totalLaps": TOTAL_LAPS,
+        "stints": stints,
     }
     f.write(json.dumps(header, separators=(',', ':')) + '\n')
 
     # --- Frame lines ---
+    _last_weather = None
     for i, t_s in enumerate(t_grid_s):
         rev = i + 1
         time_ms = int(round(t_s * 1000))
@@ -568,6 +670,8 @@ with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
                 status_str = 'Pit'
             else:
                 status_str = 'Out'
+            if _in_pit(dnum, t_s):
+                status_str = 'Pit'
 
             nx, ny = normalise(xi, yi)
             pos_order = get_position(dnum, t_s)
@@ -611,6 +715,7 @@ with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
         for car in cars:
             dn = car['driverNum']
             lapn[dn] = _lap_number(dn, t_s)
+            car['lap'] = lapn[dn]
             frac[dn] = _lap_fraction(car['p']['x'], car['p']['y'])
             dist[dn] = lapn[dn] + frac[dn]
         by_pos = sorted(cars, key=lambda c: c['pos'])
@@ -647,6 +752,10 @@ with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
         frame = {"rev": rev, "timeMs": time_ms, "cars": cars}
         if i in msgs_by_idx:
             frame["messages"] = msgs_by_idx[i]
+        wx = _weather_at(t_s)
+        if wx is not None and (i == 0 or wx != _last_weather):
+            frame["weather"] = wx
+            _last_weather = wx
         frame_line = {"timeMs": time_ms, "frame": frame}
         f.write(json.dumps(frame_line, separators=(',', ':')) + '\n')
 
@@ -692,7 +801,14 @@ try:
         assert {'timeMs', 'driverNum', 'clip'} <= set(rm.keys()), f"radio item missing fields: {rm}"
         assert WINDOW_START_S * 1000 <= rm['timeMs'] < WINDOW_END_S * 1000, f"radio timeMs out of window: {rm}"
         assert rm['clip'].startswith('http'), f"radio clip not a URL: {rm}"
-    print(f"  Header OK: {len(hdr['track'])} track points, maxRev={hdr['maxRev']}, {len(hdr['radio'])} radio clips")
+    assert 'totalLaps' in hdr, "header missing 'totalLaps'"
+    assert isinstance(hdr['totalLaps'], int) and hdr['totalLaps'] >= 0, "totalLaps must be a non-negative int"
+    assert 'stints' in hdr, "header missing 'stints'"
+    assert len(hdr['stints']) >= 15, f"expected stints for >=15 drivers, got {len(hdr['stints'])}"
+    for dn, stint_list in hdr['stints'].items():
+        for st in stint_list:
+            assert {'compound', 'startLap', 'endLap'} <= set(st.keys()), f"stint missing fields: {st}"
+    print(f"  Header OK: {len(hdr['track'])} track points, maxRev={hdr['maxRev']}, {len(hdr['radio'])} radio clips, totalLaps={hdr['totalLaps']}, stints for {len(hdr['stints'])} drivers")
 except AssertionError as e:
     print(f"  HEADER ERROR: {e}")
     errors += 1
@@ -719,6 +835,31 @@ for idx in check_indices:
         print(f"  Frame line {idx} OK: rev={frame['rev']}, {len(frame['cars'])} cars")
     except AssertionError as e:
         print(f"  FRAME ERROR at line {idx}: {e}")
+        errors += 1
+
+# Scan every frame line (not just the sample) for weather presence and, when a
+# lap window was requested, an actual pit stop — the whole point of the re-bake.
+saw_weather = False
+saw_pit = False
+for line in lines[1:]:
+    fr = json.loads(line)['frame']
+    if 'weather' in fr:
+        saw_weather = True
+    if any(c.get('status') == 'Pit' for c in fr['cars']):
+        saw_pit = True
+try:
+    assert saw_weather, "no frame carried a 'weather' field"
+    print("  Weather OK: at least one frame carries weather")
+except AssertionError as e:
+    print(f"  WEATHER ERROR: {e}")
+    errors += 1
+
+if _args.start_lap is not None:
+    try:
+        assert saw_pit, "no frame car had status 'Pit' in the requested lap window"
+        print("  Pit-stop OK: at least one car shows status 'Pit' in this window")
+    except AssertionError as e:
+        print(f"  PIT-STOP ERROR: {e}")
         errors += 1
 
 if errors == 0:

@@ -3,7 +3,7 @@ import type { RaceState } from '../state/race';
 import {
   fmtLap, fmtSec, fmtGap, gapLabel, intLabel,
   orderCars, bestSectors, updatePersonalBests, sectorColour, sectorDelta,
-  TYRE_COLOUR,
+  TYRE_COLOUR, tyreLabel, statusLabel, sectorDeltaVs, fmtSigned,
 } from './timingHelpers';
 import type { Bests } from './timingHelpers';
 
@@ -37,8 +37,15 @@ export function TimingTower({
     const c = sectorColour(v, best, pb[dn]?.[i] ?? Infinity);
     return c ? { color: c } : undefined;
   };
+  // With a reference car selected, every OTHER row's delta compares against
+  // that car's same sector (the rival-relative question a race engineer asks)
+  // instead of this driver's own personal best.
+  const refCar = selected != null ? state.cars[selected] : undefined;
+  const refSectors: (number | undefined)[] = refCar ? [refCar.s1Ms, refCar.s2Ms, refCar.s3Ms] : [];
   const cellDelta = (v: number | undefined, dn: number, i: number) =>
-    sectorDelta(v, pb[dn]?.[i] ?? Infinity);
+    refCar && dn !== selected
+      ? sectorDeltaVs(v, refSectors[i])
+      : sectorDelta(v, pb[dn]?.[i] ?? Infinity);
 
   return (
     <div>
@@ -49,19 +56,20 @@ export function TimingTower({
     >
       {secondsMode ? 'Show laps' : 'Show seconds'}
     </button>
+    <div className="tt-scroll">
     <table className="tt-table">
       <thead>
         <tr>
-          <th>#</th>
-          <th>Driver</th>
-          <th>Gap</th>
-          <th>Int</th>
-          <th>Last</th>
-          <th>Best</th>
-          <th>Tyre</th>
-          <th>S1</th>
-          <th>S2</th>
-          <th>S3</th>
+          <th scope="col">#</th>
+          <th scope="col">Driver</th>
+          <th scope="col">Gap</th>
+          <th scope="col">Int</th>
+          <th scope="col">Last</th>
+          <th scope="col">Best</th>
+          <th scope="col">Tyre</th>
+          <th scope="col">S1</th>
+          <th scope="col">S2</th>
+          <th scope="col">S3</th>
         </tr>
       </thead>
       <tbody>
@@ -69,6 +77,7 @@ export function TimingTower({
           const isLeader = c.pos === 1;
           const ahead = order[idx - 1];
           const isSel = c.driverNum === selected;
+          const status = statusLabel(c.status);
           return (
             <tr
               key={c.driverNum}
@@ -83,24 +92,38 @@ export function TimingTower({
                   onSelect(c.driverNum);
                 }
               }}
+              style={c.status === 'Out' ? { opacity: 0.5 } : undefined}
             >
               <td>{c.pos}</td>
               <td><b>{c.code}</b></td>
-              <td title="best-effort, derived">{gapLabel(c.gapMs, c.gapLaps, isLeader, secondsMode, c.lastLapMs)}</td>
-              <td title="best-effort, derived">{intLabel(c.gapLaps, ahead?.gapLaps, c.intMs, isLeader, secondsMode, c.lastLapMs, ahead?.lastLapMs)}</td>
+              {status ? (
+                <>
+                  <td style={{ color: c.status === 'Pit' ? '#e8c84a' : 'var(--slate)' }}>{status}</td>
+                  <td>—</td>
+                </>
+              ) : (
+                <>
+                  <td title="best-effort, derived">{gapLabel(c.gapMs, c.gapLaps, isLeader, secondsMode, c.lastLapMs)}</td>
+                  <td title="best-effort, derived">{intLabel(c.gapLaps, ahead?.gapLaps, c.intMs, isLeader, secondsMode, c.lastLapMs, ahead?.lastLapMs)}</td>
+                </>
+              )}
               <td>{fmtLap(c.lastLapMs)}</td>
               <td>{fmtLap(c.bestLapMs)}</td>
               <td style={{ color: TYRE_COLOUR[c.tyre ?? ''] ?? 'var(--chalk)' }}>
-                {c.tyre ? `${c.tyre[0]}${c.tyreAge ? ` ${c.tyreAge}` : ''}` : '—'}
+                {tyreLabel(c.tyre, c.tyreAge)}
               </td>
               {([[c.s1Ms, b1, 0], [c.s2Ms, b2, 1], [c.s3Ms, b3, 2]] as const).map(([v, best, i]) => {
                 const d = cellDelta(v, c.driverNum, i);
+                const rivalMode = !!refCar && c.driverNum !== selected;
                 return (
                   <td key={i} style={cellColour(v, best, c.driverNum, i)}>
                     {fmtSec(v)}
                     {d !== undefined && (
-                      <sup style={{ fontSize: 9, color: 'var(--slate)', marginLeft: 3 }}>
-                        {fmtGap(d)}
+                      <sup style={{
+                        fontSize: 9, marginLeft: 3,
+                        color: rivalMode ? (d < 0 ? '#3bb273' : 'var(--slate)') : 'var(--slate)',
+                      }}>
+                        {rivalMode ? fmtSigned(d) : fmtGap(d)}
                       </sup>
                     )}
                   </td>
@@ -111,6 +134,17 @@ export function TimingTower({
         })}
       </tbody>
     </table>
+    </div>
+    <div className="empty" style={{ fontSize: 10, marginTop: 4 }}>
+      Gap / Int are estimates derived from track position, not official timing.
+      {refCar && ` Click a row to set the reference car — sector deltas compare against ${refCar.code}.`}
+    </div>
+    <div className="empty" style={{ fontSize: 10, marginTop: 2, display: 'flex', gap: 10 }}>
+      {([['SOFT', 'S Soft'], ['MEDIUM', 'M Medium'], ['HARD', 'H Hard'],
+         ['INTERMEDIATE', 'I Inter'], ['WET', 'W Wet']] as const).map(([t, label]) => (
+        <span key={t} style={{ color: TYRE_COLOUR[t] }}>{label}</span>
+      ))}
+    </div>
     </div>
   );
 }

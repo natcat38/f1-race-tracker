@@ -68,6 +68,17 @@ changed values are sent, like a JSON Merge Patch:
 "Position" is the race running order (int, 1 = leader).
 Not every message contains both fields; some may have only one.
 
+Also (UNVERIFIED against a live capture — see docs/runbooks/live-verification.md):
+  "GapToLeader": "+0.512" | "1L" | "", "NumberOfLaps": int,
+  "IntervalToPositionAhead": {"Value": "+0.512", "Catching": bool},
+  "LastLapTime": {"Value": "1:25.633", "PersonalFastest": bool}
+
+--- TimingAppData (topic "TimingAppData") ---
+Same incremental "Lines" shape as TimingData. Fields of interest:
+  "Stints": {"0": {"Compound": "SOFT", "TotalLaps": 5, "New": "true"}, ...}
+  (or a plain list) — the current stint is the highest-indexed entry; its
+  Compound/TotalLaps become the car's tyre/tyreAge.
+
 --- DriverList (topic "DriverList") ---
 Each message is a partial update dict:
   {
@@ -281,19 +292,26 @@ def _replay_capture(r, session: str, label: str, capture_path: str) -> None:
 
     pos_entries = livedata.get('Position.z')
     timing_entries = livedata.get('TimingData') if livedata.has('TimingData') else []
+    appdata_entries = livedata.get('TimingAppData') if livedata.has('TimingAppData') else []
 
     # running position lookup: str_num -> int (1 = leader)
     running_positions: dict[str, int] = {}
+    # lap/gap/interval/last-lap (from TimingData) and tyre/tyreAge (from
+    # TimingAppData) — incremental patches, so entries accumulate rather than
+    # being replaced wholesale each message.
+    timing_extra: dict[str, dict] = {}
+    tyre_extra: dict[str, dict] = {}
 
     bounds = BoundBox()
     rev = starting_rev(r, session)
-    snapshot = build_snapshot(session, label or "Live F1", [], [], {}, rev)
+    snapshot = build_snapshot(session, label or "Live F1", [], [], {}, {}, 0, rev)
     r.set(snap_key(session), json.dumps(snapshot, separators=(",", ":")))
 
     # Interleave events by timedelta
     events = (
         [('pos', td, payload) for td, payload in pos_entries] +
-        [('timing', td, payload) for td, payload in timing_entries]
+        [('timing', td, payload) for td, payload in timing_entries] +
+        [('appdata', td, payload) for td, payload in appdata_entries]
     )
     events.sort(key=lambda e: e[1])
 
@@ -318,16 +336,33 @@ def _replay_capture(r, session: str, label: str, capture_path: str) -> None:
             time.sleep(wait)
 
         if kind == 'timing':
-            # Update running positions from TimingData
+            # Update running positions + lap/gap/interval/last-lap from TimingData
             # UNVERIFIED shape: payload should be dict with 'Lines' key
             if isinstance(payload, dict):
                 lines = payload.get('Lines', {})
                 for num_str, drv_data in lines.items():
-                    if isinstance(drv_data, dict) and 'Position' in drv_data:
+                    if not isinstance(drv_data, dict):
+                        continue
+                    if 'Position' in drv_data:
                         try:
                             running_positions[num_str] = int(drv_data['Position'])
                         except (ValueError, TypeError):
                             pass
+                    parsed = _parse_timing_line(drv_data)
+                    if parsed:
+                        timing_extra.setdefault(num_str, {}).update(parsed)
+            continue
+
+        if kind == 'appdata':
+            # Tyre compound/age from TimingAppData
+            if isinstance(payload, dict):
+                lines = payload.get('Lines', {})
+                for num_str, drv_data in lines.items():
+                    if not isinstance(drv_data, dict):
+                        continue
+                    parsed = _parse_tyre_line(drv_data)
+                    if parsed:
+                        tyre_extra.setdefault(num_str, {}).update(parsed)
             continue
 
         # kind == 'pos': decompress and emit
@@ -361,7 +396,7 @@ def _replay_capture(r, session: str, label: str, capture_path: str) -> None:
                 status = _map_status(raw_status)
 
                 info = driver_info.get(num_str, {'code': '???', 'team': 'Unknown'})
-                latest_cars[num_str] = {
+                car = {
                     'driverNum': _safe_int(num_str),
                     'code':      info['code'],
                     'team':      info['team'],
@@ -369,6 +404,9 @@ def _replay_capture(r, session: str, label: str, capture_path: str) -> None:
                     'p':         {'x': nx, 'y': ny},
                     'status':    status,
                 }
+                car.update(timing_extra.get(num_str, {}))
+                car.update(tyre_extra.get(num_str, {}))
+                latest_cars[num_str] = car
 
         # Rate-limit publishing
         now = time.monotonic()
@@ -428,8 +466,10 @@ def _run_live_signalr(r, session: str, label: str) -> None:
     rev_holder = [starting_rev(r, session)]
     driver_info: dict[str, dict] = {}
     running_positions: dict[str, int] = {}
+    timing_extra: dict[str, dict] = {}
+    tyre_extra: dict[str, dict] = {}
     latest_cars: dict[str, dict] = {}
-    snapshot_holder = [build_snapshot(session, label or "Live F1", [], [], {}, rev_holder[0])]
+    snapshot_holder = [build_snapshot(session, label or "Live F1", [], [], {}, {}, 0, rev_holder[0])]
     last_publish = [time.monotonic() - FRAME_INTERVAL_S]
 
     r.set(snap_key(session), json.dumps(snapshot_holder[0], separators=(",", ":")))
@@ -464,11 +504,27 @@ def _run_live_signalr(r, session: str, label: str) -> None:
                 return
             lines = payload.get('Lines', {})
             for num_str, drv_data in lines.items():
-                if isinstance(drv_data, dict) and 'Position' in drv_data:
+                if not isinstance(drv_data, dict):
+                    continue
+                if 'Position' in drv_data:
                     try:
                         running_positions[num_str] = int(drv_data['Position'])
                     except (ValueError, TypeError):
                         pass
+                parsed = _parse_timing_line(drv_data)
+                if parsed:
+                    timing_extra.setdefault(num_str, {}).update(parsed)
+
+        elif topic == 'TimingAppData':
+            if not isinstance(payload, dict):
+                return
+            lines = payload.get('Lines', {})
+            for num_str, drv_data in lines.items():
+                if not isinstance(drv_data, dict):
+                    continue
+                parsed = _parse_tyre_line(drv_data)
+                if parsed:
+                    tyre_extra.setdefault(num_str, {}).update(parsed)
 
         elif topic == 'Position.z':
             try:
@@ -491,7 +547,7 @@ def _run_live_signalr(r, session: str, label: str) -> None:
                     nx, ny = bounds.normalise(x, y)
                     raw_status = coords.get('Status', 'OnTrack')
                     info = driver_info.get(num_str, {'code': '???', 'team': 'Unknown'})
-                    latest_cars[num_str] = {
+                    car = {
                         'driverNum': _safe_int(num_str),
                         'code':      info['code'],
                         'team':      info['team'],
@@ -499,6 +555,9 @@ def _run_live_signalr(r, session: str, label: str) -> None:
                         'p':         {'x': nx, 'y': ny},
                         'status':    _map_status(raw_status),
                     }
+                    car.update(timing_extra.get(num_str, {}))
+                    car.update(tyre_extra.get(num_str, {}))
+                    latest_cars[num_str] = car
 
             # Rate-limited publish
             if (now - last_publish[0]) < FRAME_INTERVAL_S or not latest_cars:
@@ -625,6 +684,104 @@ def _decode_position_payload(payload) -> list:
             pass
 
     return []
+
+
+def _parse_gap_str(s: str):
+    """Parse a gap/interval string ('+0.512', '1L', '1 LAP') into (gapMs, gapLaps).
+
+    UNVERIFIED: exact string forms based on public reverse-engineering of the F1
+    timing feed (fastf1 treats these as opaque strings) — confirm against a real
+    capture per docs/runbooks/live-verification.md.
+    """
+    if not s:
+        return None, None
+    s = s.strip()
+    upper = s.upper()
+    if upper.endswith('L') or 'LAP' in upper:
+        digits = ''.join(ch for ch in s if ch.isdigit())
+        return (None, int(digits)) if digits else (None, None)
+    try:
+        return int(round(float(s) * 1000)), None
+    except ValueError:
+        return None, None
+
+
+def _parse_laptime_str(s: str):
+    """Parse 'M:SS.mmm' or 'SS.mmm' into milliseconds, or None if unparseable."""
+    if not s:
+        return None
+    parts = s.split(':')
+    try:
+        if len(parts) == 2:
+            total_s = int(parts[0]) * 60 + float(parts[1])
+        else:
+            total_s = float(parts[0])
+        return int(round(total_s * 1000))
+    except ValueError:
+        return None
+
+
+def _parse_timing_line(drv_data: dict) -> dict:
+    """Extract lap/gap/interval/last-lap fields from one TimingData Lines[num] entry.
+
+    UNVERIFIED: field names ('GapToLeader', 'IntervalToPositionAhead.Value',
+    'LastLapTime.Value', 'NumberOfLaps') are based on community documentation of
+    the F1 timing feed, not confirmed against a real capture — see
+    docs/runbooks/live-verification.md for how to verify and correct these.
+    """
+    out = {}
+    if 'NumberOfLaps' in drv_data:
+        try:
+            out['lap'] = int(drv_data['NumberOfLaps'])
+        except (ValueError, TypeError):
+            pass
+    gap = drv_data.get('GapToLeader')
+    if isinstance(gap, str) and gap:
+        gap_ms, gap_laps = _parse_gap_str(gap)
+        if gap_ms is not None:
+            out['gapMs'] = gap_ms
+        if gap_laps is not None:
+            out['gapLaps'] = gap_laps
+    interval = drv_data.get('IntervalToPositionAhead')
+    if isinstance(interval, dict):
+        int_ms, _ = _parse_gap_str(interval.get('Value', ''))
+        if int_ms is not None:
+            out['intMs'] = int_ms
+    last_lap = drv_data.get('LastLapTime')
+    if isinstance(last_lap, dict):
+        ms = _parse_laptime_str(last_lap.get('Value', ''))
+        if ms is not None:
+            out['lastLapMs'] = ms
+    return out
+
+
+def _parse_tyre_line(app_data: dict) -> dict:
+    """Extract current tyre compound/age from one TimingAppData Lines[num] entry.
+
+    UNVERIFIED: 'Stints' shape (dict keyed by stint index vs a plain list) varies
+    by feed version; the current stint is taken as the highest-indexed entry.
+    See docs/runbooks/live-verification.md.
+    """
+    stints = app_data.get('Stints')
+    if isinstance(stints, dict) and stints:
+        current = stints[max(stints, key=lambda k: _safe_int(k))]
+    elif isinstance(stints, list) and stints:
+        current = stints[-1]
+    else:
+        current = None
+    if not isinstance(current, dict):
+        return {}
+    out = {}
+    compound = current.get('Compound')
+    if isinstance(compound, str) and compound:
+        out['tyre'] = compound.upper()
+    age = current.get('TotalLaps')
+    if age is not None:
+        try:
+            out['tyreAge'] = int(age)
+        except (ValueError, TypeError):
+            pass
+    return out
 
 
 def _map_status(raw: str) -> str:

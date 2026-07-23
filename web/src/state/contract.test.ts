@@ -18,12 +18,14 @@ describe('golden snapshot contract', () => {
     expect(s.label).toBe('Contract Fixture');
     expect(s.rev).toBe(42);
     expect(s.timeMs).toBe(3300000);
+    expect(s.totalLaps).toBe(53);
     expect(s.track).toHaveLength(2);
     expect(s.track[1]).toEqual({ x: 0.9, y: 0.8 });
 
     expect(Object.keys(s.cars)).toHaveLength(2);
     expect(s.cars[1].driverNum).toBe(1);
     expect(s.cars[1].code).toBe('VER');
+    expect(s.cars[1].lap).toBe(12);
     expect(s.cars[1].status).toBe('OnTrack');
     expect(s.cars[1].tyre).toBe('SOFT');
     expect(s.cars[1].tyreAge).toBe(5);
@@ -35,5 +37,12 @@ describe('golden snapshot contract', () => {
     expect(s.radio).toHaveLength(1);
     expect(s.radio[0].driverNum).toBe(1);
     expect(s.lapTrace[1]).toHaveLength(4);
+
+    expect(s.stints[1]).toHaveLength(2);
+    expect(s.stints[1][1].compound).toBe('HARD');
+    expect(s.stints[1][1].startLap).toBe(15);
+    expect(s.weather?.trackTempC).toBe(41.2);
+    expect(s.weather?.airTempC).toBe(28.5);
+    expect(s.weather?.rainfall).toBe(false);
   });
 });

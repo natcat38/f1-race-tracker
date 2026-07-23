@@ -5,7 +5,7 @@ import { teamColour } from './teamColours';
 // Comms is the toggleable team-radio layer: a now-playing banner + a short
 // replayable history. Audio streams from F1's public URL (ADR-0003).
 export function Comms({ state }: { state: RaceState }) {
-  const { enabled, toggle, nowPlaying, history, replay } = useComms(state);
+  const { enabled, toggle, nowPlaying, history, replay, error } = useComms(state);
 
   function codeFor(driverNum: number) {
     return state.cars[driverNum]?.code ?? String(driverNum);
@@ -33,7 +33,12 @@ export function Comms({ state }: { state: RaceState }) {
             {codeFor(nowPlaying.driverNum)}
           </span>
           <span style={{ color: 'var(--slate)' }}>radio</span>
-          <button onClick={() => replay(nowPlaying)} className="btn" style={{ border: 'none', padding: '0 4px' }}>↻</button>
+          <button
+            onClick={() => replay(nowPlaying)}
+            className="btn"
+            style={{ border: 'none', padding: '0 4px' }}
+            aria-label="Replay current clip"
+          >↻</button>
         </div>
       )}
 
@@ -45,7 +50,12 @@ export function Comms({ state }: { state: RaceState }) {
               fontSize: 12, color: 'var(--slate)',
             }}>
               <span style={{ color: colourFor(m.driverNum), fontWeight: 700 }}>{codeFor(m.driverNum)}</span>
-              <button onClick={() => replay(m)} className="btn" style={{ border: 'none', padding: '0 4px' }}>▶</button>
+              <button
+                onClick={() => replay(m)}
+                className="btn"
+                style={{ border: 'none', padding: '0 4px' }}
+                aria-label={`Play ${codeFor(m.driverNum)} radio`}
+              >▶</button>
             </div>
           ))}
         </div>
@@ -56,6 +66,9 @@ export function Comms({ state }: { state: RaceState }) {
       )}
       {enabled && !nowPlaying && history.length === 0 && (
         <div className="empty">No radio yet — clips play as the replay reaches them.</div>
+      )}
+      {error && (
+        <div className="empty" style={{ color: '#ff8c00' }}>{error}</div>
       )}
     </div>
   );

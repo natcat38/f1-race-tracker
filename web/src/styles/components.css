@@ -43,6 +43,14 @@
   white-space: nowrap;
 }
 
+.rail-lap {
+  font-family: var(--data);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-sm);
+  color: var(--slate);
+  white-space: nowrap;
+}
+
 .rail-note {
   color: var(--slate);
   font-size: var(--fs-sm);
@@ -212,6 +220,11 @@
 
 /* Timing tower */
 
+.tt-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
 .tt-table {
   width: 100%;
   border-collapse: collapse;
@@ -251,7 +264,7 @@
 
 .board-bottom {
   display: grid;
-  grid-template-columns: repeat(3, minmax(240px, 1fr));
+  grid-template-columns: repeat(4, minmax(220px, 1fr));
   gap: var(--sp-6);
 }
 
@@ -282,16 +295,6 @@
   font-size: var(--fs-sm);
 }
 
-.navlink {
-  color: var(--chalk);
-  text-decoration: none;
-  font-size: var(--fs-lg);
-}
-
-.navlink:hover {
-  text-decoration: underline;
-}
-
 /* Motion — opt-in only: nothing here plays unless the user hasn't asked to
    reduce motion. One orchestrated moment (panel mount stagger) plus a quiet
    chip transition; nothing else animates. */
@@ -308,6 +311,10 @@
 
   .board-bottom .panel:nth-child(3) {
     animation-delay: 120ms;
+  }
+
+  .board-bottom .panel:nth-child(4) {
+    animation-delay: 180ms;
   }
 
   @keyframes panel-in {

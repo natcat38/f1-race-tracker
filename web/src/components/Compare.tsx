@@ -25,7 +25,7 @@ function Lane({ session, year }: { session: string; year: string }) {
       actions={<StatusBadge status={status} state={state} staleSec={staleSec} />}
     >
       {state.rev === 0 ? (
-        <div className="track-skeleton" />
+        <div className="track-skeleton">Warming up the timing feed…</div>
       ) : (
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
           <Map state={state} />

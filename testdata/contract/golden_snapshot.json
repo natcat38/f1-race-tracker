@@ -5,7 +5,7 @@
   "track": [{"x": 0.1, "y": 0.2}, {"x": 0.9, "y": 0.8}],
   "cars": {
     "1": {
-      "driverNum": 1, "code": "VER", "team": "Red Bull", "pos": 1,
+      "driverNum": 1, "code": "VER", "team": "Red Bull", "pos": 1, "lap": 12,
       "p": {"x": 0.5, "y": 0.5}, "status": "OnTrack",
       "tyre": "SOFT", "tyreAge": 5, "lastLapMs": 81234, "bestLapMs": 80950,
       "s1Ms": 26100, "s2Ms": 28200, "s3Ms": 26900,
@@ -25,6 +25,14 @@
   "lapTrace": {
     "1": [0, 100, 200, 300]
   },
+  "stints": {
+    "1": [
+      {"compound": "SOFT", "startLap": 1, "endLap": 14},
+      {"compound": "HARD", "startLap": 15, "endLap": 53}
+    ]
+  },
+  "weather": {"airTempC": 28.5, "trackTempC": 41.2, "rainfall": false},
   "timeMs": 3300000,
-  "rev": 42
+  "rev": 42,
+  "totalLaps": 53
 }

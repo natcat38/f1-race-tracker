@@ -1,7 +1,7 @@
 # F1 Race Tracker — Product Scope
 
 > **Audience:** product readers; primary persona: the armchair race engineer (and the recruiter who lands on the repo, secondarily). Plain language, no code.
-> **Status:** built and shipped through Phase 4 (see [README](../README.md) and [BENCHMARKS.md](../BENCHMARKS.md) for the as-run system). Originally reframed after design review (June 2026) into a **polyglot, track-map-first** project.
+> **Status:** built and shipped through Phase 5 (see [README](../README.md) and [BENCHMARKS.md](../BENCHMARKS.md) for the as-run system). Originally reframed after design review (June 2026) into a **polyglot, track-map-first** project.
 > **Companion doc:** `F1_Race_Tracker_Tech_Scope.md`.
 
 ---
@@ -29,15 +29,24 @@ A **real-time F1 race visualisation**: a Python ingestion layer feeds normalised
 - **Cross-year comparison:** the same circuit across two seasons (e.g. **2023 vs 2024**) shown as **two maps side by side, aligned**, so you can watch how the racing differed. Built *last* in Phase 1, on top of the working single map.
 - New visitors **joining mid-session immediately see the current state** (a snapshot), then live updates. **Reconnects** re-sync automatically.
 
-**Phase 2 — Pit-Wall Timing Dashboard (later):**
+**Phase 2 — Pit-Wall Timing Dashboard (shipped):**
 - The detailed timing screen — gaps, intervals, last/best laps, tyre stints, sector times, telemetry readouts — the "pit wall" view. Reuses the entire pipeline; adds richer data and UI.
 - A **race control feed** — flags, safety car, and investigation messages alongside the timing tower.
 
-**Phase 3 — Team-Radio Comms (later):**
+**Phase 3 — Team-Radio Comms (shipped):**
 - The driver ↔ race-engineer **team radio** played alongside the race (the audio is freely available), as a toggleable layer. Radio is a single-race feature: it gives the pit-wall context of a live/replayed session. The comparison views (side-by-side and ghost overlay) deliberately exclude it — they are analysis surfaces, not race atmosphere.
 
-**Phase 4 — Cross-Year "Ghost" Overlay (later):**
+**Phase 4 — Cross-Year "Ghost" Overlay (shipped):**
 - A computed **delta** between two seasons — a "ghost" of last year's car overlaid on this year's, showing where time is won or lost. A deliberate, toggleable analytics layer (the richer cousin of Phase 1's side-by-side).
+
+**Phase 5 — Pit-Wall Completion (shipped):**
+- The replay clips were re-baked around real pit-stop windows (previously a laps-1–5 slice that could never show a pit stop) so the strategy story — stops, tyre changes, undercuts — is actually visible instead of structurally impossible.
+- A full-race **stint timeline** panel, baked once per session alongside the windowed frame stream, so the tyre plan reads at a glance even though the replay window only covers part of the race.
+- **Weather** (track/air temp, rain) baked from the session's real samples, shown as a status-rail chip.
+- **Pit-lane visibility**: a car in the pits shows `IN PIT` in the timing tower and dims on the track map, derived from lap timing (`PitInTime`/`PitOutTime`) rather than the position-data status field, which doesn't reliably tag pit lane.
+- **Per-rival sector deltas**: click a row to set it as the reference car; every other row's sector delta becomes "how much am I losing to *them*, right now" instead of your own personal best.
+- **Gap-trend and two-car telemetry compare**: a per-lap gap-trend sparkline alongside the existing lap-time sparkline, and a "vs" picker in the telemetry panel for a side-by-side two-car readout.
+- The "live" toggle is now honestly labelled `Live (demo)` in the UI itself (previously this caveat lived only in the README), and `ingest/live_signalr.py`'s field coverage was extended (lap, gap/interval, tyre) — see [docs/runbooks/live-verification.md](runbooks/live-verification.md) for the checklist to verify it against a real session.
 
 ### Core principle: one pipeline, swappable feeds, two languages either side of Redis
 > Live and replay produce the **same normalised event stream** onto Redis, so everything downstream (Go fan-out → WebSocket → React) is **identical** whether it's a real race or a replay. Redis is the language-agnostic seam: **Python writes** events on one side, **Go reads and fans out** on the other. They agree only on a JSON event contract.
@@ -68,7 +77,7 @@ A **real-time F1 race visualisation**: a Python ingestion layer feeds normalised
 | Ops | Load test + benchmark + README + demo recording | 1.5 d | Ops |
 | | **Phase 1 total** | **~23–25 d** | |
 
-> **Phases 2–4 (post-Phase-1).** Effort TBD — each reuses the Phase 1 pipeline.
+> **Phases 2–4 (shipped).** Each reused the Phase 1 pipeline; the as-built decisions are recorded in ADR-0002 (timing fields), ADR-0003 (team radio), and ADR-0004 (ghost overlay).
 
 | Layer | Task | Phase | Component |
 |-------|------|-------|-----------|
@@ -85,18 +94,18 @@ A **real-time F1 race visualisation**: a Python ingestion layer feeds normalised
 ### 4.1 The track map (Phase 1)
 - A **circuit drawn from real position data**, with one **marker per car** moving around it in real time, coloured by team.
 - Animation is **smooth** even though the underlying data is sampled a few times a second — the frontend interpolates between points.
-- A **badge** states what's playing and how: `● LIVE — {Grand Prix} {Session}` or `▶ REPLAY — {Grand Prix} {Year} {Session}`.
+- A **badge** states what's playing and how: `● LIVE (DEMO) — {Grand Prix} {Session}` or `▶ REPLAY — {Grand Prix} {Year} {Session}` — "(DEMO)" is deliberate, not a bug: see §4.3.
 
 ### 4.2 The standings list (Phase 1)
-- A compact list beside the map showing the **running order** (position, driver code, team colour). The detailed timing screen (gaps, tyres, sectors) is **Phase 2**, not here.
+- A compact list beside the map showing the **running order** (position, driver code, team colour). The list has since grown into the full pit-wall timing tower (Phase 2, shipped) — gaps, intervals, laps, tyres, sector times with best-sector shading.
 
 ### 4.3 Live / replay toggle (Phase 1)
-- A control to **switch the source**: play a recorded replay, or switch to the **live** lane. The switch is server-side (the active *writer* changes); all connected viewers converge to the new source. The live lane is best-effort: a real F1 session is only available on race weekends, so **out of the box the live lane streams a clip through the Python writer** — this exercises the polyglot seam (Python publishing the identical contract the Go writer uses) rather than literal live data. The real live-timing client exists and is used during actual sessions.
+- A control to **switch the source**: play a recorded replay, or switch to the **live** lane. The switch is server-side (the active *writer* changes); all connected viewers converge to the new source. The live lane is best-effort: a real F1 session is only available on race weekends, so **out of the box the live lane streams a clip through the Python writer** — this exercises the polyglot seam (Python publishing the identical contract the Go writer uses) rather than literal live data, and the UI says so directly (`Live (demo)`, with a tooltip) rather than leaving the caveat only in the README. A real live-timing client (`ingest/live_signalr.py`) exists as an exploratory path behind an explicit opt-in flag; as of Phase 5 it parses lap, gap/interval, and tyre fields in addition to position, but every message shape remains unverified against a real session — see [docs/runbooks/live-verification.md](runbooks/live-verification.md).
 - Because the deployment is local and single-operator, the toggle is **open** — no login. (There is no anonymous public site to protect.)
 - The replay **loops cleanly** — a brief `↻ replay restarting` beat covers the reset so it never snaps jarringly from finish back to lap 1.
 
 ### 4.4 Cross-year comparison (Phase 1, built last)
-- Pick the **same circuit across two seasons** (e.g. Monza 2023 and Monza 2024). The view shows **two maps side by side**, playback **aligned** so you can watch the same phase of the race in both years at once. It is literally the single-map view **rendered twice** — no new data type.
+- The view shows the **same circuit across two seasons** — the committed pair is Monza 2023 vs Monza 2024. The view shows **two maps side by side**, playback **aligned** so you can watch the same phase of the race in both years at once. It is literally the single-map view **rendered twice** — no new data type.
 
 ### 4.5 Joining mid-session & connection states
 A visitor who connects after playback started **immediately sees the current car positions** (from the latest snapshot), then live updates. Connection rules:
@@ -156,7 +165,8 @@ The primary experience is the running app itself — a race engineer opens the b
 ## 8. Rollout Plan
 
 - **Phase 1 — Animated Track Map + Comparison:** ~23–25 dev-days. Built tracer-bullet first (plain dots end-to-end → polished map → live toggle → comparison last). Deliverables: working local system via `docker-compose up`, README with architecture diagram + demo GIF, `BENCHMARKS.md`, a few committed curated clips (including a same-track two-year pair), MIT-licensed.
-- **Phase 2 — Pit-Wall Timing Dashboard:** effort TBD.
-- **Phase 3 — Team-Radio Comms:** effort TBD.
-- **Phase 4 — Cross-Year Ghost Overlay:** effort TBD.
+- **Phase 2 — Pit-Wall Timing Dashboard:** shipped (timing tower, telemetry panel, race-control feed; ADR-0002).
+- **Phase 3 — Team-Radio Comms:** shipped (streamed, not committed; ADR-0003).
+- **Phase 4 — Cross-Year Ghost Overlay:** shipped (baked lap traces, frontend-computed delta; ADR-0004).
+- **Phase 5 — Pit-Wall Completion:** shipped (clips re-baked around real pit-stop windows; stint timeline; weather; pit-lane visibility; per-rival sector deltas; gap-trend and two-car telemetry compare; honest `Live (demo)` labelling; extended `live_signalr.py` field coverage — see [docs/runbooks/live-verification.md](runbooks/live-verification.md)).
 - **Default behaviour:** out of the box, `docker-compose up` plays a curated replay — the map animates immediately with real F1 data, no live race or external setup required.

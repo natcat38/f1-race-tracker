@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
-  fmtLap, fmtGap, fmtClock, gapLabel, intLabel, bestSectors, orderCars,
-  updatePersonalBests, sectorColour, sectorDelta, updateLapHistory,
+  fmtLap, fmtGap, fmtClock, fmtElapsed, gapLabel, intLabel, bestSectors, orderCars,
+  updatePersonalBests, sectorColour, sectorDelta, updateLapHistory, tyreLabel, statusLabel,
+  sectorDeltaVs, fmtSigned, updateGapHistory,
 } from './timingHelpers';
 import type { Car } from '../state/race';
 
@@ -14,6 +15,16 @@ describe('fmtLap', () => {
     expect(fmtLap(81234)).toBe('1:21.234');
     expect(fmtLap(undefined)).toBe('—');
     expect(fmtLap(0)).toBe('—');
+  });
+});
+
+describe('fmtElapsed', () => {
+  it('formats a fractional ms (as produced by performance.now() deltas) without leaking decimal digits', () => {
+    expect(fmtElapsed(7117.799999998533)).toBe('0:07.117');
+  });
+  it('formats whole ms as m:ss.SSS', () => {
+    expect(fmtElapsed(81234)).toBe('1:21.234');
+    expect(fmtElapsed(0)).toBe('0:00.000');
   });
 });
 
@@ -120,6 +131,56 @@ describe('sectorDelta', () => {
   it('undefined when the value is absent or zero', () => {
     expect(sectorDelta(undefined, 25900)).toBeUndefined();
     expect(sectorDelta(0, 25900)).toBeUndefined();
+  });
+});
+
+describe('tyreLabel', () => {
+  it('formats compound letter + age, no space', () => {
+    expect(tyreLabel('SOFT', 5)).toBe('S5');
+    expect(tyreLabel('MEDIUM', 0)).toBe('M');
+  });
+  it('dash when no tyre', () => {
+    expect(tyreLabel(undefined, 5)).toBe('—');
+  });
+});
+
+describe('statusLabel', () => {
+  it('IN PIT for Pit, OUT for Out, undefined for OnTrack', () => {
+    expect(statusLabel('Pit')).toBe('IN PIT');
+    expect(statusLabel('Out')).toBe('OUT');
+    expect(statusLabel('OnTrack')).toBeUndefined();
+  });
+});
+
+describe('sectorDeltaVs', () => {
+  it('signed ms difference vs a reference sector', () => {
+    expect(sectorDeltaVs(26100, 25900)).toBe(200);
+    expect(sectorDeltaVs(25700, 25900)).toBe(-200);
+  });
+  it('undefined when either value is absent or zero', () => {
+    expect(sectorDeltaVs(undefined, 25900)).toBeUndefined();
+    expect(sectorDeltaVs(26100, undefined)).toBeUndefined();
+    expect(sectorDeltaVs(0, 25900)).toBeUndefined();
+  });
+});
+
+describe('fmtSigned', () => {
+  it('formats positive and negative ms with an explicit sign', () => {
+    expect(fmtSigned(312)).toBe('+0.312');
+    expect(fmtSigned(-145)).toBe('-0.145');
+  });
+});
+
+describe('updateGapHistory', () => {
+  it('appends gapMs once per completed lap', () => {
+    let h = updateGapHistory({}, [car({ driverNum: 1, lap: 1, gapMs: 5000 })]);
+    h = updateGapHistory(h, [car({ driverNum: 1, lap: 1, gapMs: 5000 })]); // same lap, no-op
+    h = updateGapHistory(h, [car({ driverNum: 1, lap: 2, gapMs: 4800 })]); // new lap
+    expect(h[1].gaps).toEqual([5000, 4800]);
+  });
+  it('ignores cars with no lap number yet', () => {
+    const h = updateGapHistory({}, [car({ driverNum: 1 })]);
+    expect(h[1]).toBeUndefined();
   });
 });
 

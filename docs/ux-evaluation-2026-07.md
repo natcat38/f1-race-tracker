@@ -83,6 +83,32 @@ The existing pipeline (gap, interval, tyre, sectors, telemetry, ghost overlay's 
 
 None of these require reopening an ADR: the sector/stint ideas stay within ADR-0002's per-frame-field gate (no new wire shape), and the ghost-overlay one stays within ADR-0004's frontend-only-computation rule (no new gateway correlation).
 
+## Update — 2026-07-23 (Phase 5, "pit-wall completion")
+
+Re-checked against this session's changes. Most findings above were already
+resolved before this pass (the timing-tower keyboard accessibility, Comms/Race
+Control empty-state copy, and the Gap/Int disclaimer footnote all predate this
+work) or remain open (compare/ghost naming and cross-linking, lane-stall
+staleness detection, ghost-overlay pause/scrub, and the raw console error on
+reconnect are all still as described above — out of scope for this pass).
+
+What this pass *did* close, from the "Gap analysis vs the race-engineer
+vision" section:
+- **"Stint/tyre pace trend"** — resolved. A full-race stint timeline panel
+  (compound + stint length per driver, baked once per session) now shows
+  degradation/strategy at a glance, and a per-lap gap-trend sparkline sits
+  alongside the existing lap-time sparkline in the telemetry panel.
+
+Beyond that specific gap-analysis item, this pass also addressed a
+structural problem the July evaluation didn't surface (out of its scope,
+which was UI/UX rather than the underlying data): all three committed replay
+clips were laps-1–5 slices with zero pit stops in any of them, making the
+stint/strategy story impossible to show regardless of UI work. Clips are now
+windowed around real pit-stop phases (see the [README](../README.md)), which
+is what makes the stint timeline and the new pit-lane visibility
+(`IN PIT`/`OUT` in the tower, dimming on the map) meaningful rather than
+theoretical.
+
 ## Could not verify
 
 - **Screenshots / visual rendering** — the Browser pane's screenshot action timed out consistently in this environment; all findings above come from DOM text extraction, the accessibility tree, JS state inspection (`performance` entries, `document.querySelectorAll`), network/console logs, and source reads, not visual inspection. Anything purely visual (colour contrast, layout crowding, animation smoothness) is not assessed here.

@@ -25,6 +25,11 @@ export function StatusRail({
   note?: string;
   children?: ReactNode;
 }) {
+  // The race leader's current lap, out of the session's total — the recorder bakes
+  // both from FastF1's lap data (ingest/record.py's _lap_number / TOTAL_LAPS), so
+  // this is exact, not a derived estimate like Gap/Int.
+  const leaderLap = state && Object.values(state.cars).find((c) => c.pos === 1)?.lap;
+
   return (
     <div className="rail">
       <span className="rail-brand">F1 Race Tracker</span>
@@ -32,6 +37,15 @@ export function StatusRail({
         <>
           {state.label && <span className="rail-session">{state.label}</span>}
           <span className="rail-clock">{fmtClock(state.timeMs)}</span>
+          {!!leaderLap && !!state.totalLaps && (
+            <span className="rail-lap">LAP {leaderLap}/{state.totalLaps}</span>
+          )}
+          {state.weather && (
+            <span className="rail-lap" title="Baked from session weather data">
+              TRK {state.weather.trackTempC.toFixed(0)}° · AIR {state.weather.airTempC.toFixed(0)}°
+              {state.weather.rainfall && <span style={{ color: '#3671C6' }}> · RAIN</span>}
+            </span>
+          )}
           <StatusBadge status={status ?? 'connecting'} state={state} staleSec={staleSec} />
         </>
       )}

@@ -1,0 +1,5 @@
+["SessionStatus", {"StatusSeries": [{"Utc": "2024-09-01T13:00:00.000Z", "SessionStatus": "Started"}]}, "2024-09-01T13:00:00.000Z"]
+["DriverList", {"1": {"RacingNumber": "1", "Tla": "VER", "TeamName": "Red Bull Racing"}}, "2024-09-01T13:00:00.000Z"]
+["TimingData", {"Lines": {"1": {"Position": 1, "GapToLeader": "0.000", "NumberOfLaps": 5, "LastLapTime": {"Value": "1:25.633"}, "IntervalToPositionAhead": {"Value": "+0.512"}}}}, "2024-09-01T13:00:00.100Z"]
+["TimingAppData", {"Lines": {"1": {"Stints": {"0": {"Compound": "SOFT", "TotalLaps": 5}}}}}, "2024-09-01T13:00:00.200Z"]
+["Position.z", {"Position": [{"Timestamp": "2024-09-01T13:00:00.300Z", "Entries": {"1": {"X": 1000, "Y": 2000, "Z": 0, "Status": "OnTrack"}}}]}, "2024-09-01T13:00:00.300Z"]

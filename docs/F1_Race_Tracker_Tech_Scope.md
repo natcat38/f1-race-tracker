@@ -28,7 +28,7 @@
 | 14 | Load test + benchmark + README + demo recording | Ops | `cmd/loadtest/*`, `BENCHMARKS.md`, `README.md` | 1.5 d |
 | | **Phase 1 total** | | | **~23–25 d** |
 
-> **Phases 2–4 (deferred, reuse the pipeline).** Phase 2: pit-wall timing dashboard (richer model fields + UI). Phase 3: team-radio audio layer (OpenF1/FastF1 `team_radio` → a new event kind + audio playback). Phase 4: computed cross-year "ghost" delta (offline alignment from committed clips → overlay). Not detailed here.
+> **Phases 2–5 (shipped, reused the pipeline).** Phase 2: pit-wall timing dashboard — see ADR-0002. Phase 3: team-radio audio layer — see ADR-0003. Phase 4: computed cross-year "ghost" delta — see ADR-0004. Phase 5: pit-wall completion — re-baked replay clips around real pit-stop windows, full-race stint timeline, weather, pit-lane visibility, per-rival sector deltas, gap-trend + two-car telemetry compare, honest `Live (demo)` labelling, and extended `live_signalr.py` field coverage (see [docs/runbooks/live-verification.md](runbooks/live-verification.md)). Task-level detail lives in those ADRs and the "Built differently than planned" section below, not here.
 
 ---
 
@@ -313,3 +313,30 @@ Architecture diagram (§2.1), GIF of the map + the two-year comparison, `docker 
   (`ingest/check_live_contract.py`); a markdown link check over `README`/`CONTEXT`/`docs/`
   (lychee); and a `docker compose build` smoke test. `.github/workflows/okf.yml` separately
   validates the `knowledge/` bundle. (`go test -race` is not gated yet.)
+- **Phase 5 grew the §2.2 contract** beyond what's shown there: `CarState` gained
+  `Lap`; `Snapshot`/`Frame` gained `Weather`; `Snapshot` gained `Stints` (a
+  per-driver, whole-race tyre-stint plan, baked once like `LapTrace` rather than
+  windowed like the frame stream). All three language mirrors
+  (`internal/model/model.go`, `web/src/state/race.ts`, `ingest/live.py`) and the
+  golden contract fixture (`testdata/contract/golden_snapshot.json` +
+  `internal/model/contract_test.go` + `web/src/state/contract.test.ts`) were
+  updated together — the discipline §2.2 already calls for.
+- **Pit status is derived from lap timing, not the position-data status field.**
+  `ingest/record.py` found that FastF1's `pos_data['Status']` reads `"OnTrack"`
+  for an entire session even during a confirmed pit stop, across every session
+  checked — it doesn't reliably tag pit lane. `status: "Pit"`/`"Out"` is instead
+  derived from each lap's `PitInTime`/`PitOutTime` (authoritative), overriding
+  the position-status mapping when the two disagree.
+- **Replay clips are windowed around real pit stops, not a fixed mid-race slice.**
+  `record.py` gained `--start-lap`/`--end-lap` (deriving the window from the
+  leader's `LapStartTime` for those laps) specifically because the original fixed
+  `WINDOW_START_S`/`WINDOW_END_S` window happened to land on laps 1–5 for all
+  three committed clips — zero pit stops, no tyre-age resets, making the
+  strategy story structurally impossible to show regardless of frontend work.
+- **`ingest/live_signalr.py`'s field coverage was extended** (lap, gap/interval,
+  last-lap, tyre/tyreAge from `TimingData`/`TimingAppData`) without changing its
+  exploratory status — every new parsing assumption is still marked
+  `UNVERIFIED:` in the source. `ingest/test_capture_replay.py` (a synthetic
+  fixture, no network/Redis) regression-tests the parsing helpers offline;
+  `docs/runbooks/live-verification.md` is the checklist to confirm each
+  assumption against a real session and promote it out of "unverified."

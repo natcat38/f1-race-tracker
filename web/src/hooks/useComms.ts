@@ -12,6 +12,8 @@ export function useComms(state: RaceState) {
   const [enabled, setEnabled] = useState(false);
   const [nowPlaying, setNowPlaying] = useState<RadioMessage | null>(null);
   const [history, setHistory] = useState<RadioMessage[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const PLAYBACK_ERROR = 'Radio clip failed to play — the browser may have blocked audio or the stream is unavailable.';
   // All refs declared before the helpers so nothing is used-before-defined (lint gate).
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const cursorRef = useRef<CommsCursor>({ lastClock: -1 });
@@ -33,6 +35,7 @@ export function useComms(state: RaceState) {
     if (!next) return;
     nowPlayingRef.current = next;
     setNowPlaying(next);
+    setError(null);
     audio.src = next.clip; // ponytail: no crossOrigin attr -> plays cross-origin without CORS
     // A late play() rejection (transient error, or an interrupting src change/AbortError)
     // must only clear the banner if this clip is still the current one — otherwise it
@@ -42,6 +45,7 @@ export function useComms(state: RaceState) {
       console.warn('comms: playback failed', next.clip, err);
       nowPlayingRef.current = null;
       setNowPlaying(null);
+      setError(PLAYBACK_ERROR);
     });
   }
 
@@ -96,6 +100,7 @@ export function useComms(state: RaceState) {
       setNowPlaying(null);
       enabledRef.current = false;
       setEnabled(false);
+      setError(null);
     } else {
       enabledRef.current = true;
       setEnabled(true);
@@ -112,14 +117,16 @@ export function useComms(state: RaceState) {
     queueRef.current = []; // manual replay jumps the queue
     nowPlayingRef.current = msg;
     setNowPlaying(msg);
+    setError(null);
     audio.src = msg.clip;
     audio.play().catch((err) => {
       if (nowPlayingRef.current !== msg) return; // a newer replay/clip already took over
       console.warn('comms: replay playback failed', msg.clip, err);
       nowPlayingRef.current = null;
       setNowPlaying(null);
+      setError(PLAYBACK_ERROR);
     });
   }
 
-  return { enabled, toggle, nowPlaying, history, replay };
+  return { enabled, toggle, nowPlaying, history, replay, error };
 }

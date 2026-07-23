@@ -19,8 +19,9 @@ type CarState struct {
 	DriverNum int       `json:"driverNum"`
 	Code      string    `json:"code"` // "VER"
 	Team      string    `json:"team"`
-	Pos       int       `json:"pos"` // running order
-	P         Point     `json:"p"`   // track-space coordinate, scaled to [0,1]
+	Pos       int       `json:"pos"`           // running order
+	Lap       int       `json:"lap,omitempty"` // this car's current lap number
+	P         Point     `json:"p"`             // track-space coordinate, scaled to [0,1]
 	Status    CarStatus `json:"status"`
 	Tyre      string    `json:"tyre,omitempty"` // Phase 2: compound, e.g. "SOFT"
 	TyreAge   int       `json:"tyreAge,omitempty"`
@@ -53,6 +54,21 @@ type RadioMessage struct {
 	Clip      string `json:"clip"`      // full https URL to the .mp3 on livetiming.formula1.com
 }
 
+// Stint is one tyre stint from the full-race lap data (session-constant, like LapTrace).
+type Stint struct {
+	Compound string `json:"compound"` // "SOFT"|"MEDIUM"|"HARD"|"INTERMEDIATE"|"WET"
+	StartLap int    `json:"startLap"`
+	EndLap   int    `json:"endLap"`
+}
+
+// Weather is a low-rate sample (~1/min at bake). Rides on a frame when it
+// changes; folded into the snapshot by Apply.
+type Weather struct {
+	AirTempC   float64 `json:"airTempC"`
+	TrackTempC float64 `json:"trackTempC"`
+	Rainfall   bool    `json:"rainfall"`
+}
+
 // Mode is the small closed set of values Snapshot.Mode carries.
 type Mode string
 
@@ -70,6 +86,9 @@ type Snapshot struct {
 	Messages   []RaceControlMessage `json:"messages,omitempty"`
 	Radio      []RadioMessage       `json:"radio,omitempty"`
 	LapTrace   map[int][]int        `json:"lapTrace,omitempty"`
+	TotalLaps  int                  `json:"totalLaps,omitempty"` // session-constant race distance
+	Stints     map[int][]Stint      `json:"stints,omitempty"`    // session-constant, like LapTrace
+	Weather    *Weather             `json:"weather,omitempty"`
 	TimeMs     int64                `json:"timeMs"`
 	Rev        int64                `json:"rev"`
 }
@@ -85,6 +104,7 @@ type Frame struct {
 	TimeMs     int64                `json:"timeMs"` // session clock
 	Cars       []CarState           `json:"cars"`
 	Messages   []RaceControlMessage `json:"messages,omitempty"`
+	Weather    *Weather             `json:"weather,omitempty"`
 }
 
 // NewSnapshot returns an empty snapshot ready to receive frames. mode is a plain
