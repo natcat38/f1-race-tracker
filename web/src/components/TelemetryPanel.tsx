@@ -1,5 +1,5 @@
-import type { Car } from '../state/race';
-import { fmtLap, fmtGap } from './timingHelpers';
+import type { Car, RaceState } from '../state/race';
+import { fmtLap, fmtGap, type LapHistory, type GapHistory } from './timingHelpers';
 
 function Bar({ label, value }: { label: string; value: number }) {
   return (
@@ -17,14 +17,18 @@ function Bar({ label, value }: { label: string; value: number }) {
 // green = faster — the stint-degradation squint test. Reused for the gap
 // trend too, where the same colouring reads as "closing" (green) vs
 // "opening" (red).
-function Sparkline({ values }: { values: number[] }) {
-  const min = Math.min(...values), max = Math.max(...values);
+function Sparkline({ values }: { values: (number | undefined)[] }) {
+  const known = values.filter((v): v is number => v != null);
+  if (known.length === 0) return null;
+  const min = Math.min(...known), max = Math.max(...known);
   const span = max - min || 1;
   return (
     <svg width={values.length * 15} height={24} role="img" aria-label="Trend">
       {values.map((v, i) => {
+        if (v == null) return null;
         const h = 4 + ((v - min) / span) * 18;
-        const slower = i > 0 && v > values[i - 1];
+        const prev = values[i - 1];
+        const slower = i > 0 && prev != null && v > prev;
         return (
           <rect key={i} x={i * 15} y={24 - h} width={11} height={h}
                 fill={slower ? '#e1342e' : '#3bb273'} />
@@ -35,7 +39,7 @@ function Sparkline({ values }: { values: number[] }) {
 }
 
 function CarTelemetry({ car, history, gapHistory }: {
-  car: Car; history?: number[]; gapHistory?: number[];
+  car: Car; history?: number[]; gapHistory?: (number | undefined)[];
 }) {
   return (
     <div style={{ display: 'grid', gap: 8, minWidth: 200 }}>
@@ -67,23 +71,26 @@ function CarTelemetry({ car, history, gapHistory }: {
   );
 }
 
+// TelemetryPanel takes the raw state + selection (rather than every car/history
+// combination pre-looked-up by the caller) and does the primary/rival lookup
+// once, itself, for both cars — instead of the caller duplicating the same
+// `x != null ? lookup[x] : undefined` pattern once per car.
 export function TelemetryPanel({
-  car, history, gapHistory, cars, rival, rivalCar, rivalHistory, rivalGapHistory, onRivalChange,
+  state, lapHistory, gapHistory, selected, rival, onRivalChange,
 }: {
-  car: Car | undefined;
-  history?: number[];
-  gapHistory?: number[];
-  cars?: Car[];
-  rival?: number | null;
-  rivalCar?: Car;
-  rivalHistory?: number[];
-  rivalGapHistory?: number[];
+  state: RaceState;
+  lapHistory: LapHistory;
+  gapHistory: GapHistory;
+  selected: number | null;
+  rival: number | null;
   onRivalChange?: (driverNum: number | null) => void;
 }) {
+  const car = selected != null ? state.cars[selected] : undefined;
   if (!car) {
     return <div className="empty">Select a car to see telemetry</div>;
   }
-  const others = (cars ?? []).filter((c) => c.driverNum !== car.driverNum);
+  const rivalCar = rival != null ? state.cars[rival] : undefined;
+  const others = Object.values(state.cars).filter((c) => c.driverNum !== car.driverNum);
   return (
     <div style={{ display: 'grid', gap: 8 }}>
       {others.length > 0 && onRivalChange && (
@@ -103,8 +110,10 @@ export function TelemetryPanel({
         </label>
       )}
       <div style={{ display: 'flex', gap: 16 }}>
-        <CarTelemetry car={car} history={history} gapHistory={gapHistory} />
-        {rivalCar && <CarTelemetry car={rivalCar} history={rivalHistory} gapHistory={rivalGapHistory} />}
+        <CarTelemetry car={car} history={lapHistory[car.driverNum]} gapHistory={gapHistory[car.driverNum]?.gaps} />
+        {rivalCar && (
+          <CarTelemetry car={rivalCar} history={lapHistory[rivalCar.driverNum]} gapHistory={gapHistory[rivalCar.driverNum]?.gaps} />
+        )}
       </div>
     </div>
   );

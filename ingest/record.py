@@ -41,7 +41,7 @@ from fastf1 import _api
 from radio import extract_radio
 from race_control import extract_race_control
 from ghost import build_lap_trace
-from resample import nearest_index, step_value
+from resample import nearest_index, step_value, in_window_ms
 
 # ---------------------------------------------------------------------------
 # Args
@@ -429,35 +429,28 @@ def _lap_fraction(nx, ny):
     d = (_track_xy[:, 0] - nx) ** 2 + (_track_xy[:, 1] - ny) ** 2
     return int(np.argmin(d)) / len(_track_xy)
 
-# Lap-number step lookup per driver (from laps 'LapNumber').
+# Per-driver derivations, all from the same laps slice: the lap-number step
+# lookup (from 'LapNumber'), the whole-race tyre-stint plan (Phase 3, baked
+# once — not windowed like the frame stream, so the strategy chart can show
+# the full plan), and pit-lane windows. Position-data 'Status' does NOT
+# reliably tag pit lane in FastF1 (verified empty — 'OnTrack' for the entire
+# session, even during a confirmed pit stop) — so a car's Pit/Out status is
+# derived from lap timing (PitInTime/PitOutTime) instead, which is authoritative.
 lapnum_lookup = {}  # driver_num -> (times, lap_numbers), parallel lists ascending by time
-for num in session.drivers:
-    inum = int(num)
-    if inum not in driver_info:
-        continue
-    drv = session.laps.pick_drivers(num)[['LapStartTime', 'LapNumber']].dropna()
-    lapnum_lookup[inum] = (
-        [t.total_seconds() for t in drv['LapStartTime']],
-        [int(n) for n in drv['LapNumber']],
-    )
-
-def _lap_number(driver_num, t_s):
-    times, lapnums = lapnum_lookup.get(driver_num, ([], []))
-    if not lapnums:
-        return 1
-    return step_value(times, lapnums, t_s, lapnums[0])
-
-# ---------------------------------------------------------------------------
-# Stints (Phase 3): whole-race tyre-stint plan per driver, baked once — not
-# windowed like the frame stream, so the strategy chart can show the full plan.
-# ---------------------------------------------------------------------------
-
 stints = {}
+pit_windows = {}  # driver_num -> [(pit_in_s, pit_out_s), ...]
 for num in session.drivers:
     inum = int(num)
     if inum not in driver_info:
         continue
     drv = session.laps.pick_drivers(num)
+
+    lap_times = drv[['LapStartTime', 'LapNumber']].dropna()
+    lapnum_lookup[inum] = (
+        [t.total_seconds() for t in lap_times['LapStartTime']],
+        [int(n) for n in lap_times['LapNumber']],
+    )
+
     out = []
     for _, grp in drv.groupby('Stint'):
         grp = grp.dropna(subset=['LapNumber'])
@@ -470,32 +463,32 @@ for num in session.drivers:
         })
     if out:
         stints[inum] = out
-print(f"Stints baked for {len(stints)} drivers")
 
-# ---------------------------------------------------------------------------
-# Pit-lane windows: the position-data 'Status' field does NOT reliably tag pit
-# lane in FastF1 (verified empty — 'OnTrack' for the entire session, even during
-# a confirmed pit stop) — so a car's Pit/Out status is derived from lap timing
-# (PitInTime/PitOutTime) instead, which is authoritative.
-# ---------------------------------------------------------------------------
-
-pit_windows = {}  # driver_num -> [(pit_in_s, pit_out_s), ...]
-for num in session.drivers:
-    inum = int(num)
-    if inum not in driver_info:
-        continue
-    drv = session.laps.pick_drivers(num).sort_values('LapNumber')
     windows = []
     pit_in = None
-    for _, lap in drv.iterrows():
+    for _, lap in drv.sort_values('LapNumber').iterrows():
         if not pd.isna(lap['PitInTime']):
             pit_in = lap['PitInTime'].total_seconds()
-        if not pd.isna(lap['PitOutTime']) and pit_in is not None:
-            windows.append((pit_in, lap['PitOutTime'].total_seconds()))
-            pit_in = None
+        if not pd.isna(lap['PitOutTime']):
+            if pit_in is None and not pd.isna(lap['LapStartTime']):
+                # No PitInTime seen before this PitOutTime — e.g. the car
+                # started the race from the pit lane. Treat the lap's own
+                # start as the pit-in edge so the car is still correctly
+                # flagged as in the pits up to PitOutTime.
+                pit_in = lap['LapStartTime'].total_seconds()
+            if pit_in is not None:
+                windows.append((pit_in, lap['PitOutTime'].total_seconds()))
+                pit_in = None
     if pit_in is not None:
         windows.append((pit_in, pit_in + 30))  # no recorded out-lap; assume a typical stop
     pit_windows[inum] = windows
+print(f"Stints baked for {len(stints)} drivers")
+
+def _lap_number(driver_num, t_s):
+    times, lapnums = lapnum_lookup.get(driver_num, ([], []))
+    if not lapnums:
+        return 1
+    return step_value(times, lapnums, t_s, lapnums[0])
 
 def _in_pit(driver_num, t_s):
     for in_s, out_s in pit_windows.get(driver_num, []):
@@ -663,13 +656,10 @@ with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
             yi = driver_frames[dnum]['y'][i]
             st = driver_frames[dnum]['status'][i]
 
-            # Map status
-            if st == 'OnTrack':
-                status_str = 'OnTrack'
-            elif st in ('Pitlane', 'Pit'):
-                status_str = 'Pit'
-            else:
-                status_str = 'Out'
+            # Map status. Position-data 'Status' never reliably reports pit
+            # lane (see the note above _in_pit's definition), so it's only
+            # used for OnTrack-vs-not; pit status comes from lap timing.
+            status_str = 'OnTrack' if st == 'OnTrack' else 'Out'
             if _in_pit(dnum, t_s):
                 status_str = 'Pit'
 
@@ -799,7 +789,7 @@ try:
     assert isinstance(hdr['radio'], list), "radio must be a list"
     for rm in hdr['radio']:
         assert {'timeMs', 'driverNum', 'clip'} <= set(rm.keys()), f"radio item missing fields: {rm}"
-        assert WINDOW_START_S * 1000 <= rm['timeMs'] < WINDOW_END_S * 1000, f"radio timeMs out of window: {rm}"
+        assert in_window_ms(rm['timeMs'], WINDOW_START_S, WINDOW_END_S), f"radio timeMs out of window: {rm}"
         assert rm['clip'].startswith('http'), f"radio clip not a URL: {rm}"
     assert 'totalLaps' in hdr, "header missing 'totalLaps'"
     assert isinstance(hdr['totalLaps'], int) and hdr['totalLaps'] >= 0, "totalLaps must be a non-negative int"

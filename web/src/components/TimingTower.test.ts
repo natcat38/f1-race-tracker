@@ -182,6 +182,11 @@ describe('updateGapHistory', () => {
     const h = updateGapHistory({}, [car({ driverNum: 1 })]);
     expect(h[1]).toBeUndefined();
   });
+  it('records undefined (not 0) when gapMs is legitimately absent', () => {
+    let h = updateGapHistory({}, [car({ driverNum: 1, lap: 1 })]); // no gapMs yet
+    h = updateGapHistory(h, [car({ driverNum: 1, lap: 2, gapMs: 4800 })]);
+    expect(h[1].gaps).toEqual([undefined, 4800]);
+  });
 });
 
 describe('updateLapHistory', () => {

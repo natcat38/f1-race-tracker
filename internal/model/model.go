@@ -20,7 +20,7 @@ type CarState struct {
 	Code      string    `json:"code"` // "VER"
 	Team      string    `json:"team"`
 	Pos       int       `json:"pos"`           // running order
-	Lap       int       `json:"lap,omitempty"` // this car's current lap number
+	Lap       int       `json:"lap"` // this car's current lap number; always meaningful (0 is a real value, e.g. before lap 1), so no omitempty
 	P         Point     `json:"p"`             // track-space coordinate, scaled to [0,1]
 	Status    CarStatus `json:"status"`
 	Tyre      string    `json:"tyre,omitempty"` // Phase 2: compound, e.g. "SOFT"

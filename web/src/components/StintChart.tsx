@@ -1,12 +1,22 @@
+import { memo } from 'react';
 import type { RaceState } from '../state/race';
 import { orderCars, TYRE_COLOUR } from './timingHelpers';
+
+function leaderLapOf(state: RaceState): number | undefined {
+  return Object.values(state.cars).find((c) => c.pos === 1)?.lap;
+}
 
 // StintChart is the full-race strategy timeline: one row per car (running
 // order), each stint drawn as a coloured segment on a 0..totalLaps axis, with
 // a marker at the leader's current lap. Unlike every other board panel this
 // isn't windowed to the replay clip — the stint plan is baked for the whole
 // race so the strategy story reads at a glance (see ingest/record.py's stints).
-export function StintChart({ state }: { state: RaceState }) {
+//
+// state.stints/state.totalLaps are baked once per session and never change
+// mid-race; only the leader-lap marker needs to move. Memoized on just those
+// three values (not `state` itself, which gets a new identity every 10Hz
+// frame) so the full sort + per-driver stint bars aren't rebuilt every tick.
+function StintChartInner({ state }: { state: RaceState }) {
   const order = orderCars(state.cars).filter((c) => state.stints[c.driverNum]?.length);
   if (order.length === 0) return <div className="empty">No stint data for this session.</div>;
 
@@ -53,3 +63,9 @@ export function StintChart({ state }: { state: RaceState }) {
     </div>
   );
 }
+
+export const StintChart = memo(StintChartInner, (prev, next) => (
+  prev.state.stints === next.state.stints &&
+  prev.state.totalLaps === next.state.totalLaps &&
+  leaderLapOf(prev.state) === leaderLapOf(next.state)
+));

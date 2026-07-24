@@ -15,7 +15,6 @@ import { useGapHistory } from './hooks/useGapHistory';
 import { Compare } from './components/Compare';
 import { Ghost } from './components/Ghost';
 import { StintChart } from './components/StintChart';
-import { orderCars } from './components/timingHelpers';
 
 function SkeletonMap() {
   return <div className="track-skeleton">Warming up the timing feed…</div>;
@@ -76,14 +75,11 @@ export default function App() {
       <div className="board-bottom">
         <Panel label="Telemetry">
           <TelemetryPanel
-            car={selected != null ? state.cars[selected] : undefined}
-            history={selected != null ? lapHistory[selected] : undefined}
-            gapHistory={selected != null ? gapHistory[selected]?.gaps : undefined}
-            cars={orderCars(state.cars)}
+            state={state}
+            lapHistory={lapHistory}
+            gapHistory={gapHistory}
+            selected={selected}
             rival={effectiveRival}
-            rivalCar={effectiveRival != null ? state.cars[effectiveRival] : undefined}
-            rivalHistory={effectiveRival != null ? lapHistory[effectiveRival] : undefined}
-            rivalGapHistory={effectiveRival != null ? gapHistory[effectiveRival]?.gaps : undefined}
             onRivalChange={setRival}
           />
         </Panel>

@@ -136,10 +136,6 @@ import time
 import zlib
 import base64
 
-# FastF1 imports — safe at module level because live.py imports us lazily
-# (only when --live is passed). These do NOT trigger data downloads.
-import fastf1.livetiming.data as _ltd
-
 # Contract helpers — must match internal/model/model.go exactly.
 from live import (
     snap_key,
@@ -253,6 +249,11 @@ def _replay_capture(r, session: str, label: str, capture_path: str) -> None:
     not for frame-by-frame streaming. Here we read it as a structured log and
     re-emit at real-time pace using the stored timestamps.
     """
+    # Imported lazily (not at module level) so importing this module — e.g. for
+    # its parsing helpers in tests/contract checks — never requires fastf1 to
+    # be installed; only actually replaying a capture does.
+    import fastf1.livetiming.data as _ltd
+
     _log.info(f"Replaying capture file: {capture_path}")
     livedata = _ltd.LiveTimingData(capture_path)
     # Trigger load
@@ -701,7 +702,12 @@ def _parse_gap_str(s: str):
         digits = ''.join(ch for ch in s if ch.isdigit())
         return (None, int(digits)) if digits else (None, None)
     try:
-        return int(round(float(s) * 1000)), None
+        # Clamp to non-negative: every other gapMs/intMs producer in this
+        # codebase (ingest/record.py) is non-negative by convention (a
+        # "catching" interval is never rendered as a signed value downstream),
+        # so a feed variant that encodes it with a leading '-' shouldn't leak
+        # a negative value into the contract.
+        return max(0, int(round(float(s) * 1000))), None
     except ValueError:
         return None, None
 
@@ -732,6 +738,12 @@ def _parse_timing_line(drv_data: dict) -> dict:
     out = {}
     if 'NumberOfLaps' in drv_data:
         try:
+            # UNVERIFIED: assumed to be the car's current (in-progress) lap
+            # number, matching ingest/record.py's 'lap' (from FastF1's
+            # LapNumber). If the real feed instead counts *completed* laps,
+            # this is off-by-one vs. the replay path until the driver crosses
+            # the line — check this specifically per the runbook's
+            # NumberOfLaps checklist item before relying on it.
             out['lap'] = int(drv_data['NumberOfLaps'])
         except (ValueError, TypeError):
             pass

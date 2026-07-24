@@ -164,8 +164,11 @@ export function fmtSigned(ms: number): string {
 
 // GapHistory maps driverNum -> {lap: last lap counted, gaps: recent gapMs
 // readings, oldest-first} — the "closing/opening" trend a race engineer
-// watches lap over lap, as opposed to the instantaneous Gap column.
-export type GapHistory = Record<number, { lap: number; gaps: number[] }>;
+// watches lap over lap, as opposed to the instantaneous Gap column. A gap
+// reading is `undefined` (not 0) for a lap where gapMs was legitimately
+// absent (no completed reference lap yet) — 0 means "tied with the leader",
+// a real and different value.
+export type GapHistory = Record<number, { lap: number; gaps: (number | undefined)[] }>;
 const MAX_GAP_HISTORY = 8;
 
 // updateGapHistory appends a driver's gapMs once per completed lap (detected
@@ -178,7 +181,7 @@ export function updateGapHistory(prev: GapHistory, cars: Car[]): GapHistory {
     const entry = prev[c.driverNum];
     if (entry && c.lap <= entry.lap) continue;
     next ??= { ...prev };
-    const gaps = [...(entry?.gaps ?? []), c.gapMs ?? 0].slice(-MAX_GAP_HISTORY);
+    const gaps = [...(entry?.gaps ?? []), c.gapMs].slice(-MAX_GAP_HISTORY);
     next[c.driverNum] = { lap: c.lap, gaps };
   }
   return next ?? prev;

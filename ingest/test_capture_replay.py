@@ -11,6 +11,16 @@ import json
 import os
 import sys
 
+import pytest
+
+# _replay_capture actually drives fastf1.livetiming.data.LiveTimingData (only
+# imported lazily, inside that function, so importing live_signalr itself
+# never requires fastf1) — so this test needs fastf1 installed to run, even
+# though it needs no network/Redis. CI's `contract` job is deliberately
+# fastf1-free (ingest/requirements-dev.txt), so skip cleanly there instead of
+# failing; run it for real wherever fastf1 is installed (e.g. locally).
+pytest.importorskip("fastf1", reason="needs fastf1 for LiveTimingData; not installed in the fastf1-free contract job")
+
 sys.path.insert(0, os.path.dirname(__file__))
 
 from live_signalr import _replay_capture  # noqa: E402
