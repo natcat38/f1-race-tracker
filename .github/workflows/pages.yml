@@ -1,0 +1,62 @@
+name: Deploy static demo
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'cmd/bake-static/**'
+      - 'internal/**'
+      - 'data/replays/monza-2024-race.jsonl'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Bake the static-demo clip
+        run: go run ./cmd/bake-static --clip data/replays/monza-2024-race.jsonl --out web/public/static-demo/monza-2024-race.ndjson --session static-demo
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+        working-directory: web
+
+      - name: Build (static-demo base path + player)
+        run: npm run build
+        working-directory: web
+        env:
+          VITE_STATIC_DEMO: 'true'
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: web/dist
+
+      - uses: actions/deploy-pages@v4
+        id: deployment

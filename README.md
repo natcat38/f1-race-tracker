@@ -22,6 +22,12 @@ The product is judged first by whether it helps you understand how the car is pe
 - **A polyglot seam done right** — Python and Go publish byte-identical JSON to the same Redis keys; the gateway consumes either with zero code changes.
 - **Live WebSocket fan-out at scale** — one in-memory hub pushes 10 Hz frames to a thousand viewers, with backpressure that sheds milliseconds rather than dropping clients.
 
+## Quick look (no clone required)
+
+**[Live static demo →](https://natcat38.github.io/f1-race-tracker/)** — a frontend-only build that plays back one recorded clip, client-side, with no backend running. This is the fastest way to see what the project does, but it's a simplified artifact, not the real system: no live source, no cross-year comparison, and nothing here proves the polyglot pipeline actually works.
+
+For that, run it for real:
+
 ## Run it
 
 ```bash

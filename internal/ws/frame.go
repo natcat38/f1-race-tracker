@@ -13,7 +13,7 @@ type envelope struct {
 	Data json.RawMessage `json:"data"`
 }
 
-func encodeSnapshot(s *model.Snapshot) ([]byte, error) {
+func EncodeSnapshot(s *model.Snapshot) ([]byte, error) {
 	d, err := json.Marshal(s)
 	if err != nil {
 		return nil, err
@@ -21,7 +21,7 @@ func encodeSnapshot(s *model.Snapshot) ([]byte, error) {
 	return json.Marshal(envelope{Type: "snapshot", Data: d})
 }
 
-func encodeFrame(f model.Frame) ([]byte, error) {
+func EncodeFrame(f model.Frame) ([]byte, error) {
 	// A zero-value frame (Rev 0, no cars) is never a real broadcast — Rev 0 is the
 	// "no frame yet" sentinel the hub's stale check assumes. Refuse it rather than
 	// silently fan out an empty frame.

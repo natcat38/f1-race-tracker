@@ -158,6 +158,27 @@ func TestLoadParsesLapTraceFromHeader(t *testing.T) {
 	}
 }
 
+func TestSource_Frames_ReturnsAllInFileOrder(t *testing.T) {
+	body := `{"track":[{"x":0,"y":0}],"label":"Lbl","maxRev":3}
+{"timeMs":100,"frame":{"rev":1,"timeMs":100,"cars":[{"driverNum":1}]}}
+{"timeMs":200,"frame":{"rev":2,"timeMs":200,"cars":[{"driverNum":1}]}}
+{"timeMs":300,"frame":{"rev":3,"timeMs":300,"cars":[{"driverNum":1}]}}
+`
+	src, err := Load(writeTemp(t, body), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	frames := src.Frames()
+	if len(frames) != 3 {
+		t.Fatalf("got %d frames, want 3", len(frames))
+	}
+	for i, want := range []int64{100, 200, 300} {
+		if frames[i].TimeMs != want {
+			t.Errorf("frames[%d].TimeMs = %d, want %d", i, frames[i].TimeMs, want)
+		}
+	}
+}
+
 func TestLoadParsesTotalLapsFromHeader(t *testing.T) {
 	clip := `{"track":[{"x":0.1,"y":0.2}],"label":"T","maxRev":1,"totalLaps":53}
 {"timeMs":3300000,"frame":{"rev":1,"timeMs":3300000,"cars":[{"driverNum":1,"code":"VER","team":"Red Bull","pos":1,"p":{"x":0.1,"y":0.2},"status":"OnTrack"}]}}

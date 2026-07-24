@@ -10,7 +10,7 @@ import (
 func TestEncodeSnapshot_WrapsTypeAndData(t *testing.T) {
 	s := model.NewSnapshot("demo", "replay", "Synthetic")
 	s.Rev = 3
-	b, err := encodeSnapshot(s)
+	b, err := EncodeSnapshot(s)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func TestEncodeSnapshot_WrapsTypeAndData(t *testing.T) {
 
 func TestEncodeFrame_WrapsTypeAndData(t *testing.T) {
 	f := model.Frame{Rev: 9, TimeMs: 1234, Cars: []model.CarState{{DriverNum: 44}}}
-	b, err := encodeFrame(f)
+	b, err := EncodeFrame(f)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,9 +54,9 @@ func TestEncodeFrame_WrapsTypeAndData(t *testing.T) {
 
 // A zero-value Frame (Rev 0, no cars) should never be silently encoded and
 // broadcast — Rev 0 collides with the "no frame yet" sentinel the hub's stale
-// check relies on. encodeFrame must reject it.
+// check relies on. EncodeFrame must reject it.
 func TestEncodeFrame_RejectsZeroValueFrame(t *testing.T) {
-	if _, err := encodeFrame(model.Frame{}); err == nil {
+	if _, err := EncodeFrame(model.Frame{}); err == nil {
 		t.Fatal("expected error encoding a zero-value Frame (Rev 0, no cars), got nil")
 	}
 }

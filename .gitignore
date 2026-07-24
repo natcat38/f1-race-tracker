@@ -21,6 +21,10 @@ node_modules/
 web/dist/
 !web/dist/.gitkeep
 web/.vite/
+# Baked by `go run ./cmd/bake-static` for the GitHub Pages static demo — CI
+# generates this fresh on every deploy (.github/workflows/pages.yml), it's
+# never committed.
+web/public/static-demo/
 
 # --- OS / IDE ---
 .DS_Store

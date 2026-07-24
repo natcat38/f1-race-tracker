@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { connectRace, type ConnStatus } from './realtime/socket';
+import { connectStaticReplay } from './realtime/staticReplay';
 import { emptyState, type RaceState } from './state/race';
 import { Map } from './components/Map';
 import { TimingTower } from './components/TimingTower';
@@ -20,6 +21,11 @@ function SkeletonMap() {
   return <div className="track-skeleton">Warming up the timing feed…</div>;
 }
 
+// Build-time flag: VITE_STATIC_DEMO=true selects the file-backed static player
+// instead of the real WebSocket connection. Set only by the GitHub Pages build
+// (see .github/workflows/pages.yml) — docker-compose and local dev never set it.
+const STATIC_DEMO = import.meta.env.VITE_STATIC_DEMO === 'true';
+
 export default function App() {
   const [state, setState] = useState<RaceState>(emptyState());
   const [status, setStatus] = useState<ConnStatus>('connecting');
@@ -30,7 +36,7 @@ export default function App() {
   const lapHistory = useLapHistory(state);
   const gapHistory = useGapHistory(state);
 
-  useEffect(() => connectRace(setState, setStatus), []);
+  useEffect(() => (STATIC_DEMO ? connectStaticReplay : connectRace)(setState, setStatus), []);
   useEffect(() => {
     const onHash = () => setHash(location.hash);
     window.addEventListener('hashchange', onHash);
@@ -49,7 +55,7 @@ export default function App() {
   return (
     <div className="page">
       <StatusRail active="board" state={state} status={status} staleSec={staleSec}>
-        <SourceToggle state={state} />
+        {!STATIC_DEMO && <SourceToggle state={state} />}
       </StatusRail>
 
       <div className="board-top">

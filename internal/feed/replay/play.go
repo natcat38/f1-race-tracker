@@ -100,6 +100,19 @@ func (s *Source) Stints() map[int][]model.Stint { return s.stints }
 func (s *Source) Label() string                 { return s.label }
 func (s *Source) Mode() string                  { return "replay" }
 
+// Frames returns every frame in the clip, in file order, with each frame's Rev
+// exactly as recorded in the file (advisory — a caller publishing to a fresh
+// session should reassign a monotonic Rev, as Writer.Run and cmd/bake-static do).
+// Unlike Events, this does not pace playback in real time: it's for tooling that
+// needs the whole clip immediately, not a live-paced stream.
+func (s *Source) Frames() []model.Frame {
+	out := make([]model.Frame, len(s.lines))
+	for i, ln := range s.lines {
+		out[i] = ln.Frame
+	}
+	return out
+}
+
 // Events streams frames forever, looping. T is stamped to emit-time (see
 // knowledge/components/replay-engine.md).
 // Rev on the emitted frame is advisory — the writer reassigns a monotonic Rev.
