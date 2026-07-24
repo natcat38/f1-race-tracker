@@ -78,6 +78,19 @@ rather than connecting to a real session. The UI labels this state honestly
 (`Live (demo)`, with a tooltip) rather than leaving the caveat only in the docs.
 
 - _Use_ "source" for the live-vs-replay choice; the operator switches it via a toggle.
+- Neither term describes the **static demo** (below) — that has no pipeline at all.
+
+## Static demo
+
+The frontend-only build hosted on GitHub Pages: a baked snapshot+frames JSON per
+clip, played back by the frontend alone on a client-side clock, with no **writer**,
+no **seam**, and no **gateway** behind it. It visually resembles the **replay**
+source (same clip content) but shares none of its machinery — nothing here proves
+anything about the real pipeline. A third front door alongside the README/video and
+`docker-compose`, not a replacement for either.
+
+- _Use_ "static demo" (or "the Pages demo"); never call it "replay" — that term is
+  reserved for the pipeline-backed source above.
 
 ## Compare
 

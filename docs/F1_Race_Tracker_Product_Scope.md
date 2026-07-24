@@ -140,20 +140,21 @@ A visitor who connects after playback started **immediately sees the current car
 
 ## 6. How It's Run & Demoed
 
-> This replaces the original "always-on hosted site." There is **no required hosting** and **no cost**.
+> This replaces the original "always-on hosted site." There is **no required hosting of the real system, and no cost** — see ADR-0006 for why a static, backend-free demo doesn't count as a reversal of that.
 
-The primary experience is the running app itself — a race engineer opens the board and reads it. The rest of this section is about how someone gets there:
+The primary experience is the running app itself — a race engineer opens the board and reads it. The rest of this section is about how someone gets there, via **three front doors**:
 
 - **Primary artifact (what most people see):** a polished **README** with the architecture diagram, a recorded **GIF/video** of the map animating and the two-year comparison, and the **benchmark numbers**.
-- **Hands-on reviewer:** **`docker-compose up`** runs the *full real system* locally — Python ingestion + Redis + the Go gateway — so a serious reviewer sees the actual polyglot architecture, not a simplified version. The gateway is stateless by design (so it *could* run as multiple replicas), but the system currently runs and is benchmarked as a single gateway — see `docs/adr/0001-single-gateway-deferred-multigateway.md`.
-- **Hosted live link:** *optional and deferred.* Running it 24/7 is never a requirement or a maintenance burden.
+- **Quick look, no clone required:** a **static demo** on GitHub Pages — a frontend-only build that plays back one pre-baked clip client-side, with no Python, Redis, or Go behind it (see `CONTEXT.md`'s **Static demo** entry and `docs/adr/0006-static-gh-pages-demo-as-third-front-door.md`). Free and zero-maintenance, so it doesn't reopen the cost/ops concern §7 retires — but it is explicitly a lesser artifact, framed honestly as a quick look, never as "the system." It has no live source and (for now) no cross-year comparison.
+- **Hands-on reviewer:** **`docker-compose up`** runs the *full real system* locally — Python ingestion + Redis + the Go gateway — so a serious reviewer sees the actual polyglot architecture, not a simplified version. This remains the **only** way to see the real system run; the static demo does not substitute for it. The gateway is stateless by design (so it *could* run as multiple replicas), but the system currently runs and is benchmarked as a single gateway — see `docs/adr/0001-single-gateway-deferred-multigateway.md`.
+- **Hosted live link (of the real system):** *optional and deferred.* Running the full stack 24/7 is never a requirement or a maintenance burden — this is distinct from the static demo above, which has no stack to run.
 - **The benchmark** (concurrent WebSocket connections, p50/p99 fan-out latency) is run on demand and published in `BENCHMARKS.md` — it measures how a **single gateway** holds up as concurrent viewers climb (a lower bound, since the load generator shares the host). The stateless-gateway + Redis seam is what *would* make a multi-gateway tier a config change; building and benchmarking that tier is future work (see ADR-0001).
 
 ---
 
 ## 7. Out of Scope
 
-- **Always-on public hosting** — deliberately retired; demo is README + video + local `docker-compose`.
+- **Always-on hosting of the real system** — deliberately retired; the hands-on experience stays local `docker-compose`. (A free, zero-maintenance **static demo** of the frontend alone is not this — see ADR-0006.)
 - **Paid data tiers** — uses **free** F1 data only (FastF1; OpenF1 historical). Live uses FastF1's free client, best-effort.
 - **Full-race data files in the repo** — only short, curated, downsampled clips are committed; the recorder bakes more on demand.
 - **User accounts / auth** — none; runs locally, single-operator.
