@@ -28,7 +28,7 @@ func (h *Hub) ApplyFrame(f model.Frame) bool {
 		h.mu.Unlock()
 		return false
 	}
-	b, err := encodeFrame(f)
+	b, err := EncodeFrame(f)
 	if err != nil {
 		h.logger.Error("encode frame failed", "session", f.SessionKey, "rev", f.Rev, "err", err)
 		h.mu.Unlock()
@@ -67,7 +67,7 @@ func closeAll(clients []*Client) {
 func (h *Hub) Register(c *Client) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	b, err := encodeSnapshot(h.snapshot)
+	b, err := EncodeSnapshot(h.snapshot)
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func (h *Hub) Unregister(c *Client) {
 func (h *Hub) Reset(snap *model.Snapshot) {
 	h.mu.Lock()
 	h.snapshot = snap
-	b, err := encodeSnapshot(snap)
+	b, err := EncodeSnapshot(snap)
 	if err != nil {
 		h.logger.Error("encode snapshot failed", "session", snap.SessionKey, "err", err)
 		h.mu.Unlock()
