@@ -422,7 +422,7 @@ describe('connectStaticReplay', () => {
     // itself = 0) — mirrors play.go's `base := lines[0].TimeMs`, where the first
     // emitted frame always has target=0. So the snapshot AND the first frame both
     // play at offset 0, back to back, with no artificial delay between them.
-    await vi.waitFor(() => expect(states.length).toBeGreaterThanOrEqual(2));
+    await vi.waitFor(() => expect(states.length).toBeGreaterThanOrEqual(2), { interval: 1 });
     expect(states[0].rev).toBe(0); // snapshot
     expect(states[1].rev).toBe(1); // first frame, right behind it
 
@@ -430,21 +430,26 @@ describe('connectStaticReplay', () => {
     expect(states.at(-1)?.rev).toBe(2);
   });
 
-  test('loops back to the start after the last frame', async () => {
+  test('loops back to the first frame after the last frame, without re-emitting the snapshot, and Rev keeps climbing', async () => {
     const states: RaceState[] = [];
     connectStaticReplay((s) => states.push(s));
-    await vi.waitFor(() => expect(states.length).toBeGreaterThanOrEqual(2)); // snapshot + frame 1
+    await vi.waitFor(() => expect(states.length).toBeGreaterThanOrEqual(2), { interval: 1 }); // snapshot + frame 1
 
-    await vi.advanceTimersByTimeAsync(200); // frame 2 (end of clip)
-    await vi.advanceTimersByTimeAsync(50);  // past the end -> loop restarts at the snapshot
+    await vi.advanceTimersByTimeAsync(200); // frame 2, rev 2 (end of clip)
+    await vi.advanceTimersByTimeAsync(50);  // past the end -> loop restarts at frame 1, not the snapshot
 
-    expect(states.at(-1)?.rev).toBe(0); // back to the baked snapshot's rev
+    // The restarted frame 1 is baked with rev 1, which is <= the rev 2 the state
+    // already reached — applyMessage would silently drop it as stale (CONTEXT.md's
+    // Rev invariant) unless its rev is bumped past the previous lap's max (2),
+    // landing at 1 + 1*2 = 3. This is the whole point of the test: prove Rev keeps
+    // climbing across a loop restart instead of freezing the map.
+    expect(states.at(-1)?.rev).toBe(3);
   });
 
   test('the returned close function stops scheduling further frames', async () => {
     const states: RaceState[] = [];
     const close = connectStaticReplay((s) => states.push(s));
-    await vi.waitFor(() => expect(states.length).toBeGreaterThanOrEqual(2));
+    await vi.waitFor(() => expect(states.length).toBeGreaterThanOrEqual(2), { interval: 1 });
 
     close();
     const countAtClose = states.length;
@@ -456,7 +461,7 @@ describe('connectStaticReplay', () => {
     const statuses: string[] = [];
     connectStaticReplay(() => {}, (s) => statuses.push(s));
     expect(statuses[0]).toBe('connecting');
-    await vi.waitFor(() => expect(statuses).toContain('live'));
+    await vi.waitFor(() => expect(statuses).toContain('live'), { interval: 1 });
   });
 });
 ```
@@ -531,21 +536,45 @@ export function connectStaticReplay(
     // Every frame's timeMs, relative to the first frame's timeMs — mirrors
     // play.go's `base := s.lines[0].TimeMs`. The snapshot (if any) always plays
     // at offset 0, same as the Go player's first-message-is-current-state model.
-    const frameBase = messages.find((m) => m.type === 'frame')?.data.timeMs ?? 0;
+    const frameStartIndex = messages.findIndex((m) => m.type === 'frame');
+    const frameBase = frameStartIndex >= 0 ? messages[frameStartIndex].data.timeMs : 0;
     const offsets = messages.map((m) => (m.type === 'frame' ? m.data.timeMs - frameBase : 0));
+    // Where a loop restart resumes: the first FRAME, not index 0. The synthetic
+    // baked snapshot (empty cars, the pre-playback baseline) plays exactly once,
+    // on the very first pass — re-emitting it every lap would flash the map back
+    // to empty on every loop, and production never does this either: a real
+    // replay loop restart is detected by TimeMs decreasing and only clears the
+    // rolling message buffer (internal/model/apply.go), it never re-sends a
+    // from-scratch empty snapshot.
+    const loopRestartIndex = frameStartIndex >= 0 ? frameStartIndex : 0;
+    // applyMessage drops any frame whose Rev isn't greater than the state's
+    // current Rev (CONTEXT.md: "Rev ... must never reset — not across a replay
+    // loop"). cmd/bake-static bakes Rev as 1..N for one pass, so replaying the
+    // same baked messages verbatim on lap 2 would have every frame's Rev <= the
+    // Rev the first lap already reached, silently dropped as stale — freezing
+    // the map after one lap. Mirror play.go's `fr.Rev = ln.Frame.Rev + loop*s.max`:
+    // bump every frame's Rev by (completed laps * the highest baked Rev) so Rev
+    // keeps climbing forever, exactly like the real writer does across a loop.
+    const maxRev = messages.reduce((max, m) => (m.type === 'frame' ? Math.max(max, m.data.rev) : max), 0);
+    let lapsCompleted = 0;
 
     let loopStart = Date.now();
 
     const playFrom = (i: number) => {
       if (closed) return;
       if (i >= messages.length) {
+        lapsCompleted++;
         loopStart = Date.now();
-        timer = setTimeout(() => playFrom(0), 0);
+        timer = setTimeout(() => playFrom(loopRestartIndex), 0);
         return;
       }
       const wait = Math.max(0, offsets[i] - (Date.now() - loopStart));
       timer = setTimeout(() => {
-        state = applyMessage(state, messages[i]);
+        const msg = messages[i];
+        const bumped: Msg = msg.type === 'frame' && lapsCompleted > 0
+          ? { ...msg, data: { ...msg.data, rev: msg.data.rev + lapsCompleted * maxRev } }
+          : msg;
+        state = applyMessage(state, bumped);
         if (!live) { live = true; onStatus?.('live'); }
         onState(state);
         playFrom(i + 1);
