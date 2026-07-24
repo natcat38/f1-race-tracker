@@ -16,6 +16,8 @@ type Source interface {
 	Track() []model.Point
 	Radio() []model.RadioMessage
 	LapTrace() map[int][]int
+	TotalLaps() int
+	Stints() map[int][]model.Stint
 	Label() string
 	Mode() string
 }
@@ -54,6 +56,8 @@ func (wr *Writer) Run(ctx context.Context, session string) error {
 	snap.Track = wr.src.Track()
 	snap.Radio = wr.src.Radio()
 	snap.LapTrace = wr.src.LapTrace()
+	snap.TotalLaps = wr.src.TotalLaps()
+	snap.Stints = wr.src.Stints()
 	snap.Rev = base
 	rev := base
 	for {

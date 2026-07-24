@@ -7,6 +7,8 @@ and tz handling, then hands plain dicts here.
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
+from resample import in_window_ms
+
 _ALLOWED_HOST_SUFFIX = "formula1.com"
 
 
@@ -46,7 +48,7 @@ def extract_radio(captures, t0_epoch_s, window_start_s, window_end_s, base_url, 
         except (TypeError, ValueError):
             continue
         time_ms = _utc_to_session_ms(utc, t0_epoch_s)
-        if window_start_s * 1000 <= time_ms < window_end_s * 1000:
+        if in_window_ms(time_ms, window_start_s, window_end_s):
             out.append({
                 "timeMs": time_ms,
                 "driverNum": driver_num,

@@ -20,6 +20,7 @@ type CarState struct {
 	Code      string    `json:"code"` // "VER"
 	Team      string    `json:"team"`
 	Pos       int       `json:"pos"` // running order
+	Lap       int       `json:"lap"` // this car's current lap number; always meaningful (0 is a real value, e.g. before lap 1), so no omitempty
 	P         Point     `json:"p"`   // track-space coordinate, scaled to [0,1]
 	Status    CarStatus `json:"status"`
 	Tyre      string    `json:"tyre,omitempty"` // Phase 2: compound, e.g. "SOFT"
@@ -41,7 +42,7 @@ type CarState struct {
 
 type RaceControlMessage struct {
 	Rev      int64  `json:"rev"`
-	T        int64  `json:"t"`
+	T        int64  `json:"t"` // session-relative ms (mirrors Frame.TimeMs) — NOT wall-clock like Frame.T
 	Category string `json:"category"`
 	Message  string `json:"message"`
 	Driver   *int   `json:"driver,omitempty"`
@@ -51,6 +52,21 @@ type RadioMessage struct {
 	TimeMs    int64  `json:"timeMs"`    // session clock at which the team radio occurred
 	DriverNum int    `json:"driverNum"` // FE derives code/team/colour from the cars map
 	Clip      string `json:"clip"`      // full https URL to the .mp3 on livetiming.formula1.com
+}
+
+// Stint is one tyre stint from the full-race lap data (session-constant, like LapTrace).
+type Stint struct {
+	Compound string `json:"compound"` // "SOFT"|"MEDIUM"|"HARD"|"INTERMEDIATE"|"WET"
+	StartLap int    `json:"startLap"`
+	EndLap   int    `json:"endLap"`
+}
+
+// Weather is a low-rate sample (~1/min at bake). Rides on a frame when it
+// changes; folded into the snapshot by Apply.
+type Weather struct {
+	AirTempC   float64 `json:"airTempC"`
+	TrackTempC float64 `json:"trackTempC"`
+	Rainfall   bool    `json:"rainfall"`
 }
 
 // Mode is the small closed set of values Snapshot.Mode carries.
@@ -70,21 +86,25 @@ type Snapshot struct {
 	Messages   []RaceControlMessage `json:"messages,omitempty"`
 	Radio      []RadioMessage       `json:"radio,omitempty"`
 	LapTrace   map[int][]int        `json:"lapTrace,omitempty"`
+	TotalLaps  int                  `json:"totalLaps,omitempty"` // session-constant race distance
+	Stints     map[int][]Stint      `json:"stints,omitempty"`    // session-constant, like LapTrace
+	Weather    *Weather             `json:"weather,omitempty"`
 	TimeMs     int64                `json:"timeMs"`
 	Rev        int64                `json:"rev"`
 }
 
 type Frame struct {
-	// SessionKey and T are part of the wire contract mirrored by ingest/live.py's
-	// build_frame() but are not read back by any current Go or TS consumer — they
-	// ride along as passenger fields for the Python mirror and future latency
-	// introspection (T = publish wall-time), not dead code to prune.
+	// SessionKey rides along as a passenger field for the Python mirror
+	// (ingest/live.py's build_frame()); no Go or TS consumer reads it. T (publish
+	// wall-time, unix ms) IS read — cmd/loadtest computes fan-out latency as
+	// now - frame.T (see BENCHMARKS.md) — so it is not dead code to prune.
 	SessionKey string               `json:"session"`
 	Rev        int64                `json:"rev"`
 	T          int64                `json:"t"`      // publish wall-time, unix ms
 	TimeMs     int64                `json:"timeMs"` // session clock
 	Cars       []CarState           `json:"cars"`
 	Messages   []RaceControlMessage `json:"messages,omitempty"`
+	Weather    *Weather             `json:"weather,omitempty"`
 }
 
 // NewSnapshot returns an empty snapshot ready to receive frames. mode is a plain

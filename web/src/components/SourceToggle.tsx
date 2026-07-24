@@ -2,8 +2,11 @@ import { useState } from 'react';
 import type { RaceState } from '../state/race';
 
 const SOURCES = [
-  { key: 'replay', label: '▶ Replay' },
-  { key: 'live', label: '● Live' },
+  { key: 'replay', label: '▶ Replay', title: undefined },
+  {
+    key: 'live', label: '● Live (demo)',
+    title: 'Demo lane streaming a second replay clip — real live ingestion not yet verified',
+  },
 ] as const;
 
 // The active source is the session key the gateway is currently fanning out
@@ -11,13 +14,13 @@ const SOURCES = [
 // We key off session (the lane) rather than mode (the data's provenance) so the
 // highlight is correct even when both lanes happen to be replay-sourced.
 export function SourceToggle({ state }: { state: RaceState }) {
-  const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const active = state.session;
 
   async function pick(source: string) {
-    if (busy || source === active) return;
-    setBusy(true);
+    if (pending || source === active) return;
+    setPending(source);
     setError(null);
     try {
       const res = await fetch('/control/source', {
@@ -29,7 +32,7 @@ export function SourceToggle({ state }: { state: RaceState }) {
     } catch {
       setError('switch failed: network error');
     } finally {
-      setBusy(false);
+      setPending(null);
     }
   }
 
@@ -40,10 +43,11 @@ export function SourceToggle({ state }: { state: RaceState }) {
           <button
             key={s.key}
             onClick={() => pick(s.key)}
-            disabled={busy}
+            disabled={pending !== null}
             className={active === s.key ? 'btn btn-active' : 'btn'}
+            title={s.title}
           >
-            {s.label}
+            {pending === s.key ? 'Switching…' : s.label}
           </button>
         ))}
       </div>

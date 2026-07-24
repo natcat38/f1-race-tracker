@@ -10,8 +10,11 @@ import { RaceControl } from './components/RaceControl';
 import { Panel } from './components/Panel';
 import { StatusRail } from './components/StatusRail';
 import { useStale } from './hooks/useStale';
+import { useLapHistory } from './hooks/useLapHistory';
+import { useGapHistory } from './hooks/useGapHistory';
 import { Compare } from './components/Compare';
 import { Ghost } from './components/Ghost';
+import { StintChart } from './components/StintChart';
 
 function SkeletonMap() {
   return <div className="track-skeleton">Warming up the timing feed…</div>;
@@ -22,7 +25,10 @@ export default function App() {
   const [status, setStatus] = useState<ConnStatus>('connecting');
   const [hash, setHash] = useState<string>(typeof location !== 'undefined' ? location.hash : '');
   const [selected, setSelected] = useState<number | null>(null);
+  const [rival, setRival] = useState<number | null>(null);
   const staleSec = useStale(state);
+  const lapHistory = useLapHistory(state);
+  const gapHistory = useGapHistory(state);
 
   useEffect(() => connectRace(setState, setStatus), []);
   useEffect(() => {
@@ -31,8 +37,12 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
+  // A rival only makes sense alongside a primary selection, and never as the
+  // same car as the primary — derived rather than synced via effect.
+  const effectiveRival = selected != null && rival !== selected ? rival : null;
+
   if (hash === '#compare') return <Compare />;
-  if (hash === '#ghost') return <Ghost />;
+  if (hash === '#ghost') return <Ghost initialSelected={selected} />;
 
   const showSkeleton = state.rev === 0;
 
@@ -64,7 +74,17 @@ export default function App() {
 
       <div className="board-bottom">
         <Panel label="Telemetry">
-          <TelemetryPanel car={selected != null ? state.cars[selected] : undefined} />
+          <TelemetryPanel
+            state={state}
+            lapHistory={lapHistory}
+            gapHistory={gapHistory}
+            selected={selected}
+            rival={effectiveRival}
+            onRivalChange={setRival}
+          />
+        </Panel>
+        <Panel label="Strategy">
+          <StintChart state={state} />
         </Panel>
         <Panel label="Comms">
           <Comms state={state} />

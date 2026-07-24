@@ -14,13 +14,18 @@ import (
 	"github.com/natcat38/f1-race-tracker/internal/model"
 )
 
-type fakeSource struct{ frames []model.Frame }
+type fakeSource struct {
+	frames []model.Frame
+	stints map[int][]model.Stint
+}
 
-func (f *fakeSource) Track() []model.Point        { return []model.Point{{X: 0, Y: 0}} }
-func (f *fakeSource) Radio() []model.RadioMessage { return nil }
-func (f *fakeSource) LapTrace() map[int][]int     { return nil }
-func (f *fakeSource) Label() string               { return "Fake" }
-func (f *fakeSource) Mode() string                { return "replay" }
+func (f *fakeSource) Track() []model.Point          { return []model.Point{{X: 0, Y: 0}} }
+func (f *fakeSource) Radio() []model.RadioMessage   { return nil }
+func (f *fakeSource) LapTrace() map[int][]int       { return nil }
+func (f *fakeSource) TotalLaps() int                { return 0 }
+func (f *fakeSource) Stints() map[int][]model.Stint { return f.stints }
+func (f *fakeSource) Label() string                 { return "Fake" }
+func (f *fakeSource) Mode() string                  { return "replay" }
 func (f *fakeSource) Events(ctx context.Context) (<-chan model.Frame, error) {
 	ch := make(chan model.Frame)
 	go func() {
@@ -41,11 +46,13 @@ func (f *fakeSource) Events(ctx context.Context) (<-chan model.Frame, error) {
 // blocks on ctx after emitting) — exercising Writer.Run's frames-channel-closed branch.
 type closingSource struct{ frames []model.Frame }
 
-func (closingSource) Track() []model.Point        { return nil }
-func (closingSource) Radio() []model.RadioMessage { return nil }
-func (closingSource) LapTrace() map[int][]int     { return nil }
-func (closingSource) Label() string               { return "Closing" }
-func (closingSource) Mode() string                { return "replay" }
+func (closingSource) Track() []model.Point          { return nil }
+func (closingSource) Radio() []model.RadioMessage   { return nil }
+func (closingSource) LapTrace() map[int][]int       { return nil }
+func (closingSource) TotalLaps() int                { return 0 }
+func (closingSource) Stints() map[int][]model.Stint { return nil }
+func (closingSource) Label() string                 { return "Closing" }
+func (closingSource) Mode() string                  { return "replay" }
 func (s closingSource) Events(ctx context.Context) (<-chan model.Frame, error) {
 	ch := make(chan model.Frame)
 	go func() {
@@ -107,10 +114,13 @@ func TestWriter_FailsFastWhenSnapshotReadErrors(t *testing.T) {
 
 func TestWriter_PublishesSnapshotWithLatestRevAndTrack(t *testing.T) {
 	b := testBus(t)
-	src := &fakeSource{frames: []model.Frame{
-		{Rev: 1, Cars: []model.CarState{{DriverNum: 1, Code: "VER"}}},
-		{Rev: 2, Cars: []model.CarState{{DriverNum: 16, Code: "LEC"}}},
-	}}
+	src := &fakeSource{
+		frames: []model.Frame{
+			{Rev: 1, Cars: []model.CarState{{DriverNum: 1, Code: "VER"}}},
+			{Rev: 2, Cars: []model.CarState{{DriverNum: 16, Code: "LEC"}}},
+		},
+		stints: map[int][]model.Stint{1: {{Compound: "SOFT", StartLap: 1, EndLap: 10}}},
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go NewWriter(b, src, slog.New(slog.NewTextHandler(io.Discard, nil))).Run(ctx, "demo")
@@ -119,6 +129,9 @@ func TestWriter_PublishesSnapshotWithLatestRevAndTrack(t *testing.T) {
 	for {
 		snap, _ := b.GetSnapshot(context.Background(), "demo")
 		if snap != nil && snap.Rev == 2 && len(snap.Cars) == 2 && len(snap.Track) == 1 {
+			if len(snap.Stints[1]) != 1 || snap.Stints[1][0].Compound != "SOFT" {
+				t.Fatalf("stints did not pass through: %+v", snap.Stints)
+			}
 			return
 		}
 		select {

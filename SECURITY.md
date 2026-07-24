@@ -1,6 +1,6 @@
 # Security Policy
 
-This is a personal portfolio project, not a hosted service — there is no public
+This is a self-hosted app you run locally, not a hosted service — there is no public
 deployment to protect and no SLA. Still, if you find a security issue in the code
 (e.g. in the gateway, the ingest pipeline, or the Docker setup), please report it
 privately rather than opening a public issue:

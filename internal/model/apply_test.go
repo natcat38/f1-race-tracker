@@ -55,6 +55,26 @@ func TestApply_AppendsAndCapsMessages(t *testing.T) {
 	}
 }
 
+// A replaying clip loops back to its start (Rev keeps climbing — the writer
+// owns it — but the frame's own baked TimeMs drops back to the first frame's
+// value). The rolling race-control buffer must reset on that loop restart,
+// not accumulate duplicate copies of the same finite message set forever.
+func TestApply_MessagesResetOnReplayLoopRestart(t *testing.T) {
+	s := NewSnapshot("demo", "replay", "Synthetic")
+	Apply(s, Frame{Rev: 1, TimeMs: 1000, Messages: []RaceControlMessage{{Message: "green flag"}}})
+	Apply(s, Frame{Rev: 2, TimeMs: 2000, Messages: []RaceControlMessage{{Message: "yellow flag"}}})
+	if len(s.Messages) != 2 {
+		t.Fatalf("messages before loop restart = %d, want 2", len(s.Messages))
+	}
+
+	// Loop restarts: TimeMs drops back to (near) the clip's start even though
+	// Rev keeps climbing.
+	Apply(s, Frame{Rev: 3, TimeMs: 100, Messages: []RaceControlMessage{{Message: "green flag"}}})
+	if len(s.Messages) != 1 || s.Messages[0].Message != "green flag" {
+		t.Errorf("messages after loop restart = %+v, want reset to just the new frame's message", s.Messages)
+	}
+}
+
 // A frame's Cars is a partial update (only changed cars), not the full field —
 // a car absent from the incoming frame must survive untouched in the snapshot.
 func TestApply_UnmentionedCarsSurviveFrame(t *testing.T) {

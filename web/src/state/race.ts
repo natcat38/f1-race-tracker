@@ -1,6 +1,6 @@
 export interface Point { x: number; y: number }
 export interface Car {
-  driverNum: number; code: string; team: string; pos: number;
+  driverNum: number; code: string; team: string; pos: number; lap?: number;
   p: Point; status: string;
   // Phase 2 — all optional; absent renders blank.
   tyre?: string; tyreAge?: number;
@@ -10,6 +10,8 @@ export interface Car {
   speed?: number; gear?: number; throttle?: number; brake?: number; drs?: boolean;
 }
 export interface RadioMessage { timeMs: number; driverNum: number; clip: string }
+export interface Stint { compound: string; startLap: number; endLap: number }
+export interface Weather { airTempC: number; trackTempC: number; rainfall: boolean }
 export interface RaceControlMessage {
   rev: number; t: number; category: string; message: string; driver?: number;
 }
@@ -24,6 +26,9 @@ export interface RaceState {
   track: Point[]; cars: Record<number, Car>; timeMs: number; rev: number;
   radio: RadioMessage[];
   lapTrace: Record<number, number[]>;
+  totalLaps: number;
+  stints: Record<number, Stint[]>;
+  weather?: Weather;
   messages: RaceControlMessage[];
   // Bumped on every snapshot (never on a frame) — lets a consumer (useComms) tell
   // a reconnect or source-switch snapshot apart from steady-state frames.
@@ -33,7 +38,7 @@ export interface RaceState {
 export function emptyState(): RaceState {
   return {
     session: '', mode: '', label: '', track: [], cars: {}, timeMs: 0, rev: 0,
-    radio: [], lapTrace: {}, messages: [], snapshotSeq: 0,
+    radio: [], lapTrace: {}, totalLaps: 0, stints: {}, messages: [], snapshotSeq: 0,
   };
 }
 
@@ -43,9 +48,14 @@ interface SnapshotData {
   track?: Point[]; cars: Record<number, Car>; timeMs: number; rev: number;
   radio?: RadioMessage[];
   lapTrace?: Record<number, number[]>;
+  totalLaps?: number;
+  stints?: Record<number, Stint[]>;
+  weather?: Weather;
   messages?: RaceControlMessage[];
 }
-interface FrameData { rev: number; timeMs: number; cars?: Car[]; messages?: RaceControlMessage[] }
+interface FrameData {
+  rev: number; timeMs: number; cars?: Car[]; messages?: RaceControlMessage[]; weather?: Weather;
+}
 type Msg =
   | { type: 'snapshot'; data: SnapshotData }
   | { type: 'frame'; data: FrameData };
@@ -73,6 +83,9 @@ export function parseMsg(raw: unknown): Msg | null {
     if (data.messages !== undefined && !Array.isArray(data.messages)) return null;
     if (data.radio !== undefined && !Array.isArray(data.radio)) return null;
     if (data.track !== undefined && !Array.isArray(data.track)) return null;
+    // stints/weather are objects, not arrays — reject an array (would spread wrong).
+    if (data.stints !== undefined && (typeof data.stints !== 'object' || data.stints === null || Array.isArray(data.stints))) return null;
+    if (data.weather !== undefined && (typeof data.weather !== 'object' || data.weather === null || Array.isArray(data.weather))) return null;
     return { type: 'snapshot', data: data as unknown as SnapshotData };
   }
   if (r.type === 'frame') {
@@ -80,6 +93,7 @@ export function parseMsg(raw: unknown): Msg | null {
     // applyMessage iterates cars and spreads messages — reject a present-but-non-array value.
     if (data.cars !== undefined && !Array.isArray(data.cars)) return null;
     if (data.messages !== undefined && !Array.isArray(data.messages)) return null;
+    if (data.weather !== undefined && (typeof data.weather !== 'object' || data.weather === null || Array.isArray(data.weather))) return null;
     return { type: 'frame', data: data as unknown as FrameData };
   }
   return null;
@@ -93,7 +107,9 @@ export function applyMessage(s: RaceState, msg: Msg): RaceState {
     return {
       session: d.session, mode: d.mode, label: d.label,
       track: d.track ?? [], cars: { ...d.cars }, timeMs: d.timeMs, rev: d.rev,
-      radio: d.radio ?? [], lapTrace: d.lapTrace ?? {}, messages: d.messages ?? [],
+      radio: d.radio ?? [], lapTrace: d.lapTrace ?? {}, totalLaps: d.totalLaps ?? 0,
+      stints: d.stints ?? {}, weather: d.weather,
+      messages: d.messages ?? [],
       snapshotSeq: s.snapshotSeq + 1,
     };
   }
@@ -104,5 +120,5 @@ export function applyMessage(s: RaceState, msg: Msg): RaceState {
   const messages = d.messages?.length
     ? [...s.messages, ...d.messages].slice(-MAX_MESSAGES)
     : s.messages;
-  return { ...s, cars, timeMs: d.timeMs, rev: d.rev, messages };
+  return { ...s, cars, timeMs: d.timeMs, rev: d.rev, messages, weather: d.weather ?? s.weather };
 }

@@ -157,3 +157,20 @@ func TestLoadParsesLapTraceFromHeader(t *testing.T) {
 		t.Fatalf("lapTrace not parsed: %+v", lt)
 	}
 }
+
+func TestLoadParsesTotalLapsFromHeader(t *testing.T) {
+	clip := `{"track":[{"x":0.1,"y":0.2}],"label":"T","maxRev":1,"totalLaps":53}
+{"timeMs":3300000,"frame":{"rev":1,"timeMs":3300000,"cars":[{"driverNum":1,"code":"VER","team":"Red Bull","pos":1,"p":{"x":0.1,"y":0.2},"status":"OnTrack"}]}}
+`
+	path := filepath.Join(t.TempDir(), "clip.jsonl")
+	if err := os.WriteFile(path, []byte(clip), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	src, err := Load(path, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := src.TotalLaps(); got != 53 {
+		t.Fatalf("totalLaps = %d, want 53", got)
+	}
+}

@@ -24,7 +24,14 @@ export function StatusBadge({ status, state, staleSec }: Props) {
     );
   }
   if (state.mode === 'live') {
-    return <span className="chip chip-live">● LIVE</span>;
+    return (
+      <span
+        className="chip chip-live"
+        title="Demo lane streaming a second replay clip — real live ingestion not yet verified"
+      >
+        ● LIVE (DEMO)
+      </span>
+    );
   }
   return <span className="chip chip-replay">▶ REPLAY</span>;
 }

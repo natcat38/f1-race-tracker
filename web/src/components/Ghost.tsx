@@ -12,7 +12,7 @@ const BAR_H = 90;
 const THIS = { session: 'compare-monza-2024', year: '2024' };
 const LAST = { session: 'compare-monza-2023', year: '2023' };
 
-export function Ghost() {
+export function Ghost({ initialSelected }: { initialSelected?: number | null } = {}) {
   const [thisYear, setThisYear] = useState<RaceState>(emptyState());
   const [lastYear, setLastYear] = useState<RaceState>(emptyState());
   useEffect(() => connectRace(setThisYear, undefined, THIS.session), []);
@@ -22,7 +22,7 @@ export function Ghost() {
     () => commonDrivers(thisYear.lapTrace, lastYear.lapTrace),
     [thisYear.lapTrace, lastYear.lapTrace],
   );
-  const [selected, setSelected] = useState<number | null>(null);
+  const [selected, setSelected] = useState<number | null>(initialSelected ?? null);
   // Default to the first common driver; fall back to it if a prior selection is no
   // longer present in both years (e.g. a lane reconnects with a different driver set).
   const resolvedSelected =
@@ -85,6 +85,10 @@ export function Ghost() {
 
   const track = thisYear.track;
   const ready = track.length > 0 && !!traceThis && !!traceLast;
+  // Distinguishes "both lanes connected but share no driver" (a genuine data gap)
+  // from "still waiting on a snapshot" — both would otherwise show the same
+  // "Loading reference laps…" copy forever in the no-overlap case.
+  const lanesLoaded = thisYear.rev > 0 && lastYear.rev > 0;
   const trackPath = useMemo(
     () => (track.length ? 'M ' + track.map((p) => `${p.x * SIZE},${p.y * SIZE}`).join(' L ') + ' Z' : ''),
     [track],
@@ -119,11 +123,15 @@ export function Ghost() {
         note={`${THIS.year} solid vs ${LAST.year} ghost · fastest lap (approx)`}
       />
 
-      <Panel label="Ghost overlay">
+      <Panel label="Track">
         {!ready ? (
-          <div className="track-skeleton">Loading reference laps…</div>
+          <div className="track-skeleton">
+            {lanesLoaded && drivers.length === 0
+              ? 'No driver appears in both seasons — ghost overlay needs a common driver.'
+              : 'Loading reference laps…'}
+          </div>
         ) : (
-          <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="track-svg">
+          <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="track-svg" role="img" aria-label="Ghost overlay track map">
             <path d={trackPath} fill="none" stroke="#333" strokeWidth={10} strokeLinejoin="round" />
             <path d={trackPath} fill="none" stroke="#1a1a1a" strokeWidth={6} strokeLinejoin="round" />
             {/* ghost (last year) — translucent */}
@@ -136,9 +144,9 @@ export function Ghost() {
       </Panel>
 
       {ready && (
-        <Panel label="Delta">
+        <Panel label="Delta bar">
           {/* red above the midline = this year slower, green below = faster */}
-          <svg viewBox={`0 0 ${SIZE} ${BAR_H}`} className="track-svg">
+          <svg viewBox={`0 0 ${SIZE} ${BAR_H}`} className="track-svg" role="img" aria-label="Lap time delta around the circuit">
             <line x1={0} y1={BAR_H / 2} x2={SIZE} y2={BAR_H / 2} stroke="#444" strokeWidth={1} />
             {delta.map((d, i) => {
               const h = (Math.abs(d) / maxAbs) * (BAR_H / 2);

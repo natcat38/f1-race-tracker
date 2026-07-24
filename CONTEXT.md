@@ -74,7 +74,8 @@ Names the Redis keys for that lane and selects it in `/ws?session=<key>`.
 The two interchangeable **sources** behind one pipeline. **Replay** loops a committed
 clip and is the always-on default. **Live** is the real-session source — best-effort,
 and in the default demo it streams a clip through Python to exercise **the seam**
-rather than connecting to a real session.
+rather than connecting to a real session. The UI labels this state honestly
+(`Live (demo)`, with a tooltip) rather than leaving the caveat only in the docs.
 
 - _Use_ "source" for the live-vs-replay choice; the operator switches it via a toggle.
 
@@ -124,6 +125,38 @@ selected in the **timing tower**. Per-tick data; updates every frame.
 
 - _Use_ "telemetry" for this readout.
 
+## Reference car
+
+The car selected in the **timing tower** (by clicking its row) whose sector times
+every other row's sector delta compares against, instead of that driver's own
+personal best — "how much am I losing to *them*, right now" rather than a
+self-relative reading. The same selection also drives the primary **telemetry**
+readout; a second, independently-picked car (the "vs" rival) can sit alongside it
+for a two-car telemetry compare.
+
+- _Use_ "reference car" for the tower's sector-delta anchor; "rival" only for the
+  telemetry panel's second, independently-chosen car — the two selections are
+  related but distinct.
+
+## Stint
+
+One baked, whole-race tyre-stint entry for a driver — a compound and the lap range
+it covers. The full **stint** plan for a driver (all their stints, covering the
+entire race) is baked once at record time, like the **lap trace**, not windowed to
+the replay clip — so the strategy timeline can show the whole plan even though the
+replay window only plays part of it.
+
+- _Use_ "stint" for one compound/lap-range entry; "stint plan" or "strategy
+  timeline" for the full per-driver set shown on the board.
+
+## Weather
+
+A session weather sample — air temp, track temp, rainfall — baked at record time
+from the session's real weather data, best-effort like **gap**, and shown as a
+status-rail chip. Attached to a **frame** only when the sample changes from the
+last one emitted, then carried forward on the **snapshot** like any other
+frame-delivered field.
+
 ## Team radio
 
 A driver↔race-engineer audio clip tied to a moment in the race (a session-time).
@@ -145,6 +178,18 @@ radio-free analytics surfaces.
 
 - _Use_ "comms" / "comms layer"; never "overlay" (that is the cross-year ghost view,
   below) and not "lane" (a lane is a whole stream of state, not a UI toggle).
+
+## Race control
+
+The rolling per-lane log of session messages — flags, safety car, investigations —
+shown alongside the **timing tower** on the main board. Baked from the session's
+actual race-control feed at record time, attached to whichever **frame** covers each
+message's moment, and accumulated on the **snapshot** incrementally as those frames
+play — a genuine rolling buffer (cap 30), unlike **team radio**'s reference list,
+which rides the snapshot whole and fixed from the very first frame.
+
+- _Use_ "race control" or "the race-control feed"; not "incidents" or "flags" alone
+  (those are one **category** of message, not the whole feed).
 
 ## Ghost overlay
 
