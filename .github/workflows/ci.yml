@@ -105,7 +105,8 @@ jobs:
           # (.github/workflows/pages.yml) has deployed at least once post-merge
           # and Settings > Pages > Source is set to "GitHub Actions" — both
           # happen after this PR merges, not before. Remove this --exclude once
-          # https://natcat38.github.io/f1-race-tracker/ is confirmed live.
+          # https://natcat38.github.io/f1-race-tracker/ is confirmed live —
+          # tracked in issue #41.
           args: "--no-progress --exclude-loopback --exclude 'https://natcat38\\.github\\.io/f1-race-tracker/?$' README.md CONTEXT.md docs/*.md docs/adr/**/*.md"
           fail: true
 
