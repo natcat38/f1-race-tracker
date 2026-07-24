@@ -15,8 +15,8 @@ jobs:
     name: Go (fmt + vet + test)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
@@ -34,8 +34,8 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: npm
@@ -49,8 +49,8 @@ jobs:
     name: Python (contract self-checks + bench)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
       - run: pip install -r ingest/requirements-dev.txt
@@ -67,8 +67,8 @@ jobs:
     name: Dependency vulnerability scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - name: govulncheck (Go)
@@ -76,7 +76,7 @@ jobs:
         # toolchain (go.mod = 1.26), and older pinned releases fail to build under it
         # ("invalid array length ..."). Tracking latest keeps it toolchain-compatible.
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: npm
@@ -86,7 +86,7 @@ jobs:
       - name: npm audit (web)
         run: npm audit --audit-level=high
         working-directory: web
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
       - name: pip-audit (Python)
@@ -98,7 +98,7 @@ jobs:
     name: Docs link check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: lycheeverse/lychee-action@v2
         with:
           args: "--no-progress --exclude-loopback README.md CONTEXT.md docs/*.md docs/adr/**/*.md"
@@ -108,6 +108,6 @@ jobs:
     name: Docker build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: docker compose build
         run: docker compose build
