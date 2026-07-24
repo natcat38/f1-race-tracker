@@ -68,4 +68,36 @@ describe('connectStaticReplay', () => {
     expect(statuses[0]).toBe('connecting');
     await vi.waitFor(() => expect(statuses).toContain('live'), { interval: 1 });
   });
+
+  test('reports a non-hung status instead of leaving the UI on "connecting" forever when the clip fetch fails', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('network down'))));
+    const statuses: string[] = [];
+    connectStaticReplay(() => {}, (s) => statuses.push(s));
+    await vi.waitFor(() => expect(statuses).toContain('reconnecting'), { interval: 1 });
+  });
+
+  test('reports a non-hung status and does not busy-loop when the clip has no valid frame messages', async () => {
+    // Snapshot-only clip: parses fine, but has zero frames. Without the
+    // frameStartIndex guard, loopRestartIndex would fall back to 0 (the
+    // snapshot itself) and playFrom would reschedule a 0ms timer against
+    // itself forever.
+    const snapshotOnly = JSON.stringify({
+      type: 'snapshot',
+      data: { session: 'x', mode: 'replay', label: 'Test', cars: {}, timeMs: 0, rev: 0 },
+    }) + '\n';
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ ok: true, text: () => Promise.resolve(snapshotOnly) })));
+
+    const states: RaceState[] = [];
+    const statuses: string[] = [];
+    connectStaticReplay((s) => states.push(s), (s) => statuses.push(s));
+
+    await vi.waitFor(() => expect(statuses).toContain('reconnecting'), { interval: 1 });
+    expect(states).toHaveLength(0); // playback never started — the snapshot itself is never applied
+
+    // The busy-loop this guard exists to prevent would show up as a timer
+    // still ticking; confirm none is scheduled, even after time passes.
+    expect(vi.getTimerCount()).toBe(0);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(vi.getTimerCount()).toBe(0);
+  });
 });

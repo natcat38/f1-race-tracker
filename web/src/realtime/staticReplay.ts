@@ -44,14 +44,21 @@ export function connectStaticReplay(
           }
         })
         .filter((m): m is Msg => m !== null);
-      if (messages.length === 0) {
-        console.error('connectStaticReplay: baked clip had no valid messages');
+      // Require at least one FRAME, not just any message: a clip with only a
+      // parseable snapshot and zero valid frames would otherwise pass this
+      // check, then schedulePlayback's loopRestartIndex would fall back to 0
+      // (the snapshot itself) and playFrom would reschedule a 0ms timer against
+      // itself forever — a busy-loop pegging the tab instead of a visible error.
+      if (!messages.some((m) => m.type === 'frame')) {
+        console.error('connectStaticReplay: baked clip had no valid frame messages');
+        onStatus?.('reconnecting'); // no live source to fall back to on a static page — signals "not progressing" over a silent hang
         return;
       }
       schedulePlayback(messages);
     })
     .catch((err) => {
       console.error('connectStaticReplay: failed to load clip', err);
+      onStatus?.('reconnecting'); // same: nothing to reconnect to, but better than a silent "connecting" hang
     });
 
   function schedulePlayback(messages: Msg[]) {
