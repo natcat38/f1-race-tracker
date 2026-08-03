@@ -3,5 +3,5 @@
 # The live-SignalR path (live_signalr.py) is exploratory/unverified against a real session
 # either way and unused by the demo; the one direct low-level import this repo makes
 # (signalrcore.messages.completion_message.CompletionMessage) still resolves at 0.8.8.
-redis==8.0.1
+redis==8.1.0
 signalrcore==0.8.8
