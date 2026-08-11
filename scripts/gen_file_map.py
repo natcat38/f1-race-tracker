@@ -119,7 +119,10 @@ def main():
             return 1
         print("FILE-MAP.md is current")
         return 0
-    OUT.write_text(text, encoding="utf-8")
+    # newline="" keeps the LF endings built above intact on Windows, so the file
+    # is byte-identical wherever it is generated and --check never trips on CRLF.
+    with OUT.open("w", encoding="utf-8", newline="") as fh:
+        fh.write(text)
     print(f"wrote {OUT.relative_to(ROOT)}")
     return 0
 
