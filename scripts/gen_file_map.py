@@ -73,13 +73,19 @@ def _ts_doc(path):
     it marks a comment as describing the whole module rather than the next
     symbol, so no convention had to be invented for the TypeScript trees.
     """
+    tag = re.compile(r"^\s*\*?\s*@packageDocumentation\s*$", re.M)
     for f in sorted([*path.glob("*.ts"), *path.glob("*.tsx")]):
         if ".test." in f.name:
             continue
         src = f.read_text(encoding="utf-8", errors="replace")
-        m = re.match(r"\s*/\*\*(.*?)\*/", src, re.S)
-        if m and "@packageDocumentation" in m.group(1):
-            body = m.group(1).replace("@packageDocumentation", "")
+        # Every block comment, not just the first: a file may explain itself up
+        # top and carry the directory's package doc in a later block. The tag
+        # must also sit on its own line — a substring test would match a comment
+        # that merely mentions @packageDocumentation in prose.
+        for m in re.finditer(r"/\*\*(.*?)\*/", src, re.S):
+            if not tag.search(m.group(1)):
+                continue
+            body = tag.sub("", m.group(1))
             lines = [ln.strip().lstrip("*").strip() for ln in body.splitlines()]
             text = " ".join(ln for ln in lines if ln)
             if text:
