@@ -57,9 +57,33 @@ def _py_doc(path):
     cands = [f for f in path.glob("*.py") if not f.name.startswith(("test_", "check_"))]
     for f in sorted(cands, key=lambda p: p.stat().st_size, reverse=True):
         src = f.read_text(encoding="utf-8", errors="replace")
+        # Skip a shebang and any encoding/comment preamble: the docstring is
+        # still the module docstring when `#!/usr/bin/env python3` precedes it.
+        src = re.sub(r"\A(?:\s*#[^\n]*\n)+", "", src)
         m = re.match(r'\s*(?:"""|\'\'\')(.*?)(?:"""|\'\'\')', src, re.S)
         if m and m.group(1).strip():
             return _first_sentence(m.group(1).strip().splitlines()[0])
+    return ""
+
+
+def _ts_doc(path):
+    """First `/** ... @packageDocumentation */` block in a .ts/.tsx file.
+
+    TSDoc's @packageDocumentation is the direct analogue of Go's `// Package x`:
+    it marks a comment as describing the whole module rather than the next
+    symbol, so no convention had to be invented for the TypeScript trees.
+    """
+    for f in sorted([*path.glob("*.ts"), *path.glob("*.tsx")]):
+        if ".test." in f.name:
+            continue
+        src = f.read_text(encoding="utf-8", errors="replace")
+        m = re.match(r"\s*/\*\*(.*?)\*/", src, re.S)
+        if m and "@packageDocumentation" in m.group(1):
+            body = m.group(1).replace("@packageDocumentation", "")
+            lines = [ln.strip().lstrip("*").strip() for ln in body.splitlines()]
+            text = " ".join(ln for ln in lines if ln)
+            if text:
+                return _first_sentence(text)
     return ""
 
 
@@ -68,7 +92,7 @@ def _describe(path):
         return _go_doc(path)
     if any(path.glob("*.py")):
         return _py_doc(path)
-    return ""  # no TS/TSX doc convention in this repo — left blank on purpose
+    return _ts_doc(path)
 
 
 def _dirs():

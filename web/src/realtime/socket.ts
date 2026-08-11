@@ -1,3 +1,7 @@
+/**
+ * The frontend's data-source connections: a reconnecting live WebSocket and a paced static-replay reader, both feeding the same RaceState reducer.
+ * @packageDocumentation
+ */
 import { applyMessage, emptyState, parseMsg, type RaceState } from '../state/race';
 
 export type ConnStatus = 'connecting' | 'live' | 'reconnecting';

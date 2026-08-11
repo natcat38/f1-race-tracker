@@ -1,3 +1,7 @@
+/**
+ * React hooks that derive UI-facing state (staleness, gap/lap history, smoothed car positions, comms playback) from the raw RaceState stream.
+ * @packageDocumentation
+ */
 import { useEffect, useRef, useState } from 'react';
 import type { RaceState } from '../state/race';
 

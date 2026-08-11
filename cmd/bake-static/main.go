@@ -1,3 +1,5 @@
+// Package main is the bake-static command, which bakes a replay clip into newline-delimited WebSocket envelopes for the GitHub Pages static demo.
+//
 // Command bake-static reads a replay clip and writes it as a sequence of
 // WebSocket wire envelopes — the same {type,data} shape internal/ws/frame.go
 // encodes for real clients — to a newline-delimited JSON file. The GitHub

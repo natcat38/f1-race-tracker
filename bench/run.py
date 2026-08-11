@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Sweep WebSocket load levels against the gateway, sample docker stats for the
+"""Drive the loadtest sweeps behind BENCHMARKS.md by running cmd/loadtest at increasing concurrency and recording gateway resource usage.
+
+Sweep WebSocket load levels against the gateway, sample docker stats for the
 gateway container, write bench/results.csv, and render bench/results.png.
 
 Usage:

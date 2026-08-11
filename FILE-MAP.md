@@ -10,22 +10,22 @@ docstring — an orientation gap, not an omission by the generator.
 
 | Directory | Source files | Purpose |
 | --- | ---: | --- |
-| `cmd/bake-static` | 2 |  |
-| `cmd/genclip` | 1 |  |
-| `cmd/loadtest` | 3 |  |
-| `cmd/server` | 1 |  |
+| `cmd/bake-static` | 2 | main is the bake-static command, which bakes a replay clip into newline-delimited WebSocket envelopes for the GitHub Pages static demo. |
+| `cmd/genclip` | 1 | main is the genclip command, which synthesises a circular-track replay clip (.jsonl) of fake cars for testing the feed pipeline without live F1 data. |
+| `cmd/loadtest` | 3 | main is the loadtest command, which drives the concurrency sweeps recorded in BENCHMARKS.md. |
+| `cmd/server` | 1 | main is the server command, which runs as either the gateway (WebSocket fan-out) or replay (Redis feed writer) role depending on config.Role. |
 | `internal/app` | 7 | app wires the replay source, the bus, and the hub into runnable roles. |
 | `internal/bus` | 2 | bus is the Redis seam: snapshot store + frame pub/sub. |
-| `internal/config` | 2 |  |
+| `internal/config` | 2 | config loads and validates the gateway/replay process's environment configuration. |
 | `internal/feed/replay` | 2 | replay reads a .jsonl clip and replays it as a frame stream. |
 | `internal/model` | 5 | model is the normalised contract shared by every layer (and, later, Python). |
 | `internal/ws` | 7 | ws is the gateway-side WebSocket fan-out hub. |
 | `ingest` | 14 | FastF1 → JSONL clip recorder. |
-| `bench` | 2 |  |
-| `web/src` | 3 |  |
-| `web/src/components` | 17 |  |
-| `web/src/hooks` | 6 |  |
-| `web/src/realtime` | 4 |  |
-| `web/src/state` | 7 |  |
+| `bench` | 2 | Drive the loadtest sweeps behind BENCHMARKS.md by running cmd/loadtest at increasing concurrency and recording gateway resource usage. |
+| `web/src` | 3 | The React app shell: mounts the root component, wires the live WebSocket or static-replay data source into race state, and lays out the dashboard panels. |
+| `web/src/components` | 17 | The dashboard's presentational components — map, timing tower, standings, telemetry, comms, race control, ghost/compare overlays, and their shared layout/formatting helpers. |
+| `web/src/hooks` | 6 | React hooks that derive UI-facing state (staleness, gap/lap history, smoothed car positions, comms playback) from the raw RaceState stream. |
+| `web/src/realtime` | 4 | The frontend's data-source connections: a reconnecting live WebSocket and a paced static-replay reader, both feeding the same RaceState reducer. |
+| `web/src/state` | 7 | The frontend's race state: wire message types, the applyMessage reducer, and the comms/ghost sub-state it composes. |
 
-17 source directories, 85 files, 11 without a declared purpose.
+17 source directories, 85 files, 0 without a declared purpose.

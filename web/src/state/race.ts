@@ -1,3 +1,7 @@
+/**
+ * The frontend's race state: wire message types, the applyMessage reducer, and the comms/ghost sub-state it composes.
+ * @packageDocumentation
+ */
 export interface Point { x: number; y: number }
 export interface Car {
   driverNum: number; code: string; team: string; pos: number; lap?: number;
