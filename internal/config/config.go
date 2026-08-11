@@ -1,3 +1,4 @@
+// Package config loads and validates the gateway/replay process's environment configuration.
 package config
 
 import (

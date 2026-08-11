@@ -1,3 +1,7 @@
+/**
+ * The dashboard's presentational components — map, timing tower, standings, telemetry, comms, race control, ghost/compare overlays, and their shared layout/formatting helpers.
+ * @packageDocumentation
+ */
 import type { ReactNode } from 'react';
 
 // Panel is the shared instrument frame: a carbon-bordered box with an

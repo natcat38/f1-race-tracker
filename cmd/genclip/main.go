@@ -1,3 +1,4 @@
+// Package main is the genclip command, which synthesises a circular-track replay clip (.jsonl) of fake cars for testing the feed pipeline without live F1 data.
 package main
 
 import (

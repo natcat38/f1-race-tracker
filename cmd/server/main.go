@@ -1,3 +1,4 @@
+// Package main is the server command, which runs as either the gateway (WebSocket fan-out) or replay (Redis feed writer) role depending on config.Role.
 package main
 
 import (

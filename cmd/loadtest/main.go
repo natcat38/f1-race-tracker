@@ -1,3 +1,5 @@
+// Package main is the loadtest command, which drives the concurrency sweeps recorded in BENCHMARKS.md.
+//
 // Command loadtest opens many concurrent WebSocket connections to the gateway and
 // measures end-to-end fan-out latency (now - frame.T) per received frame.
 package main

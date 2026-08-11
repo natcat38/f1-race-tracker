@@ -1,3 +1,7 @@
+/**
+ * The React app shell: mounts the root component, wires the live WebSocket or static-replay data source into race state, and lays out the dashboard panels.
+ * @packageDocumentation
+ */
 import { useEffect, useState } from 'react';
 import { connectRace, type ConnStatus } from './realtime/socket';
 import { connectStaticReplay } from './realtime/staticReplay';
