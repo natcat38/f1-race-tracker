@@ -3,17 +3,47 @@
 Collectable by pytest (`pytest ingest`) AND runnable directly
 (`python ingest/check_live_contract.py`) for the CI contract job.
 """
+import re
 import sys
+from pathlib import Path
+
 from live import build_snapshot, build_frame, fold_messages
 from live_signalr import _parse_timing_line, _parse_tyre_line
 
 SNAP_KEYS = {"session", "mode", "label", "track", "radio", "lapTrace", "totalLaps", "stints", "cars", "timeMs", "rev"}
 FRAME_KEYS = {"session", "rev", "t", "timeMs", "cars"}
 
+# The base car dict live.py builds (see its module docstring's Car shape).
+CAR_BASE_KEYS = {"driverNum", "code", "team", "pos", "p", "status"}
+
 # Per-car extra fields live_signalr.py's TimingData/TimingAppData parsing may
 # add on top of the base car dict (driverNum/code/team/pos/p/status) — must be
 # a subset of internal/model/model.go's CarState json tags.
 CAR_EXTRA_KEYS = {"lap", "gapMs", "gapLaps", "intMs", "lastLapMs", "tyre", "tyreAge"}
+
+# Resolved from this file, not the cwd: pytest runs with working-directory=ingest
+# while `python ingest/check_live_contract.py` runs from the repo root.
+MODEL_GO = Path(__file__).resolve().parent.parent / "internal" / "model" / "model.go"
+
+
+def _go_json_tags(struct):
+    """Return (all_tags, required_tags) for a struct in internal/model/model.go.
+
+    required_tags are the ones without `,omitempty` — Go always marshals them, so
+    the Python mirror must always emit them too.
+    """
+    src = MODEL_GO.read_text(encoding="utf-8")
+    m = re.search(r"^type " + struct + r" struct \{$(.*?)^\}$", src, re.S | re.M)
+    assert m, f"struct {struct} not found in {MODEL_GO}"
+    all_tags, required = set(), set()
+    for tag in re.findall(r'json:"([^"]*)"', m.group(1)):
+        name, _, opts = tag.partition(",")
+        if not name or name == "-":
+            continue
+        all_tags.add(name)
+        if "omitempty" not in opts.split(","):
+            required.add(name)
+    return all_tags, required
 
 
 def test_snapshot_and_frame_key_contract():
@@ -64,6 +94,31 @@ def test_live_signalr_car_extras_match_contract():
     assert tyre == {"tyre": "MEDIUM", "tyreAge": 12}
 
 
+def test_key_sets_match_go_model():
+    """The key sets above are a hand-written mirror of internal/model/model.go.
+
+    Every other check in this file compares Python against those constants, so a
+    Go-side rename would leave them stale and still pass. This one pins them to
+    the Go source itself, closing the Go<->Python drift path the way
+    internal/model/contract_test.go's golden fixture closes Go<->TS.
+    """
+    snap_all, snap_req = _go_json_tags("Snapshot")
+    frame_all, frame_req = _go_json_tags("Frame")
+    car_all, car_req = _go_json_tags("CarState")
+    car_keys = CAR_BASE_KEYS | CAR_EXTRA_KEYS
+
+    # Python must not emit keys Go has no field for — Go would silently drop them.
+    assert SNAP_KEYS <= snap_all, f"snapshot keys not in Go Snapshot: {SNAP_KEYS - snap_all}"
+    assert FRAME_KEYS <= frame_all, f"frame keys not in Go Frame: {FRAME_KEYS - frame_all}"
+    assert car_keys <= car_all, f"car keys not in Go CarState: {car_keys - car_all}"
+
+    # Go's non-omitempty fields are always on the wire, so Python must emit them
+    # all — a new required Go field would otherwise arrive as a zero value.
+    assert snap_req <= SNAP_KEYS, f"Go Snapshot requires keys Python omits: {snap_req - SNAP_KEYS}"
+    assert frame_req <= FRAME_KEYS, f"Go Frame requires keys Python omits: {frame_req - FRAME_KEYS}"
+    assert car_req <= car_keys, f"Go CarState requires keys Python omits: {car_req - car_keys}"
+
+
 def test_fold_messages_caps_at_30():
     existing = [{"rev": i} for i in range(28)]
     new = [{"rev": 28}, {"rev": 29}]
@@ -82,6 +137,7 @@ if __name__ == "__main__":
     test_frame_messages_key_optional()
     test_frame_weather_key_optional()
     test_live_signalr_car_extras_match_contract()
+    test_key_sets_match_go_model()
     test_fold_messages_caps_at_30()
     print("live.py contract self-check PASSED")
     sys.exit(0)
