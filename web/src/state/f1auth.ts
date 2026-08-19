@@ -27,3 +27,20 @@ export function parseAuthStatus(raw: unknown): AuthStatus {
   if (typeof r.product === 'string') out.product = r.product;
   return out;
 }
+
+/** Human-readable time until a token expires, e.g. "in 3 days" / "in 5 hours".
+ *  Tokens last about four days, so a raw ISO timestamp tells the operator nothing
+ *  actionable — this answers "do I need to re-link now?" at a glance.
+ *  Returns null when there is no usable date. */
+export function relativeExpiry(expiresUtc: string | undefined, now = Date.now()): string | null {
+  if (!expiresUtc) return null;
+  const ms = Date.parse(expiresUtc);
+  if (Number.isNaN(ms)) return null;
+  const left = ms - now;
+  if (left <= 0) return 'expired';
+  const mins = Math.floor(left / 60000);
+  if (mins < 60) return `in ${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 48) return `in ${hours} hour${hours === 1 ? '' : 's'}`;
+  return `in ${Math.floor(hours / 24)} days`;
+}

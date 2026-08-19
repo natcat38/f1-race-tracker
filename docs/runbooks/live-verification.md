@@ -15,11 +15,18 @@ running true-live mode), see [`ingest/README.md`](../../ingest/README.md)'s
 
 ```bash
 pip install -r ingest/requirements.txt -r ingest/requirements-live.txt
+pip install --no-deps -r ingest/requirements-live-nodeps.txt
 ```
 
-(Both files: `requirements.txt` carries the pinned `fastf1`, `requirements-live.txt`
-adds `signalrcore`. The live container image installs only the latter — it never
-imports fastf1, see ADR-0007.)
+**Two commands, and the second one matters.** `signalrcore` must be installed with
+`--no-deps`: it declares a `msgpack` pin that is both vulnerable and conflicting, so
+pip refuses to install it alongside the patched msgpack. Its only real runtime
+dependency *is* msgpack, so skipping resolution is safe — the file's header explains
+this in full. Install it second, so the patched msgpack is already in place.
+
+Skipping the second command leaves you with no `signalrcore` at all and a live path
+that exits with an import error; installing it *without* `--no-deps` either fails to
+resolve or downgrades msgpack to a vulnerable version.
 
 ## 1. Capture a real session
 

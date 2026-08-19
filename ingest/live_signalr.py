@@ -959,15 +959,19 @@ def run_live(r, session: str, label: str | None) -> None:
     from f1tv_auth import auth_status
     status = auth_status()
     if status['state'] != 'linked':
-        _log.error(f"F1TV account is {status['state']} — run on the HOST: "
-                   "python ingest/f1tv_link.py")
-        _log.error("Then restart this service. See docs/runbooks/live-verification.md.")
+        _log.error(f"F1TV sign-in {status['state']}. Run this on the HOST, not in a "
+                   "container:  python ingest/f1tv_link.py")
+        _log.error("Then restart this service. See docs/runbooks/live-verification.md "
+                   "section 5.")
         sys.exit(1)
-    _log.info(f"F1TV linked (tier={status.get('tier', '?')}, "
-              f"expires {status.get('expiresUtc', '?')}) — connecting…")
 
-    # Attempt live connection
-    _log.info("LIVE=1 set → attempting live SignalR connection")
-    _log.info("NOTE: This only works during a live F1 session.")
-    _log.info("Outside a session: the stream will time out after ~120 s with no data.")
+    tier = status.get('tier', '?')
+    _log.info(f"F1TV signed in (subscription={tier}, lapses {status.get('expiresUtc', '?')})")
+    if tier != 'active':
+        _log.warning("This account has no active F1 TV subscription - the stream will "
+                     "connect but stay empty. F1 TV Access or better is needed for data.")
+
+    _log.info("All three gates set (--live, LIVE=1, LIVE_TIMING_MODE=beta) - connecting.")
+    _log.info("NOTE: real data only arrives during a live F1 session.")
+    _log.info("Outside a session: the stream times out after ~120 s with no data.")
     _run_live_signalr(r, session, label)

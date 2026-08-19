@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Panel } from './Panel';
 import { StatusRail } from './StatusRail';
-import { parseAuthStatus, type AuthStatus } from '../state/f1auth';
+import { parseAuthStatus, relativeExpiry, type AuthStatus } from '../state/f1auth';
 
 const POLL_MS = 5000;
 const STATIC_DEMO = import.meta.env.VITE_STATIC_DEMO === 'true';
 
-// No green token exists (--amber is attention-only, by design) so "linked" reads
-// as the settled chalk chip rather than inventing a colour.
+const LINK_CMD = 'python ingest/f1tv_link.py';
+
+// No green token exists (--amber is attention-only, by design) so "linked" reads as
+// the settled chalk chip rather than inventing a colour.
 const CHIP: Record<AuthStatus['state'], string> = {
   linked: 'chip chip-replay',
   unlinked: 'chip chip-warm',
@@ -39,18 +41,50 @@ function useAuthStatus(): AuthStatus {
   return auth;
 }
 
+// The one thing to do next, stated as an instruction rather than a diagnosis.
+function NextStep({ auth }: { auth: AuthStatus }) {
+  if (auth.state === 'unavailable') {
+    return (
+      <p>
+        <strong>Next:</strong> can&apos;t reach the link status — the gateway or the
+        ingest service is probably down. Check <code>docker compose ps</code>.
+      </p>
+    );
+  }
+  if (auth.state === 'linked') {
+    const left = relativeExpiry(auth.expiresUtc);
+    return (
+      <p>
+        <strong>Next:</strong> nothing — you&apos;re linked. This sign-in lapses{' '}
+        {left ?? 'in a few days'}; when it does, run <code>{LINK_CMD}</code> again.
+      </p>
+    );
+  }
+  return (
+    <p>
+      <strong>Next:</strong> run <code>{LINK_CMD}</code> on this machine
+      {auth.state === 'expired' ? ' to sign in again.' : ' to sign in.'}
+    </p>
+  );
+}
+
 // Settings is the #settings route: the operator's view of the beta F1TV link.
 // It only ever reads status — linking itself is a host command, because fastf1's
 // browser login POSTs to host loopback and a container cannot receive that
 // (ADR-0007). The page says so rather than offering a button that cannot work.
 export function Settings() {
   const auth = useAuthStatus();
+  const expiresIn = relativeExpiry(auth.expiresUtc);
+  const noSubscription = auth.state === 'linked' && auth.tier !== 'active';
 
   return (
     <div className="page">
       <StatusRail active="settings" note="F1TV link — beta" />
 
-      <Panel label="F1TV Link — beta" actions={<span className={CHIP[auth.state]}>{CHIP_LABEL[auth.state]}</span>}>
+      <Panel
+        label="F1TV Link — beta"
+        actions={<span className={CHIP[auth.state]}>{CHIP_LABEL[auth.state]}</span>}
+      >
         {STATIC_DEMO ? (
           <p>
             Not available in the static demo — run the full system
@@ -59,66 +93,76 @@ export function Settings() {
         ) : (
           <>
             <p>
-              Live timing from F1&apos;s own feed needs an F1TV subscription. This links
-              <em> your </em> account, on this machine, for your own use. Every other feature
-              of this tracker runs on free data and never touches this.
+              <strong>You need a paid F1 TV Access subscription for this to show live
+              data.</strong> Signing in with a free F1 account works and is worth doing —
+              it is how you find out which tier you have — but the timing feed itself is
+              only served to paying subscribers. Every other feature of this tracker runs
+              on free data and never touches any of this.
             </p>
 
-            <p>
-              <strong>Status:</strong>{' '}
-              {auth.state === 'linked' && (
-                <>
-                  linked · subscription {auth.tier ?? 'unknown'}
-                  {auth.product && <> ({auth.product})</>}
-                  {auth.expiresUtc && <> · token expires {auth.expiresUtc}</>}
-                </>
-              )}
-              {auth.state === 'unlinked' && <>no account linked on this host.</>}
-              {auth.state === 'expired' && <>the cached token has expired — link again.</>}
-              {auth.state === 'unavailable' && (
-                <>can&apos;t read the status — the gateway or the ingest service may be down.</>
-              )}
-            </p>
-
-            {auth.state === 'linked' && auth.tier !== 'active' && (
-              <p>
-                This account has <strong>no active F1 TV subscription</strong>. Linking
-                works either way, but the live timing feed itself needs F1 TV Access or
-                better — with an inactive subscription expect the stream to stay empty.
-              </p>
-            )}
+            <NextStep auth={auth} />
 
             {auth.state === 'linked' && (
               <p>
-                Tokens last about four days, so re-linking is routine rather than an
-                error: run the command below again whenever this page says EXPIRED.
+                Signed in · subscription <strong>{auth.tier ?? 'unknown'}</strong>
+                {auth.product && <> ({auth.product})</>}
+                {expiresIn && <> · lapses {expiresIn}</>}
+                {auth.expiresUtc && <> ({auth.expiresUtc})</>}
               </p>
             )}
 
-            <p>
-              Linking runs on the <strong>host</strong>, not in a container: the F1 login
-              browser extension posts the token to <code>127.0.0.1</code> on a random port,
-              which Docker cannot forward into a container.
-            </p>
+            {noSubscription && (
+              <p>
+                Your account has <strong>no active F1 TV subscription</strong>, so expect
+                the live stream to stay empty even when everything else is set up
+                correctly. That is the account, not a bug in the link.
+              </p>
+            )}
 
+            <h3>Signing in</h3>
             <ol>
-              <li><code>pip install -r ingest/requirements.txt -r ingest/requirements-live.txt</code></li>
               <li>
-                Install the f1login extension from <code>https://f1login.fastf1.dev</code>
+                Have a free F1 account — <code>https://account.formula1.com</code>
               </li>
-              <li><code>python ingest/f1tv_link.py</code> — then open the URL it prints and sign in</li>
+              <li>
+                Install the f1login browser extension —{' '}
+                <code>https://f1login.fastf1.dev</code> (this is FastF1&apos;s own
+                extension; it is what hands the sign-in to this machine)
+              </li>
+              <li>
+                Install the Python dependencies:
+                <br />
+                <code>pip install -r ingest/requirements.txt -r ingest/requirements-live.txt</code>
+                <br />
+                <code>pip install --no-deps -r ingest/requirements-live-nodeps.txt</code>
+              </li>
+              <li>
+                Run <code>{LINK_CMD}</code>, then open the URL it prints and sign in.
+                It will say <em>&quot;requires an active F1TV Access/Pro/Premium
+                subscription&quot;</em> before the URL — that line is expected, not a
+                rejection; a free account signs in fine.
+              </li>
             </ol>
 
-            <p>To unlink: <code>python ingest/f1tv_link.py --unlink</code></p>
+            <p>
+              To check without signing in again: <code>{LINK_CMD} --status</code>.
+              To forget the sign-in: <code>{LINK_CMD} --unlink</code>.
+            </p>
 
             <p>
-              <strong>Beta.</strong> The link flow and the authenticated connection were
-              verified for real on 2026-08-20 — the account links, the websocket accepts
-              the token, and the feed sends data. What still blocks a live run is a
-              dependency conflict rather than auth: the <code>signalrcore</code> version
-              pinned for security cannot talk to a modern websocket-client. Whether a
-              live session&apos;s stream is tier-gated is still untested. See
-              <code> docs/runbooks/live-verification.md</code> §5 and ADR-0007.
+              Sign-in runs on this machine rather than in a container, because the
+              browser extension posts to <code>127.0.0.1</code> on a random port and
+              Docker cannot forward that into a container. Your sign-in never leaves this
+              machine — only whether it worked, when it lapses, and which tier you have
+              are sent to this page.
+            </p>
+
+            <p>
+              <strong>Beta.</strong> Verified on 2026-08-20: the account links, the feed
+              accepts the sign-in, and the team-radio wire format is confirmed. Whether a
+              live session&apos;s stream is tier-gated is still untested — that needs a
+              race weekend. See <code>docs/runbooks/live-verification.md</code> §5 and
+              ADR-0007.
             </p>
           </>
         )}

@@ -53,8 +53,12 @@ layer as clips arrive.
 
 ```bash
 pip install -r ingest/requirements.txt -r ingest/requirements-live.txt
+pip install --no-deps -r ingest/requirements-live-nodeps.txt
 python ingest/f1tv_link.py          # prints a URL; sign in with your F1 account
 ```
+
+(The `--no-deps` line is deliberate — `signalrcore` declares a vulnerable, conflicting
+`msgpack` pin that its code does not actually need. See the file's header.)
 
 Then open <http://localhost:8080/#settings> — the **LINK** tab — to see the status.
 Linking runs on the host because the F1 login extension posts the token to

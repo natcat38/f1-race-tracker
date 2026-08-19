@@ -1,7 +1,7 @@
-# signalrcore 1.0.2 (latest) hard-pins the vulnerable msgpack==1.1.2 (GHSA-6v7p-g79w-8964);
-# 0.8.8 is the newest version compatible with the patched msgpack>=1.2.1 in requirements.txt.
-# The live-SignalR path (live_signalr.py) is exploratory/unverified against a real session
-# either way and unused by the demo; the one direct low-level import this repo makes
-# (signalrcore.messages.completion_message.CompletionMessage) still resolves at 0.8.8.
+# Extra deps for the live-SignalR path, on top of requirements.txt.
+#
+# signalrcore is NOT here: it must be installed with --no-deps, so it lives in
+# requirements-live-nodeps.txt (which explains why). Installing it normally drags in
+# a vulnerable msgpack; installing the older version that avoids that breaks the
+# websocket connection outright. See ADR-0007.
 redis==8.0.1
-signalrcore==0.8.8

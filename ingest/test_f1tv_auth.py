@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 
 from f1tv_auth import auth_status
+from f1tv_link import _expires_in, print_status
 
 
 def _fake_jwt(claims):
@@ -74,6 +75,41 @@ def test_status_never_leaks_the_token():
         assert token not in blob and token.split(".")[1] not in blob, blob
 
 
+def test_expires_in_picks_a_useful_unit():
+    from datetime import datetime, timedelta, timezone
+    def at(delta):
+        return _expires_in((datetime.now(timezone.utc) + delta).isoformat())
+    assert at(timedelta(days=3)) == "in 3 days", at(timedelta(days=3))
+    assert at(timedelta(hours=5)) == "in 4 hours" or at(timedelta(hours=5)) == "in 5 hours"
+    assert at(timedelta(minutes=30)).endswith("min"), at(timedelta(minutes=30))
+    assert at(timedelta(seconds=-10)) == "expired"
+    assert _expires_in(None) is None
+    assert _expires_in("not a date") is None
+
+
+def test_print_status_is_ascii_only(capsys=None):
+    """Windows consoles are cp1252 - a stray em-dash prints as '?' to the operator."""
+    import io
+    import contextlib
+    for status in ({"state": "unlinked"},
+                   {"state": "expired"},
+                   {"state": "linked", "expiresUtc": "2099-01-01T00:00:00+00:00", "tier": "inactive"},
+                   {"state": "linked", "expiresUtc": "2099-01-01T00:00:00+00:00", "tier": "active",
+                    "product": "F1 TV Premium"}):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            print_status(status)
+        text = buf.getvalue()
+        assert text.strip(), status
+        non_ascii = [c for c in text if ord(c) > 127]
+        assert not non_ascii, f"non-ascii {non_ascii!r} for {status}"
+    # An inactive subscription must be called out - it is why the stream stays empty.
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        print_status({"state": "linked", "expiresUtc": "2099-01-01T00:00:00+00:00", "tier": "inactive"})
+    assert "no active F1 TV subscription" in buf.getvalue()
+
+
 if __name__ == "__main__":
     test_unlinked_when_file_missing()
     test_unlinked_when_file_empty()
@@ -81,5 +117,7 @@ if __name__ == "__main__":
     test_expired_token()
     test_corrupt_file_is_unlinked()
     test_status_never_leaks_the_token()
+    test_expires_in_picks_a_useful_unit()
+    test_print_status_is_ascii_only()
     print("f1tv_auth.auth_status self-check PASSED")
     sys.exit(0)
