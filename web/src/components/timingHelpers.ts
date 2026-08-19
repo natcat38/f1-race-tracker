@@ -96,8 +96,14 @@ export function statusLabel(status: string): string | undefined {
 }
 
 // orderCars returns the cars sorted by running position.
+// The feed is not guaranteed to hand out unique positions — the Monza 2024 clip
+// reports two cars at pos 19 (and no 20) in every frame. Tie-break on laps
+// completed so the running order is still right, then driver number so the
+// result is stable rather than dependent on object key order.
 export function orderCars(cars: RaceState['cars']): Car[] {
-  return Object.values(cars).sort((a, b) => a.pos - b.pos);
+  return Object.values(cars).sort(
+    (a, b) => a.pos - b.pos || (b.lap ?? 0) - (a.lap ?? 0) || a.driverNum - b.driverNum,
+  );
 }
 
 // bestSectors finds the session-best (min across all cars) for each sector this frame.

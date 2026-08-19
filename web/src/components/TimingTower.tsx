@@ -77,7 +77,10 @@ export function TimingTower({
       </thead>
       <tbody>
         {order.map((c, idx) => {
-          const isLeader = c.pos === 1;
+          // Number rows by their place in the sorted order, not the raw feed
+          // pos: a duplicated pos would otherwise print the same number twice
+          // and skip one entirely.
+          const isLeader = idx === 0;
           const ahead = order[idx - 1];
           const isSel = c.driverNum === selected;
           const status = statusLabel(c.status);
@@ -97,7 +100,7 @@ export function TimingTower({
               }}
               style={c.status === 'Out' ? { opacity: 0.5 } : undefined}
             >
-              <td>{c.pos}</td>
+              <td>{idx + 1}</td>
               <td><b>{c.code}</b></td>
               {status ? (
                 <>

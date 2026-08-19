@@ -166,8 +166,11 @@ export function Ghost({ initialSelected }: { initialSelected?: number | null } =
           <select
             value={resolvedSelected ?? ''}
             onChange={(e) => setSelected(Number(e.target.value))}
+            disabled={drivers.length === 0}
             style={{ background: 'var(--asphalt)', color: 'var(--chalk)', border: '1px solid var(--edge)', padding: '4px 8px', borderRadius: 4 }}
           >
+            {/* An empty dropdown reads as "no drivers exist"; say we are waiting instead. */}
+            {drivers.length === 0 && <option value="">Waiting for driver data…</option>}
             {drivers.map((n) => {
               const c = thisYear.cars[n] ?? lastYear.cars[n];
               return <option key={n} value={n}>{c?.code ?? n}</option>;
@@ -179,7 +182,9 @@ export function Ghost({ initialSelected }: { initialSelected?: number | null } =
             </span>
           )}
           <button className="btn" onClick={() => setPaused((p) => !p)} disabled={!ready}>
-            {paused ? '▶ Play' : '⏸ Pause'}
+            {/* Before playback exists there is nothing to pause — offering Pause
+                implies something is running. Show the inert Play instead. */}
+            {paused || !ready ? '▶ Play' : '⏸ Pause'}
           </button>
           <input
             type="range"

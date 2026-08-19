@@ -91,6 +91,25 @@ describe('orderCars', () => {
     const cars = { 1: car({ driverNum: 1, code: 'VER', pos: 2 }), 44: car({ driverNum: 44, code: 'HAM', pos: 1 }) };
     expect(orderCars(cars).map((c) => c.code)).toEqual(['HAM', 'VER']);
   });
+
+  it('breaks a duplicate pos by laps completed, not driver number', () => {
+    // The Monza 2024 clip reports TSU and HUL both at pos 19 in every frame,
+    // with no 20 — TSU is five laps down. Ascending driver number would put
+    // TSU (22) ahead of HUL (27); laps completed puts them in running order.
+    const cars = {
+      22: car({ driverNum: 22, code: 'TSU', pos: 19, lap: 7 }),
+      27: car({ driverNum: 27, code: 'HUL', pos: 19, lap: 12 }),
+    };
+    expect(orderCars(cars).map((c) => c.code)).toEqual(['HUL', 'TSU']);
+  });
+
+  it('falls back to driver number when pos and lap are both tied', () => {
+    const cars = {
+      27: car({ driverNum: 27, code: 'HUL', pos: 19, lap: 12 }),
+      22: car({ driverNum: 22, code: 'TSU', pos: 19, lap: 12 }),
+    };
+    expect(orderCars(cars).map((c) => c.code)).toEqual(['TSU', 'HUL']);
+  });
 });
 
 describe('bestSectors', () => {

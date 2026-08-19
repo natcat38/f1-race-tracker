@@ -27,17 +27,25 @@ export function connectRace(
 
   function open() {
     let live = false; // per-connection: emit 'live' on the first message of THIS connection
-    // Only the very first attempt is 'connecting' — that status means "nothing
-    // has been tried yet". Re-emitting it on every retry overwrote the
-    // 'reconnecting' onclose had just set, and since no consumer renders
-    // 'connecting' distinctly, an outage fell through to the staleness chip
-    // ("waiting for timing data") and the map's reconnect overlay blinked out.
+    // Only the FIRST attempt is 'connecting' here. Re-emitting it at the top of
+    // every retry overwrote the 'reconnecting' onclose had just set, and since
+    // no consumer renders 'connecting' distinctly, an outage fell through to
+    // the staleness chip ("waiting for timing data") and the map's reconnect
+    // overlay blinked out — a dead backend read as a merely slow one.
     if (!attempted) {
       attempted = true;
       onStatus?.('connecting');
     }
     ws = new WebSocket(url);
-    ws.onopen = () => { backoff = 500; };
+    ws.onopen = () => {
+      backoff = 500;
+      // Back to 'connecting': the socket is established but no data has crossed
+      // it yet, so consumers should show their warming-up/staleness copy rather
+      // than keep claiming we are still retrying. 'live' follows on the first
+      // message. Safe to emit here (unlike at the top of open()) because this
+      // only fires on a connection that actually succeeded.
+      onStatus?.('connecting');
+    };
     ws.onmessage = (ev) => {
       let parsed: unknown;
       try {

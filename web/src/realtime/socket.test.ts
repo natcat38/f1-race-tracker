@@ -128,6 +128,30 @@ describe('connectRace reconnect/backoff', () => {
     expect(statuses).toEqual(['connecting', 'reconnecting', 'reconnecting']);
   });
 
+  test('a reopened socket reports connecting again, so it is not still "reconnecting"', () => {
+    // Open but silent is not the same as retrying: the badge should fall through
+    // to its warming-up/staleness copy, not keep claiming a lost connection.
+    const statuses: string[] = [];
+    connectRace(() => {}, (s) => statuses.push(s));
+    MockWebSocket.instances[0].onclose?.();
+    vi.advanceTimersByTime(500);
+    expect(statuses.at(-1)).toBe('reconnecting');
+
+    MockWebSocket.instances[1].onopen?.();
+    expect(statuses.at(-1)).toBe('connecting');
+  });
+
+  test('a failing retry never reaches onopen, so it stays reconnecting', () => {
+    const statuses: string[] = [];
+    connectRace(() => {}, (s) => statuses.push(s));
+    for (const ms of [500, 1000, 2000]) {
+      MockWebSocket.instances.at(-1)!.onclose?.();
+      vi.advanceTimersByTime(ms);
+    }
+    expect(statuses.at(-1)).toBe('reconnecting');
+    expect(statuses.filter((s) => s === 'connecting')).toHaveLength(1); // the initial attempt only
+  });
+
   test('a message on a reconnected socket still reports live', () => {
     const statuses: string[] = [];
     connectRace(() => {}, (s) => statuses.push(s));
