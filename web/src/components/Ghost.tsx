@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { connectRace } from '../realtime/socket';
+import { connectRace, type ConnStatus } from '../realtime/socket';
 import { emptyState, type RaceState } from '../state/race';
 import { teamColour } from './teamColours';
-import { commonDrivers, deltaSeries, indexAtTime } from '../state/ghost';
+import { commonDrivers, deltaSeries, indexAtTime, ghostSkeletonCopy } from '../state/ghost';
 import { fmtElapsed } from './timingHelpers';
 import { SIZE } from './geometry';
 import { Panel } from './Panel';
@@ -15,8 +15,10 @@ const LAST = { session: 'compare-monza-2023', year: '2023' };
 export function Ghost({ initialSelected }: { initialSelected?: number | null } = {}) {
   const [thisYear, setThisYear] = useState<RaceState>(emptyState());
   const [lastYear, setLastYear] = useState<RaceState>(emptyState());
-  useEffect(() => connectRace(setThisYear, undefined, THIS.session), []);
-  useEffect(() => connectRace(setLastYear, undefined, LAST.session), []);
+  const [statusThis, setStatusThis] = useState<ConnStatus>('connecting');
+  const [statusLast, setStatusLast] = useState<ConnStatus>('connecting');
+  useEffect(() => connectRace(setThisYear, setStatusThis, THIS.session), []);
+  useEffect(() => connectRace(setLastYear, setStatusLast, LAST.session), []);
 
   const drivers = useMemo(
     () => commonDrivers(thisYear.lapTrace, lastYear.lapTrace),
@@ -126,9 +128,7 @@ export function Ghost({ initialSelected }: { initialSelected?: number | null } =
       <Panel label="Track">
         {!ready ? (
           <div className="track-skeleton">
-            {lanesLoaded && drivers.length === 0
-              ? 'No driver appears in both seasons — ghost overlay needs a common driver.'
-              : 'Loading reference laps…'}
+            {ghostSkeletonCopy(lanesLoaded, drivers.length, statusThis, statusLast)}
           </div>
         ) : (
           <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="track-svg" role="img" aria-label="Ghost overlay track map">

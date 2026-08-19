@@ -1,3 +1,5 @@
+import type { ConnStatus } from '../realtime/socket';
+
 // Pure helpers for the cross-year ghost overlay. The route holds both years'
 // lap traces (cumulative ms per track-outline index, baked per clip); these turn
 // them into a signed delta and invert a trace (clock -> index) for animation.
@@ -32,4 +34,22 @@ export function commonDrivers(
     .map(Number)
     .filter((n) => b[n] !== undefined)
     .sort((x, y) => x - y);
+}
+
+// The Ghost route's skeleton copy. Priority: a confirmed data gap (both lanes
+// loaded, zero common drivers) beats a connection complaint, which beats the
+// generic loading line — so a user always sees the most specific truth.
+export function ghostSkeletonCopy(
+  lanesLoaded: boolean,
+  driverCount: number,
+  statusThis: ConnStatus,
+  statusLast: ConnStatus,
+): string {
+  if (lanesLoaded && driverCount === 0) {
+    return 'No driver appears in both seasons — ghost overlay needs a common driver.';
+  }
+  if (statusThis === 'reconnecting' || statusLast === 'reconnecting') {
+    return 'Connection lost — retrying automatically…';
+  }
+  return 'Loading reference laps…';
 }
