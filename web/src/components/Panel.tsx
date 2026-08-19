@@ -3,6 +3,7 @@
  * @packageDocumentation
  */
 import type { ReactNode } from 'react';
+import { ErrorBoundary } from '../ErrorBoundary';
 
 // Panel is the shared instrument frame: a carbon-bordered box with an
 // uppercase label plate along the top edge, and an optional actions slot
@@ -18,7 +19,13 @@ export function Panel({ label, actions, children }: {
         <span>{label}</span>
         {actions}
       </header>
-      <div className="panel-body">{children}</div>
+      <div className="panel-body">
+        <ErrorBoundary
+          fallback={<div className="empty">This panel hit an error — reload the page to restore it.</div>}
+        >
+          {children}
+        </ErrorBoundary>
+      </div>
     </section>
   );
 }

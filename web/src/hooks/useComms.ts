@@ -14,6 +14,7 @@ export function useComms(state: RaceState) {
   const [history, setHistory] = useState<RadioMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
   const PLAYBACK_ERROR = 'Radio clip failed to play — the browser may have blocked audio or the stream is unavailable.';
+  const BLOCKED_ERROR = 'This clip can’t be played — its audio source isn’t a recognised F1 domain.';
   // All refs declared before the helpers so nothing is used-before-defined (lint gate).
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const cursorRef = useRef<CommsCursor>({ lastClock: -1 });
@@ -128,6 +129,7 @@ export function useComms(state: RaceState) {
     if (!audio) return;
     if (!isAllowedClip(msg.clip)) {
       console.warn('comms: refusing to replay clip with disallowed URL', msg.clip);
+      setError(BLOCKED_ERROR);
       return;
     }
     queueRef.current = []; // manual replay jumps the queue

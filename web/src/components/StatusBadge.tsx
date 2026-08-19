@@ -10,6 +10,9 @@ interface Props {
 const STALE_THRESHOLD_SEC = 4;
 
 export function StatusBadge({ status, state, staleSec }: Props) {
+  if (status === 'failed') {
+    return <span className="chip chip-stall">⚠ Demo data failed to load — refresh the page to retry.</span>;
+  }
   if (status === 'reconnecting') {
     return <span className="chip chip-reconnect">↺ Reconnecting…</span>;
   }
