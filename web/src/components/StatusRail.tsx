@@ -8,6 +8,7 @@ const TABS = [
   { key: 'board', href: '#', label: 'BOARD', sub: 'live board' },
   { key: 'compare', href: '#compare', label: 'COMPARE', sub: 'side by side' },
   { key: 'ghost', href: '#ghost', label: 'OVERLAY', sub: 'lap delta' },
+  { key: 'settings', href: '#settings', label: 'LINK', sub: 'F1TV beta' },
 ] as const;
 
 // StatusRail is the persistent instrument strip on every route — the
@@ -18,7 +19,7 @@ const TABS = [
 export function StatusRail({
   active, state, status, staleSec, note, children,
 }: {
-  active: 'board' | 'compare' | 'ghost';
+  active: 'board' | 'compare' | 'ghost' | 'settings';
   state?: RaceState;
   status?: ConnStatus;
   staleSec?: number;
