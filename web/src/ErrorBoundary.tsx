@@ -1,8 +1,12 @@
 import { Component, type ReactNode } from 'react'
 
 // ErrorBoundary keeps a render-time exception in one component from unmounting
-// the whole app to a blank page. Logs the error and shows a minimal reload prompt.
-export class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+// the whole app to a blank page. Logs the error and shows either the provided
+// compact fallback (per-panel use) or the full-page reload prompt.
+export class ErrorBoundary extends Component<
+  { children: ReactNode; fallback?: ReactNode },
+  { error: Error | null }
+> {
   state: { error: Error | null } = { error: null }
 
   static getDerivedStateFromError(error: Error) {
@@ -15,6 +19,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
 
   render() {
     if (this.state.error) {
+      if (this.props.fallback) return this.props.fallback
       return (
         <div style={{ padding: 24, fontFamily: 'sans-serif' }}>
           <h1>Something broke.</h1>
