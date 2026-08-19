@@ -39,3 +39,17 @@ external dependency is baked into the contract as `clip` = a live F1 URL.
   from the committed clips). Acceptable for a portfolio demo.
 - We did not build the proxy up front: a working stream with a named fallback
   beats speculative infrastructure.
+
+## Amended 2026-08 — live-session clips
+
+The beta live path (ADR-0007) resolves clip URLs the same way, against
+`https://livetiming.formula1.com/static/` + the live `SessionInfo.Path` + the
+capture's `Path`. Everything above still holds: nothing is downloaded, nothing is
+committed, and every URL must pass the same `formula1.com` https allowlist that
+guards replay clips (`ingest/radio.py`, `web/src/state/comms.ts:isAllowedClip`).
+
+What is **explicitly unverified**: whether those mp3s are fetchable *mid-session*,
+and whether the `TeamRadio` topic is served to a free-tier token at all. Both await
+an actual F1TV subscription. If mid-session clips turn out to be gated or delayed,
+the fallback is unchanged from the original decision — Option 2, a gateway proxy —
+because the contract shape `{timeMs, driverNum, clip}` does not depend on it.

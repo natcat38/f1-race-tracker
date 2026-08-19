@@ -177,9 +177,13 @@ Best-effort, like **gap** — placed by mapping the clip's wall-clock to session
 when a clip is recorded. The audio is streamed from a public URL at play time, never
 stored; only the reference (driver, session-time, clip URL) rides the **snapshot**.
 
+In **replay** a team-radio reference is a sparse, fixed timeline: the recorder knows
+every clip up front, so the whole list rides the **snapshot**. In **live** the clips
+only exist once they are spoken, so refs arrive on **frames** and accumulate onto the
+snapshot — the **race control** pattern (ADR-0008).
+
 - _Use_ "team radio" (or just "radio" as the short form for the clip/data); not
-  "audio" or bare "message". A team-radio reference is a sparse, fixed timeline — it
-  rides the **snapshot**, not every **frame**.
+  "audio" or bare "message".
 
 ## Comms
 
@@ -245,3 +249,14 @@ used as the canonical lap for the **ghost overlay**. Best-effort, like **gap**.
 
 - _Use_ "reference lap"; not "best lap" (which could mean the in-race personal best shown
   in the timing tower).
+
+## Linked
+
+The operator-level auth state of the beta live source: `unlinked`, `linked`, or
+`expired` (the frontend adds `unavailable` when the gateway cannot be reached). One
+operator's own F1TV subscription, linked on the host (ADR-0007) — never a user
+account. The **writer** publishes the state over the **seam**; the **gateway** serves
+it read-only; the settings page polls it.
+
+- _Use_ "linked" / "the link" for the account state; not "logged in" or "signed in"
+  (there is no user session here) and never "account" alone.
