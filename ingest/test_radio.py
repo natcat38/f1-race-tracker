@@ -110,11 +110,43 @@ def test_live_radio_refs_rejects_bad_host():
         assert "https" in str(e).lower(), e
 
 
+def test_live_radio_refs_survives_a_malformed_timestamp():
+    """A bad Utc must not abort the batch, nor poison `seen` for the good refs.
+
+    SignalR re-sends the whole capture list on resubscribe, so a clip marked seen
+    but never emitted is lost permanently, not just this once.
+    """
+    seen = set()
+    caps = [
+        {"Utc": "2026-07-05T14:03:10Z", "RacingNumber": "1", "Path": "a.mp3"},
+        {"Utc": "", "RacingNumber": "44", "Path": "b.mp3"},          # malformed
+        {"Utc": 12345, "RacingNumber": "11", "Path": "c.mp3"},        # not even a string
+        {"Utc": "2026-07-05T14:05:00Z", "RacingNumber": "16", "Path": "d.mp3"},
+    ]
+    out = live_radio_refs(caps, "https://livetiming.formula1.com", "/static/x/", seen)
+    assert [m["driverNum"] for m in out] == [1, 16], out
+    # The malformed entries left no trace, so a later good value for them still works.
+    assert not any(u.endswith(("b.mp3", "c.mp3")) for u in seen), seen
+
+
+def test_extract_radio_survives_a_malformed_timestamp():
+    t0 = datetime(2024, 9, 1, 12, 0, 0, tzinfo=timezone.utc).timestamp()
+    out = extract_radio(
+        [
+            {"Utc": "not-a-date", "RacingNumber": "1", "Path": "bad.mp3"},
+            {"Utc": "2024-09-01T12:55:10.000Z", "RacingNumber": "16", "Path": "good.mp3"},
+        ],
+        t0, 3300, 3750, "https://livetiming.formula1.com", "/static/x/")
+    assert len(out) == 1 and out[0]["driverNum"] == 16, out
+
+
 if __name__ == "__main__":
     test_extract_radio_window_and_sort()
     test_extract_radio_rejects_bad_base_url()
     test_live_radio_refs_maps_and_dedupes()
     test_live_radio_refs_sorts_by_time()
     test_live_radio_refs_rejects_bad_host()
+    test_live_radio_refs_survives_a_malformed_timestamp()
+    test_extract_radio_survives_a_malformed_timestamp()
     print("radio self-check PASSED (extract_radio + live_radio_refs)")
     sys.exit(0)

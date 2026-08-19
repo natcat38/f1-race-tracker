@@ -63,3 +63,18 @@ describe('liveArrivals', () => {
     expect(liveArrivals(refs(1), 5, false)).toEqual([]);
   });
 });
+
+describe('live arrivals vs the clock window', () => {
+  test('a low-lag clip matches both paths, so callers must fire it once', () => {
+    // Regression note for useComms: stepComms and liveArrivals CAN both return the
+    // same clip when it is published within one frame interval of being spoken.
+    const clock = 1_000_000_000_000;
+    const clip = { timeMs: clock + 500, driverNum: 1, clip: 'https://livetiming.formula1.com/a.mp3' };
+    const clockFired = stepComms({ lastClock: clock }, clock + 1000, [clip], false).fired;
+    const arrived = liveArrivals([clip], 0, false);
+    expect(clockFired).toEqual([clip]);
+    expect(arrived).toEqual([clip]);
+    const fired = [...clockFired.filter((m) => !arrived.includes(m)), ...arrived];
+    expect(fired).toHaveLength(1);
+  });
+});

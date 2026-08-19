@@ -12,11 +12,14 @@ does the real verification when it connects.
 import base64
 import binascii
 import json
+import logging
 import os
 import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+
+_log = logging.getLogger("f1tv_auth")
 
 AUTH_STATUS_KEY = "f1auth:status"
 
@@ -80,9 +83,18 @@ def auth_status(token_path=None):
 
 
 def publish_status_loop(r, interval_s=60):
-    """SET f1auth:status now and every interval_s. Status only — never the token."""
+    """SET f1auth:status now and every interval_s. Status only — never the token.
+
+    Never lets an exception end the loop: this runs on a daemon thread, so an
+    unhandled error would kill status publishing for the life of the process while
+    the settings page went on serving whatever was written last, with nothing to
+    explain it. A Redis blip should cost one tick, not the feature.
+    """
     while True:
-        r.set(AUTH_STATUS_KEY, json.dumps(auth_status(), separators=(",", ":")))
+        try:
+            r.set(AUTH_STATUS_KEY, json.dumps(auth_status(), separators=(",", ":")))
+        except Exception:
+            _log.warning("f1auth: status publish failed, retrying next tick", exc_info=True)
         time.sleep(interval_s)
 
 

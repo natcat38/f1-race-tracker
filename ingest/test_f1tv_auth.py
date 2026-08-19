@@ -87,7 +87,7 @@ def test_expires_in_picks_a_useful_unit():
     assert _expires_in("not a date") is None
 
 
-def test_print_status_is_ascii_only(capsys=None):
+def test_print_status_is_ascii_only():
     """Windows consoles are cp1252 - a stray em-dash prints as '?' to the operator."""
     import io
     import contextlib
@@ -110,6 +110,39 @@ def test_print_status_is_ascii_only(capsys=None):
     assert "no active F1 TV subscription" in buf.getvalue()
 
 
+def test_publish_loop_survives_a_redis_error():
+    """A daemon thread that dies on one blip stops publishing status forever."""
+    import f1tv_auth
+
+    class FlakyRedis:
+        def __init__(self):
+            self.calls = 0
+
+        def set(self, key, value):
+            self.calls += 1
+            if self.calls == 1:
+                raise ConnectionError("redis went away")
+
+    r = FlakyRedis()
+    slept = []
+    real_sleep = f1tv_auth.time.sleep
+
+    def fake_sleep(_s):
+        slept.append(_s)
+        if len(slept) >= 3:
+            raise KeyboardInterrupt  # break out of the infinite loop
+
+    f1tv_auth.time.sleep = fake_sleep
+    try:
+        f1tv_auth.publish_status_loop(r, interval_s=0)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        f1tv_auth.time.sleep = real_sleep
+
+    assert r.calls >= 3, f"loop stopped after the error: {r.calls} calls"
+
+
 if __name__ == "__main__":
     test_unlinked_when_file_missing()
     test_unlinked_when_file_empty()
@@ -119,5 +152,6 @@ if __name__ == "__main__":
     test_status_never_leaks_the_token()
     test_expires_in_picks_a_useful_unit()
     test_print_status_is_ascii_only()
+    test_publish_loop_survives_a_redis_error()
     print("f1tv_auth.auth_status self-check PASSED")
     sys.exit(0)

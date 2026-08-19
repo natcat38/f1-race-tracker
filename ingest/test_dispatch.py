@@ -9,7 +9,14 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from live_signalr import _decode_payload, _dispatch_message, _radio_from_payload  # noqa: E402
+from live_signalr import (  # noqa: E402
+    _decode_payload,
+    _dispatch_message,
+    _flush_deferred_radio,
+    _radio_from_payload,
+    _radio_or_defer,
+    _session_path_from_payload,
+)
 
 # Verbatim from the real capture, trimmed to two entries.
 REAL_TEAM_RADIO = (
@@ -54,9 +61,42 @@ def test_real_capture_shape_maps_to_wire_refs():
     assert refs[0]["timeMs"] == 1785070399414, refs[0]
 
 
+def test_team_radio_before_session_info_is_parked_not_dropped():
+    """Topic order at connect is the server's choice (ADR-0008).
+
+    With no SessionInfo.Path yet there is nothing to build clip URLs from; parking
+    the payload keeps the session's radio instead of silently losing all of it.
+    """
+    seen, deferred = set(), []
+    payload = _decode_payload(REAL_TEAM_RADIO)
+
+    # TeamRadio first: nothing resolvable yet, but nothing thrown away either.
+    assert _radio_or_defer(payload, "", seen, deferred) == []
+    assert len(deferred) == 1, deferred
+
+    # SessionInfo arrives: the parked payload flushes with real clip URLs.
+    path = _session_path_from_payload(_decode_payload(REAL_SESSION_INFO))
+    refs = _flush_deferred_radio(deferred, path, seen)
+    assert len(refs) == 2, refs
+    assert refs[0]["clip"].startswith("https://livetiming.formula1.com/static/2026/"), refs[0]
+    assert deferred == [], "flushed payloads must not replay on the next SessionInfo"
+
+    # Flushing again is a no-op rather than a duplicate.
+    assert _flush_deferred_radio(deferred, path, seen) == []
+
+
+def test_normal_order_does_not_defer():
+    seen, deferred = set(), []
+    path = _session_path_from_payload(_decode_payload(REAL_SESSION_INFO))
+    refs = _radio_or_defer(_decode_payload(REAL_TEAM_RADIO), path, seen, deferred)
+    assert len(refs) == 2 and deferred == [], (refs, deferred)
+
+
 if __name__ == "__main__":
     test_decode_payload_parses_json_strings()
     test_dispatch_decodes_before_the_handler_sees_it()
     test_real_capture_shape_maps_to_wire_refs()
+    test_team_radio_before_session_info_is_parked_not_dropped()
+    test_normal_order_does_not_defer()
     print("live_signalr dispatch self-check PASSED")
     sys.exit(0)

@@ -262,6 +262,31 @@ def _radio_from_payload(payload, session_path, seen):
                            STATIC_BASE, session_path, seen)
 
 
+def _radio_or_defer(payload, session_path, seen, deferred):
+    """Map a TeamRadio payload to refs, or park it until SessionInfo.Path arrives.
+
+    Topic order at connect is the server's choice: TeamRadio can land before
+    SessionInfo, and without a path there is nothing to resolve clip URLs against.
+    Dropping it would silently lose a whole session's radio with no log line, so
+    park it instead and flush once the path is known.
+    """
+    if not session_path:
+        deferred.append(payload)
+        return []
+    return _radio_from_payload(payload, session_path, seen)
+
+
+def _flush_deferred_radio(deferred, session_path, seen):
+    """Drain payloads parked before SessionInfo.Path was known."""
+    if not (session_path and deferred):
+        return []
+    refs = []
+    for payload in deferred:
+        refs.extend(_radio_from_payload(payload, session_path, seen))
+    deferred.clear()
+    return refs
+
+
 def _session_path_from_payload(payload):
     """Extract the static-feed path from a SessionInfo message, or '' if absent."""
     if isinstance(payload, dict) and isinstance(payload.get('Path'), str):
@@ -336,6 +361,7 @@ def _replay_capture(r, session: str, label: str, capture_path: str) -> None:
     session_path = ""
     seen_clips: set[str] = set()
     pending_radio: list[dict] = []
+    deferred_radio: list = []   # TeamRadio seen before SessionInfo.Path
 
     bounds = BoundBox()
     rev = starting_rev(r, session)
@@ -395,10 +421,12 @@ def _replay_capture(r, session: str, label: str, capture_path: str) -> None:
 
         if kind == 'sessioninfo':
             session_path = _session_path_from_payload(payload) or session_path
+            pending_radio.extend(_flush_deferred_radio(deferred_radio, session_path, seen_clips))
             continue
 
         if kind == 'radio':
-            pending_radio.extend(_radio_from_payload(payload, session_path, seen_clips))
+            pending_radio.extend(
+                _radio_or_defer(payload, session_path, seen_clips, deferred_radio))
             continue
 
         if kind == 'appdata':
@@ -527,6 +555,7 @@ def _run_live_signalr(r, session: str, label: str) -> None:
     session_path_holder = ['']
     seen_clips: set[str] = set()
     pending_radio: list[dict] = []
+    deferred_radio: list = []   # TeamRadio seen before SessionInfo.Path
     snapshot_holder = [build_snapshot(session, label or "Live F1", [], [], {}, {}, 0, rev_holder[0])]
     last_publish = [time.monotonic() - FRAME_INTERVAL_S]
 
@@ -587,10 +616,12 @@ def _run_live_signalr(r, session: str, label: str) -> None:
         elif topic == 'SessionInfo':
             session_path_holder[0] = (_session_path_from_payload(payload)
                                       or session_path_holder[0])
+            pending_radio.extend(
+                _flush_deferred_radio(deferred_radio, session_path_holder[0], seen_clips))
 
         elif topic == 'TeamRadio':
             pending_radio.extend(
-                _radio_from_payload(payload, session_path_holder[0], seen_clips))
+                _radio_or_defer(payload, session_path_holder[0], seen_clips, deferred_radio))
 
         elif topic == 'Position.z':
             try:

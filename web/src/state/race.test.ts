@@ -248,4 +248,15 @@ describe('race-control messages', () => {
   it('rejects a frame whose radio is not an array', () => {
     expect(parseMsg({ type: 'frame', data: { rev: 2, timeMs: 200, radio: 'nope' } })).toBeNull();
   });
+
+  it('rejects radio elements that are not real refs (useComms holds them by identity)', () => {
+    const frame = (radio: unknown) => parseMsg({ type: 'frame', data: { rev: 2, timeMs: 200, radio } });
+    expect(frame(['oops'])).toBeNull();
+    expect(frame([null])).toBeNull();
+    expect(frame([{ timeMs: 1, driverNum: 1 }])).toBeNull();          // no clip
+    expect(frame([{ timeMs: '1', driverNum: 1, clip: 'x' }])).toBeNull(); // wrong type
+    expect(frame([])).not.toBeNull();
+    expect(frame([{ timeMs: 1, driverNum: 1, clip: 'https://livetiming.formula1.com/a.mp3' }]))
+      .not.toBeNull();
+  });
 });

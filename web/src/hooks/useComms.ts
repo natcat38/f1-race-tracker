@@ -86,7 +86,11 @@ export function useComms(state: RaceState) {
     const arrived = liveArrivals(state.radio, prevRadioLenRef.current, isSnapshot);
     prevRadioLenRef.current = state.radio.length;
     for (const msg of arrived) liveRef.current.add(msg);
-    const fired = arrived.length ? [...clockFired, ...arrived] : clockFired;
+    // A clip published with very little lag can satisfy stepComms' clock window AND
+    // be a fresh arrival, which would queue it twice and play it twice. Arrival wins.
+    const fired = arrived.length
+      ? [...clockFired.filter((m) => !arrived.includes(m)), ...arrived]
+      : clockFired;
 
     if (isSnapshot && hist.length) {
       setHistory(hist.slice(-HISTORY_MAX).reverse()); // newest first

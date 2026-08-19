@@ -53,9 +53,9 @@ def extract_radio(captures, t0_epoch_s, window_start_s, window_end_s, base_url, 
             continue
         try:
             driver_num = int(num)
-        except (TypeError, ValueError):
+            time_ms = _utc_to_session_ms(utc, t0_epoch_s)
+        except (AttributeError, TypeError, ValueError):
             continue
-        time_ms = _utc_to_session_ms(utc, t0_epoch_s)
         if in_window_ms(time_ms, window_start_s, window_end_s):
             out.append({
                 "timeMs": time_ms,
@@ -91,12 +91,16 @@ def live_radio_refs(captures, base_url, session_path, seen):
             continue
         try:
             driver_num = int(num)
-        except (TypeError, ValueError):
+            time_ms = _utc_to_epoch_ms(utc)
+        except (AttributeError, TypeError, ValueError):
+            # Parse BEFORE touching `seen`: a malformed entry must not mark its clip
+            # as emitted, or the resubscribe re-send would skip it for good. And it
+            # must not abort the batch — the good refs alongside it would be lost.
             continue
         clip = base_url.rstrip("/") + "/" + session_path.strip("/") + "/" + path.lstrip("/")
         if clip in seen:
             continue
         seen.add(clip)
-        out.append({"timeMs": _utc_to_epoch_ms(utc), "driverNum": driver_num, "clip": clip})
+        out.append({"timeMs": time_ms, "driverNum": driver_num, "clip": clip})
     out.sort(key=lambda m: m["timeMs"])
     return out
