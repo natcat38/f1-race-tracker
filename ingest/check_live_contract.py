@@ -80,6 +80,22 @@ def test_frame_weather_key_optional():
     assert build_frame("live", 7, 1234, [], None, None).keys() == FRAME_KEYS
 
 
+def test_frame_radio_key_optional():
+    """Live team-radio refs ride frames as an optional key (ADR-0008).
+
+    Like messages/weather it is omitempty on the Go side, so it must be absent —
+    not empty — when there is nothing to send.
+    """
+    refs = [{"timeMs": 1720188190500, "driverNum": 1,
+             "clip": "https://livetiming.formula1.com/static/x/TeamRadio/a.mp3"}]
+    frame = build_frame("live", 7, 1234, [], None, None, refs)
+    assert set(frame) == FRAME_KEYS | {"radio"}, f"frame keys {set(frame)} != {FRAME_KEYS | {'radio'}}"
+    assert frame["radio"] == refs
+    # No radio passed (or None/empty) -> key omitted, same key set as the base contract.
+    assert build_frame("live", 7, 1234, [], None, None, None).keys() == FRAME_KEYS
+    assert build_frame("live", 7, 1234, [], None, None, []).keys() == FRAME_KEYS
+
+
 def test_live_signalr_car_extras_match_contract():
     timing = _parse_timing_line({
         "NumberOfLaps": 5, "GapToLeader": "+1.234",
@@ -136,6 +152,7 @@ if __name__ == "__main__":
     test_snapshot_and_frame_key_contract()
     test_frame_messages_key_optional()
     test_frame_weather_key_optional()
+    test_frame_radio_key_optional()
     test_live_signalr_car_extras_match_contract()
     test_key_sets_match_go_model()
     test_fold_messages_caps_at_30()
