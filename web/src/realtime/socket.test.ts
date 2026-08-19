@@ -108,6 +108,41 @@ describe('connectRace reconnect/backoff', () => {
     expect(MockWebSocket.instances).toHaveLength(3);
   });
 
+  test('a retry keeps the reconnecting status instead of falling back to connecting', () => {
+    // 'connecting' means "no connection has been tried yet". Re-emitting it on
+    // every retry made an outage read as a slow feed: StatusBadge has no
+    // 'connecting' branch, so the chip fell through to the staleness warning
+    // and App's reconnect overlay blinked out with it.
+    const statuses: string[] = [];
+    connectRace(() => {}, (s) => statuses.push(s));
+    expect(statuses).toEqual(['connecting']);
+
+    MockWebSocket.instances[0].onclose?.();
+    vi.advanceTimersByTime(500); // retry opens
+    expect(MockWebSocket.instances).toHaveLength(2);
+    expect(statuses).toEqual(['connecting', 'reconnecting']);
+
+    MockWebSocket.instances[1].onclose?.();
+    vi.advanceTimersByTime(1000); // and again, through a longer backoff
+    expect(MockWebSocket.instances).toHaveLength(3);
+    expect(statuses).toEqual(['connecting', 'reconnecting', 'reconnecting']);
+  });
+
+  test('a message on a reconnected socket still reports live', () => {
+    const statuses: string[] = [];
+    connectRace(() => {}, (s) => statuses.push(s));
+    MockWebSocket.instances[0].onclose?.();
+    vi.advanceTimersByTime(500);
+
+    MockWebSocket.instances[1].onmessage?.({
+      data: JSON.stringify({
+        type: 'snapshot',
+        data: { session: 'x', mode: 'replay', label: 'L', cars: {}, timeMs: 0, rev: 1 },
+      }),
+    });
+    expect(statuses.at(-1)).toBe('live');
+  });
+
   test('after the returned close function runs, a late onclose does not schedule a reconnect', () => {
     const close = connectRace(() => {});
     close();

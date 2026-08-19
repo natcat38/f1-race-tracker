@@ -20,13 +20,22 @@ export function connectRace(
   let ws: WebSocket | null = null;
   let closed = false;
   let backoff = 500;
+  let attempted = false;
 
   const base = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
   const url = session ? `${base}?session=${encodeURIComponent(session)}` : base;
 
   function open() {
     let live = false; // per-connection: emit 'live' on the first message of THIS connection
-    onStatus?.('connecting');
+    // Only the very first attempt is 'connecting' — that status means "nothing
+    // has been tried yet". Re-emitting it on every retry overwrote the
+    // 'reconnecting' onclose had just set, and since no consumer renders
+    // 'connecting' distinctly, an outage fell through to the staleness chip
+    // ("waiting for timing data") and the map's reconnect overlay blinked out.
+    if (!attempted) {
+      attempted = true;
+      onStatus?.('connecting');
+    }
     ws = new WebSocket(url);
     ws.onopen = () => { backoff = 500; };
     ws.onmessage = (ev) => {
