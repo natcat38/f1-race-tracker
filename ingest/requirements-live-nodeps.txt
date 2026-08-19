@@ -16,6 +16,8 @@
 #   pip install -r ingest/requirements.txt -r ingest/requirements-live.txt
 #   pip install --no-deps -r ingest/requirements-live-nodeps.txt
 #
-# Audited in CI with `pip-audit --no-deps` so the pin itself is still checked
-# without pip resolving the over-strict msgpack it declares.
+# Audited in CI with `pip-audit --no-deps --ignore-vuln PYSEC-2026-3625`: --no-deps
+# alone still reports the msgpack==1.1.2 declared here, which this project never
+# installs (requirements.txt pins the patched 1.2.1, and the main audit checks it).
+# signalrcore itself stays audited, so a future advisory against it still fails CI.
 signalrcore==1.0.2
