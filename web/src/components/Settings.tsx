@@ -88,7 +88,7 @@ export function Settings() {
             </p>
 
             <ol>
-              <li><code>pip install -r ingest/requirements-live.txt</code></li>
+              <li><code>pip install -r ingest/requirements.txt -r ingest/requirements-live.txt</code></li>
               <li>
                 Install the f1login extension from <code>https://f1login.fastf1.dev</code>
               </li>
