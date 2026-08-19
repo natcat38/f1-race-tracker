@@ -24,12 +24,18 @@ ACCOUNT_URL = "https://account.formula1.com"
 SETTINGS_URL = "http://localhost:8080/#settings"
 
 
-def _expires_in(expires_utc):
-    """'in 3 days' / 'in 5 hours' — a bare timestamp does not say whether to act."""
+def _expires_in(expires_utc, now=None):
+    """'in 3 days' / 'in 5 hours' — a bare timestamp does not say whether to act.
+
+    `now` is injectable so this is testable without racing the clock: reading the
+    clock internally made "3 days from now" round down to "in 2 days" by the
+    microseconds spent between building the input and comparing against it.
+    Mirrors relativeExpiry() in web/src/state/f1auth.ts.
+    """
     if not expires_utc:
         return None
     try:
-        left = datetime.fromisoformat(expires_utc) - datetime.now(timezone.utc)
+        left = datetime.fromisoformat(expires_utc) - (now or datetime.now(timezone.utc))
     except (ValueError, TypeError):
         return None
     secs = left.total_seconds()

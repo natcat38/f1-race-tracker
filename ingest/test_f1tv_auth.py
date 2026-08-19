@@ -76,15 +76,21 @@ def test_status_never_leaks_the_token():
 
 
 def test_expires_in_picks_a_useful_unit():
+    """Fixed `now`, so the assertions cannot race the clock (this test used to)."""
     from datetime import datetime, timedelta, timezone
+    now = datetime(2026, 8, 20, 0, 0, 0, tzinfo=timezone.utc)
+
     def at(delta):
-        return _expires_in((datetime.now(timezone.utc) + delta).isoformat())
+        return _expires_in((now + delta).isoformat(), now=now)
+
     assert at(timedelta(days=3)) == "in 3 days", at(timedelta(days=3))
-    assert at(timedelta(hours=5)) == "in 4 hours" or at(timedelta(hours=5)) == "in 5 hours"
-    assert at(timedelta(minutes=30)).endswith("min"), at(timedelta(minutes=30))
+    assert at(timedelta(hours=5)) == "in 5 hours", at(timedelta(hours=5))
+    assert at(timedelta(minutes=30)) == "in 30 min", at(timedelta(minutes=30))
     assert at(timedelta(seconds=-10)) == "expired"
     assert _expires_in(None) is None
     assert _expires_in("not a date") is None
+    # Exactly on a day boundary must not round down a moment early.
+    assert at(timedelta(days=2)) == "in 2 days", at(timedelta(days=2))
 
 
 def test_print_status_is_ascii_only():
