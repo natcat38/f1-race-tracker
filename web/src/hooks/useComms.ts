@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RaceState, RadioMessage } from '../state/race';
-import { stepComms, isStale, isAllowedClip, type CommsCursor } from '../state/comms';
+import { stepComms, liveArrivals, isStale, isAllowedClip, type CommsCursor } from '../state/comms';
 
 const HISTORY_MAX = 6;
 
@@ -22,13 +22,18 @@ export function useComms(state: RaceState) {
   const nowPlayingRef = useRef<RadioMessage | null>(null);
   const enabledRef = useRef<boolean>(false); // read by the rev-effect without re-subscribing
   const clockRef = useRef<number>(0);        // latest race clock, read by pump's staleness check
+  const prevRadioLenRef = useRef<number>(0); // timeline length last step, to spot live arrivals
+  // Clips that arrived on a frame rather than the clock. Their timeMs is the moment
+  // they were spoken, always behind the live wall clock, so isStale would drop every
+  // one of them — arrival already is the freshness signal (ADR-0008).
+  const liveRef = useRef<WeakSet<RadioMessage>>(new WeakSet());
 
   function pump() {
     const audio = audioRef.current;
     if (!audio || nowPlayingRef.current) return;
     let next = queueRef.current.shift();
     // Skip clips that are stale vs the race clock or have a disallowed URL (kept in history).
-    while (next && (isStale(next, clockRef.current) || !isAllowedClip(next.clip))) {
+    while (next && ((isStale(next, clockRef.current) && !liveRef.current.has(next)) || !isAllowedClip(next.clip))) {
       if (!isAllowedClip(next.clip)) console.warn('comms: skipping clip with disallowed URL', next.clip);
       next = queueRef.current.shift();
     }
@@ -71,10 +76,17 @@ export function useComms(state: RaceState) {
     const isSnapshot = lastSnapshotSeqRef.current !== state.snapshotSeq;
     lastSnapshotSeqRef.current = state.snapshotSeq;
 
-    const { cursor, fired, history: hist } = stepComms(
+    const { cursor, fired: clockFired, history: hist } = stepComms(
       cursorRef.current, state.timeMs, state.radio, isSnapshot,
     );
     cursorRef.current = cursor;
+
+    // Live refs ride frames and fire on arrival; replay refs ride the snapshot and
+    // fire on the clock. A lane only ever produces one of the two (ADR-0008).
+    const arrived = liveArrivals(state.radio, prevRadioLenRef.current, isSnapshot);
+    prevRadioLenRef.current = state.radio.length;
+    for (const msg of arrived) liveRef.current.add(msg);
+    const fired = arrived.length ? [...clockFired, ...arrived] : clockFired;
 
     if (isSnapshot && hist.length) {
       setHistory(hist.slice(-HISTORY_MAX).reverse()); // newest first

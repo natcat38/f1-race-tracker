@@ -59,6 +59,7 @@ interface SnapshotData {
 }
 interface FrameData {
   rev: number; timeMs: number; cars?: Car[]; messages?: RaceControlMessage[]; weather?: Weather;
+  radio?: RadioMessage[]; // live lane only — accumulated onto state.radio (ADR-0008)
 }
 type Msg =
   | { type: 'snapshot'; data: SnapshotData }
@@ -97,6 +98,7 @@ export function parseMsg(raw: unknown): Msg | null {
     // applyMessage iterates cars and spreads messages — reject a present-but-non-array value.
     if (data.cars !== undefined && !Array.isArray(data.cars)) return null;
     if (data.messages !== undefined && !Array.isArray(data.messages)) return null;
+    if (data.radio !== undefined && !Array.isArray(data.radio)) return null;
     if (data.weather !== undefined && (typeof data.weather !== 'object' || data.weather === null || Array.isArray(data.weather))) return null;
     return { type: 'frame', data: data as unknown as FrameData };
   }
@@ -124,5 +126,7 @@ export function applyMessage(s: RaceState, msg: Msg): RaceState {
   const messages = d.messages?.length
     ? [...s.messages, ...d.messages].slice(-MAX_MESSAGES)
     : s.messages;
-  return { ...s, cars, timeMs: d.timeMs, rev: d.rev, messages, weather: d.weather ?? s.weather };
+  // Live radio accumulates uncapped, mirroring Go's Apply (ADR-0008).
+  const radio = d.radio?.length ? [...s.radio, ...d.radio] : s.radio;
+  return { ...s, cars, timeMs: d.timeMs, rev: d.rev, messages, radio, weather: d.weather ?? s.weather };
 }

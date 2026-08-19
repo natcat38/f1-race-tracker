@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { stepComms, isAllowedClip } from './comms';
+import { stepComms, isAllowedClip, liveArrivals } from './comms';
 import type { RadioMessage } from './race';
 
 const tl: RadioMessage[] = [
@@ -45,5 +45,21 @@ describe('isAllowedClip', () => {
     expect(isAllowedClip('https://notformula1.com/a.mp3')).toBe(false);
     expect(isAllowedClip('javascript:alert(1)')).toBe(false);
     expect(isAllowedClip('not a url')).toBe(false);
+  });
+});
+
+describe('liveArrivals', () => {
+  const refs = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ timeMs: i, driverNum: i, clip: `https://livetiming.formula1.com/${i}.mp3` }));
+
+  test('a frame fires only the refs appended since last step', () => {
+    expect(liveArrivals(refs(3), 1, false)).toEqual(refs(3).slice(1));
+  });
+  test('a snapshot fires nothing — its refs are history, seeded by stepComms', () => {
+    expect(liveArrivals(refs(3), 0, true)).toEqual([]);
+  });
+  test('no growth fires nothing, and a shrunk timeline never slices backwards', () => {
+    expect(liveArrivals(refs(2), 2, false)).toEqual([]);
+    expect(liveArrivals(refs(1), 5, false)).toEqual([]);
   });
 });
