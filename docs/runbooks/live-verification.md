@@ -151,21 +151,35 @@ LIVE=1 LIVE_TIMING_MODE=beta CAPTURE_OUT=capture-live.txt   python ingest/live.p
 `CAPTURE_OUT` is the verification net: the raw feed is written there as it streams,
 so §3's checklist and the TeamRadio schema below can be settled from one real session.
 
-### 5.4 What is still unverified
+### 5.4 What the 2026-08-20 spike settled, and what is left
 
-Everything below awaits an actual subscription. Do not remove these caveats from the
-README until each is checked off here against a real session:
+Verified for real (see
+[the spike findings](../superpowers/specs/2026-08-20-f1auth-spike-findings.md)):
 
-- [ ] The SignalR connection is **accepted** with a subscribed token (and what a
-      free-tier token gets — a clean empty stream, or a 401/403).
-- [ ] The `TeamRadio` topic is served at all, and whether it needs a paid tier
-      separately from timing.
-- [ ] Live `TeamRadio` payload shape matches the archived feed —
-      `Captures` holding `{Utc, RacingNumber, Path}`, as a list or an index-keyed
-      dict (ADR-0008's schema assumption; both shapes are parsed today).
-- [ ] Clip mp3s are fetchable **mid-session** from
+- [x] **A free F1 account links.** The login is not tier-gated; the token carries
+      `SubscriptionStatus: inactive` and an empty `SubscribedProduct`.
+- [x] **The websocket accepts a free-tier token.** Connect succeeded and the server
+      pushed a 91 KB snapshot of all 17 topics for the last completed session.
+      Negotiate returns 200 with or without a token.
+- [x] **`TeamRadio` schema** — `Captures` holding `{Utc, RacingNumber, Path}`, as a
+      list, 37 entries. ADR-0008's assumption was right.
+- [x] **Payloads are JSON strings, not dicts** — was a real bug, now fixed at
+      `_dispatch_message` and pinned by `ingest/test_dispatch.py`.
+
+Still open:
+
+- [ ] **The `signalrcore` pin blocks the live path.** `0.8.8` (pinned for msgpack
+      security) is incompatible with modern websocket-client and dies on connect.
+      `1.0.2` works — including with the *patched* msgpack — but its declared pin
+      conflicts, so it cannot go in a plain requirements file. **This, not auth, is
+      what stops a real run today.** See the options table in the spike findings.
+- [ ] Whether a **live session's** stream is tier-gated (the connect snapshot is not).
+      Needs a race weekend, not a subscription.
+- [ ] The **incremental patch shape** (index-keyed dict `Captures`). Only the connect
+      snapshot has been observed; both shapes are parsed defensively.
+- [ ] Clip mp3s fetchable **mid-session** from
       `https://livetiming.formula1.com/static/<SessionInfo.Path>/<Path>` (ADR-0003,
-      amended).
+      amended). The URL construction itself is confirmed against real `Path` values.
 
 ### 5.5 Troubleshooting
 

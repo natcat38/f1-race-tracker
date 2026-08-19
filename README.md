@@ -64,10 +64,14 @@ machine, is never logged, and is never sent to the frontend.
 
 **Honest status:** the whole path is built and tested end-to-end against recorded
 sessions — auth status over the seam, the beta gate and its fail-fast, radio refs
-riding frames, firing on arrival in the UI. The **authenticated live connection
-itself is unverified pending an F1TV subscription**, as are the `TeamRadio` topic's
-tier requirement and mid-session clip availability. It is off by default and takes
-three separate opt-ins to reach. See
+riding frames, firing on arrival in the UI. On 2026-08-20 the link flow and the
+authenticated connection were **verified for real**: a free account links, the
+websocket accepts the token, and the server pushes the full topic snapshot, which
+also confirmed the team-radio wire schema. What still blocks a live run is a
+**dependency conflict, not auth** — the `signalrcore` version pinned for msgpack
+security cannot talk to a modern websocket-client. Whether a *live* session's stream
+is tier-gated is still untested; that needs a race weekend. It is off by default and
+takes three separate opt-ins to reach. See
 [docs/runbooks/live-verification.md](docs/runbooks/live-verification.md) §5 and
 [ADR-0007](docs/adr/0007-f1tv-auth-delegated-operator-link.md) /
 [ADR-0008](docs/adr/0008-live-radio-rides-frames.md).

@@ -1,6 +1,6 @@
 # f1auth Spike Findings (Task 1)
 
-**Date:** 2026-08-20 · **Host:** Windows 10, Python 3.11 · **Status:** source-inspection complete; browser login pending the operator.
+**Date:** 2026-08-20 · **Host:** Windows 10, Python 3.11 · **Status:** complete — source inspected and the link flow run for real with a free F1 account.
 
 Authoritative over the assumptions in `docs/superpowers/plans/2026-08-20-f1tv-beta-link-and-live-radio.md`.
 
@@ -41,19 +41,109 @@ Module-level constants: `JWKS_URL`, `USER_DATA_DIR`, `AUTH_DATA_FILE`.
 
 `platformdirs` honours `XDG_DATA_HOME` on Linux only — Windows always uses the LocalAppData path. That is fine: linking happens on the host, the container only reads a staged copy.
 
-## Claims table
+## Claims table — real free F1 account
 
-Pending the browser login. `get_auth_token()` prints *"This feature requires an active F1TV Access/Pro/Premium subscription"* only when **no** token is cached — the login itself is not gated on a paid tier, so a free account is expected to produce a token whose `SubscriptionStatus`/`SubscribedProduct` reveal the tier.
+Linked 2026-08-20. The login is **not** tier-gated: a free account signs in fine and
+fastf1 verifies the returned JWT against F1's JWKS ("Sign-in successful"). What the
+free tier lacks shows up in the claims, not in the ability to link.
 
 | Claim | Free-account value |
 |---|---|
-| `exp` | _pending_ |
-| `SubscriptionStatus` | _pending_ |
-| `SubscribedProduct` | _pending_ |
+| `exp` | `2026-08-23T17:13:17+00:00` |
+| `iat` | `2026-08-19T17:13:17+00:00` (a **4-day** token lifetime) |
+| `SubscriptionStatus` | `'inactive'` — this is the tier signal |
+| `SubscribedProduct` | `''` (empty string, so `auth_status` omits `product`) |
 
-## SignalR connect with a free-account token
+Full claim set: `ExternalAuthorizationsContextData`, `FirstName`, `LastName`,
+`SessionId`, `SubscribedProduct`, `SubscriberId`, `SubscriptionStatus`, `ents`, `exp`,
+`hashedSubscriberId`, `iat`, `jti`, `ved`.
 
-_Pending._ Whether the timing feed 401/403s for a free tier or times out cleanly on an empty stream is the residual unknown; it is documented as unverified in the README and runbook and does not block any code path.
+**Privacy note, load-bearing for ADR-0007:** the token carries the operator's real
+name and subscriber id. `auth_status` reads only `exp`, `SubscriptionStatus` and
+`SubscribedProduct`, so none of that reaches Redis, the gateway, or the browser. Any
+future change that widens what is published must not simply forward the claim dict.
+
+A paid account should show `SubscriptionStatus: 'active'` and a non-empty
+`SubscribedProduct` (e.g. `F1 TV Premium`) — still unconfirmed, since only a free
+account was available.
+
+**Token expiry is 4 days**, so the settings page's EXPIRED state is a routine
+occurrence, not an edge case: re-run `python ingest/f1tv_link.py` roughly weekly.
+
+## SignalR connect with a free-account token — VERIFIED, and it works
+
+Run 2026-08-20 outside any live session, with the free-account token above.
+
+```
+INFO SignalR: Connection established
+WARNING SignalR: Timeout - received no data for more than 30 seconds!
+INFO SignalR: Connection closed
+RESULT: capture bytes = 91648
+```
+
+**Auth is not the blocker.** A free-tier token (`SubscriptionStatus: inactive`) opens
+the websocket and the server pushes the full subscription snapshot — 91 KB across all
+17 topics — for the most recent completed session (Hungarian GP 2026, `Finalised`).
+Negotiate returns 200 with *or without* a bearer token, so the tier gate, if any, is
+not at connect. Whether a *live* session's stream is tier-gated remains untested, and
+now needs an actual race weekend rather than a subscription.
+
+### The real blocker: the `signalrcore` pin
+
+`ingest/requirements-live.txt` pins `signalrcore==0.8.8` to keep the patched
+`msgpack>=1.2.1` (GHSA-6v7p-g79w-8964). But 0.8.8's websocket callbacks predate the
+websocket-client API that passes the app instance, so with any modern
+websocket-client the connection dies the instant it opens:
+
+```
+INFO websocket: Websocket connected
+ERROR websocket: BaseHubConnection.on_open() takes 1 positional argument but 2 were given
+```
+
+Verified: this is **not** fixable by pinning websocket-client down — 0.59.0 fails
+identically (`callback(self, *args)` at `_app.py:393`). fastf1 3.8.3 leaves
+`signalrcore` unpinned and effectively expects 1.x.
+
+**`signalrcore==1.0.2` works at runtime with the safe `msgpack==1.2.1`** — that is the
+combination that produced the successful capture above. Its *declared* pin is
+over-strict, so the two cannot be expressed together in one requirements file:
+
+```
+ERROR: ResolutionImpossible  (signalrcore 1.0.2 requires msgpack==1.1.2)
+```
+
+Options, none taken here because this is a security-posture call:
+
+| Option | Live path | msgpack | CI `pip-audit` |
+|---|---|---|---|
+| `signalrcore==0.8.8` (today) | **broken** | patched | passes |
+| `signalrcore==1.0.2` + `msgpack==1.1.2` | works | **vulnerable** | fails |
+| `signalrcore==1.0.2` installed `--no-deps`, msgpack pinned separately | works | patched | passes |
+
+The third is what the successful run actually used. It needs a Dockerfile/runbook
+change rather than a plain requirements pin.
+
+## Wire-schema verification (ADR-0008's assumption)
+
+The capture settles the assumptions the ADR flagged as unverified:
+
+- **`TeamRadio` schema CONFIRMED** — `{"Captures": [{"Utc", "RacingNumber", "Path"}, …]}`,
+  37 entries for that race. Exactly what `live_radio_refs` expects.
+- **`Captures` is a list** in the connect snapshot. The index-keyed dict variant is
+  still unobserved (it would be an incremental patch, which needs a live session).
+- **`Utc` carries 7 fractional digits** (`2026-07-26T12:53:19.4139931Z`). Python 3.11's
+  `fromisoformat` truncates rather than raising, so `_utc_to_epoch_ms` is fine —
+  checked explicitly, and now pinned by a test.
+- **Every payload arrives as a JSON string, not a dict** — `DriverList`, `TimingData`,
+  `SessionInfo`, `TeamRadio`, all 17. This was a **real bug**: every `isinstance(payload,
+  dict)` handler in `live_signalr.py` would have silently no-opped against the real
+  feed. Fixed at the one boundary (`_decode_payload` in `_dispatch_message`), with
+  `ingest/test_dispatch.py` pinned to verbatim capture data. `Position.z` is the
+  intended exception — not JSON, so it passes through for the zlib decoder.
+
+The raw capture is not committed (it is 91 KB of one session's snapshot with no
+`Position.z`, so `_replay_capture` cannot use it); the trimmed excerpts that matter
+live in `ingest/test_dispatch.py`.
 
 ## Operator step (run at a browser, on the host)
 

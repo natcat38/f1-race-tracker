@@ -674,15 +674,32 @@ def _run_live_signalr(r, session: str, label: str) -> None:
 # Message dispatch helpers
 # ---------------------------------------------------------------------------
 
+def _decode_payload(payload):
+    """Normalise a topic payload to Python data.
+
+    VERIFIED 2026-08-20 against a real connection: every topic's payload arrives
+    as a JSON *string*, not a dict — DriverList, TimingData, SessionInfo, TeamRadio,
+    all of them. Parsing here, at the one boundary, keeps every topic handler able to
+    assume real data instead of each re-parsing (and silently no-opping if it forgets).
+
+    Position.z is the deliberate exception: its payload is a zlib+base64 blob that is
+    not JSON, so it fails the parse and passes through untouched for
+    _decode_position_payload to handle.
+    """
+    if not isinstance(payload, str):
+        return payload
+    try:
+        return json.loads(payload)
+    except (ValueError, TypeError):
+        return payload
+
+
 def _dispatch_message(msg, callback) -> None:
     """Extract (topic, payload) pairs from a raw SignalR message and call callback.
 
-    UNVERIFIED: The live message shape depends on signalrcore internals.
-    Based on client.py and signalrcore, a 'feed' event msg is a list of
-    items where each item may be [topic, payload] or similar.
-    CompletionMessage.result is a dict of {topic: snapshot_payload}.
-
-    We handle the two known cases from SignalRClient._on_message.
+    VERIFIED 2026-08-20: CompletionMessage.result is {topic: payload} at connect, and
+    every payload is a JSON string (see _decode_payload). The incremental list shape
+    is still UNVERIFIED — it needs a genuinely live session, not a connect snapshot.
     """
     try:
         from signalrcore.messages.completion_message import CompletionMessage
@@ -690,7 +707,7 @@ def _dispatch_message(msg, callback) -> None:
             # Initial subscription snapshot: result = {topic: payload, ...}
             for topic, payload in msg.result.items():
                 try:
-                    callback(topic, payload)
+                    callback(topic, _decode_payload(payload))
                 except Exception as exc:
                     _log.error(f"handler failed for topic={topic}: {exc}")
             return
@@ -703,7 +720,7 @@ def _dispatch_message(msg, callback) -> None:
         for item in msg:
             try:
                 if isinstance(item, (list, tuple)) and len(item) >= 2:
-                    callback(str(item[0]), item[1])
+                    callback(str(item[0]), _decode_payload(item[1]))
             except Exception as exc:
                 _log.error(f"handler failed for item={item!r}: {exc}")
 

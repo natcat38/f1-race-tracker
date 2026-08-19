@@ -68,10 +68,9 @@ export function Settings() {
               <strong>Status:</strong>{' '}
               {auth.state === 'linked' && (
                 <>
-                  linked
-                  {auth.product && <> · {auth.product}</>}
-                  {auth.tier && <> · {auth.tier}</>}
-                  {auth.expiresUtc && <> · expires {auth.expiresUtc}</>}
+                  linked · subscription {auth.tier ?? 'unknown'}
+                  {auth.product && <> ({auth.product})</>}
+                  {auth.expiresUtc && <> · token expires {auth.expiresUtc}</>}
                 </>
               )}
               {auth.state === 'unlinked' && <>no account linked on this host.</>}
@@ -80,6 +79,21 @@ export function Settings() {
                 <>can&apos;t read the status — the gateway or the ingest service may be down.</>
               )}
             </p>
+
+            {auth.state === 'linked' && auth.tier !== 'active' && (
+              <p>
+                This account has <strong>no active F1 TV subscription</strong>. Linking
+                works either way, but the live timing feed itself needs F1 TV Access or
+                better — with an inactive subscription expect the stream to stay empty.
+              </p>
+            )}
+
+            {auth.state === 'linked' && (
+              <p>
+                Tokens last about four days, so re-linking is routine rather than an
+                error: run the command below again whenever this page says EXPIRED.
+              </p>
+            )}
 
             <p>
               Linking runs on the <strong>host</strong>, not in a container: the F1 login
@@ -98,10 +112,13 @@ export function Settings() {
             <p>To unlink: <code>python ingest/f1tv_link.py --unlink</code></p>
 
             <p>
-              <strong>Beta, and unverified.</strong> The whole path is built and tested
-              end-to-end against recorded sessions, but the authenticated live connection
-              itself is unverified pending an F1TV subscription. See
-              <code> docs/runbooks/live-verification.md</code> and ADR-0007.
+              <strong>Beta.</strong> The link flow and the authenticated connection were
+              verified for real on 2026-08-20 — the account links, the websocket accepts
+              the token, and the feed sends data. What still blocks a live run is a
+              dependency conflict rather than auth: the <code>signalrcore</code> version
+              pinned for security cannot talk to a modern websocket-client. Whether a
+              live session&apos;s stream is tier-gated is still untested. See
+              <code> docs/runbooks/live-verification.md</code> §5 and ADR-0007.
             </p>
           </>
         )}
