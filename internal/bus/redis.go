@@ -62,3 +62,20 @@ func (b *Bus) GetSnapshot(ctx context.Context, session string) (*model.Snapshot,
 func (b *Bus) Subscribe(ctx context.Context, session string) *redis.PubSub {
 	return b.rdb.Subscribe(ctx, framesChannel(session))
 }
+
+// authStatusKey mirrors ingest/f1tv_auth.py's AUTH_STATUS_KEY.
+const authStatusKey = "f1auth:status"
+
+// GetAuthStatus returns the raw F1TV auth-status JSON published by the Python
+// ingester, or (nil,nil) if none has been published. Read-only by design: the
+// gateway serves this verbatim and never writes it (ADR-0007).
+func (b *Bus) GetAuthStatus(ctx context.Context) ([]byte, error) {
+	val, err := b.rdb.Get(ctx, authStatusKey).Bytes()
+	if err == redis.Nil {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("bus: get auth status: %w", err)
+	}
+	return val, nil
+}

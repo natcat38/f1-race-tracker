@@ -12,8 +12,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/coder/websocket"
+	"github.com/redis/go-redis/v9"
 
+	"github.com/natcat38/f1-race-tracker/internal/bus"
 	"github.com/natcat38/f1-race-tracker/internal/model"
 	"github.com/natcat38/f1-race-tracker/internal/ws"
 )
@@ -287,5 +290,62 @@ func TestGetOrCreateHub_ReusesAndIsConcurrencySafe(t *testing.T) {
 		if hubs[i] != hubs[0] {
 			t.Fatalf("concurrent getOrCreateHub created multiple hubs: %p vs %p", hubs[0], hubs[i])
 		}
+	}
+}
+
+// /api/f1auth serves the seam's status verbatim, defaults to unlinked, and stays
+// read-only — the gateway is never a writer (ADR-0001/0007).
+func TestAuthStatusRoute(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mr.Close()
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer func() { _ = rdb.Close() }()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	g, err := NewGateway(ctx, bus.New(rdb), "replay", slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	g.Mount(mux, nil)
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	get := func() (int, string, string) {
+		resp, err := http.Get(srv.URL + "/api/f1auth")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		body, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, resp.Header.Get("Content-Type"), string(body)
+	}
+
+	// Nothing published yet: the gateway answers for the seam rather than 404ing.
+	code, ctype, body := get()
+	if code != http.StatusOK || body != `{"state":"unlinked"}` {
+		t.Fatalf("absent key = %d %q, want 200 unlinked", code, body)
+	}
+	if ctype != "application/json" {
+		t.Errorf("content-type = %q, want application/json", ctype)
+	}
+
+	want := `{"state":"linked","expiresUtc":"2026-09-01T00:00:00+00:00","tier":"active"}`
+	mr.Set("f1auth:status", want)
+	if code, _, body = get(); code != http.StatusOK || body != want {
+		t.Fatalf("published status = %d %q, want 200 %q", code, body, want)
+	}
+
+	resp, err := http.Post(srv.URL+"/api/f1auth", "application/json", strings.NewReader("{}"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Errorf("POST status = %d, want 405", resp.StatusCode)
 	}
 }
