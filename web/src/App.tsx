@@ -22,8 +22,14 @@ import { Ghost } from './components/Ghost';
 import { Settings } from './components/Settings';
 import { StintChart } from './components/StintChart';
 
-function SkeletonMap() {
-  return <div className="track-skeleton">Warming up the timing feed…</div>;
+function SkeletonMap({ failed }: { failed?: boolean }) {
+  return (
+    <div className="track-skeleton">
+      {failed
+        ? 'The demo replay could not be loaded. Refresh the page to retry.'
+        : 'Warming up the timing feed…'}
+    </div>
+  );
 }
 
 // Build-time flag: VITE_STATIC_DEMO=true selects the file-backed static player
@@ -77,7 +83,7 @@ export default function App() {
             </div>
           )}
           {!showSkeleton && status !== 'reconnecting' && <Map state={state} />}
-          {showSkeleton && <SkeletonMap />}
+          {showSkeleton && <SkeletonMap failed={status === 'failed'} />}
         </Panel>
         <Panel label="Timing">
           <TimingTower state={state} selected={selected} onSelect={setSelected} />

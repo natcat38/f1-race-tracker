@@ -69,14 +69,14 @@ describe('connectStaticReplay', () => {
     await vi.waitFor(() => expect(statuses).toContain('live'), { interval: 1 });
   });
 
-  test('reports a non-hung status instead of leaving the UI on "connecting" forever when the clip fetch fails', async () => {
+  test('reports a failed status instead of leaving the UI on "connecting" forever when the clip fetch fails', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('network down'))));
     const statuses: string[] = [];
     connectStaticReplay(() => {}, (s) => statuses.push(s));
-    await vi.waitFor(() => expect(statuses).toContain('reconnecting'), { interval: 1 });
+    await vi.waitFor(() => expect(statuses).toContain('failed'), { interval: 1 });
   });
 
-  test('reports a non-hung status and does not busy-loop when the clip has no valid frame messages', async () => {
+  test('reports a failed status and does not busy-loop when the clip has no valid frame messages', async () => {
     // Snapshot-only clip: parses fine, but has zero frames. Without the
     // frameStartIndex guard, loopRestartIndex would fall back to 0 (the
     // snapshot itself) and playFrom would reschedule a 0ms timer against
@@ -91,7 +91,7 @@ describe('connectStaticReplay', () => {
     const statuses: string[] = [];
     connectStaticReplay((s) => states.push(s), (s) => statuses.push(s));
 
-    await vi.waitFor(() => expect(statuses).toContain('reconnecting'), { interval: 1 });
+    await vi.waitFor(() => expect(statuses).toContain('failed'), { interval: 1 });
     expect(states).toHaveLength(0); // playback never started — the snapshot itself is never applied
 
     // The busy-loop this guard exists to prevent would show up as a timer

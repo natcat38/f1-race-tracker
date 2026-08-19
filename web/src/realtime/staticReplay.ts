@@ -51,14 +51,14 @@ export function connectStaticReplay(
       // itself forever — a busy-loop pegging the tab instead of a visible error.
       if (!messages.some((m) => m.type === 'frame')) {
         console.error('connectStaticReplay: baked clip had no valid frame messages');
-        onStatus?.('reconnecting'); // no live source to fall back to on a static page — signals "not progressing" over a silent hang
+        onStatus?.('failed'); // terminal: a static page has no live source to retry
         return;
       }
       schedulePlayback(messages);
     })
     .catch((err) => {
       console.error('connectStaticReplay: failed to load clip', err);
-      onStatus?.('reconnecting'); // same: nothing to reconnect to, but better than a silent "connecting" hang
+      onStatus?.('failed'); // terminal: nothing to reconnect to on a static page
     });
 
   function schedulePlayback(messages: Msg[]) {

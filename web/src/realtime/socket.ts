@@ -4,7 +4,9 @@
  */
 import { applyMessage, emptyState, parseMsg, type RaceState } from '../state/race';
 
-export type ConnStatus = 'connecting' | 'live' | 'reconnecting';
+// 'failed' is terminal — only the static replay emits it (a missing/empty baked
+// clip has nothing to retry against); the live socket always keeps reconnecting.
+export type ConnStatus = 'connecting' | 'live' | 'reconnecting' | 'failed';
 
 // connectRace opens a reconnecting WebSocket. onState is called with the latest
 // RaceState on every message. The optional onStatus callback receives connection
