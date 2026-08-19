@@ -4,4 +4,4 @@
 # requirements-live-nodeps.txt (which explains why). Installing it normally drags in
 # a vulnerable msgpack; installing the older version that avoids that breaks the
 # websocket connection outright. See ADR-0007.
-redis==8.0.1
+redis==8.1.0
