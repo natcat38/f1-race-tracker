@@ -30,10 +30,16 @@ verification. We write no login code and never touch a credential.
 - **Linking runs on the host**, via `ingest/f1tv_link.py` (`link` / `--status` /
   `--unlink`). It calls `get_auth_token()` in the foreground and copies the resulting
   cache file to `./secrets/fastf1/f1auth.json`.
-- **`./secrets/` is git-ignored** and mounted **read-only** into the live container.
-  Because importing `f1auth` *writes* to its data dir (`ensure_exists=True` plus a
-  `touch()`), the container points `XDG_DATA_HOME` at a **writable** dir and
-  `f1tv_auth.stage_token()` copies the mounted token there before fastf1 is imported.
+- **`./secrets/` is git-ignored** and mounted **read-only** at `/secrets` in the live
+  container, with `XDG_DATA_HOME=/secrets` so the token resolves to
+  `/secrets/fastf1/f1auth.json`. Safe because the container only ever *reads* it:
+  `ingest/f1tv_auth.py` is stdlib-only and fastf1 is never imported there.
+  **Caveat for any future in-container fastf1 use:** importing `f1auth` *writes* to
+  its data dir (`user_data_dir(..., ensure_exists=True)` plus a `touch()`), so it
+  would need `XDG_DATA_HOME` pointed at a writable dir with the token copied in.
+- **The beta SignalR connection itself runs on the host**, where fastf1 already lives
+  — the same place the existing capture workflow runs. The container image stays
+  demo-sized (no pandas/numpy pulled in for a path that is opt-in three times over).
 - **Only status crosses the seam.** `ingest/f1tv_auth.py` reads the cache file,
   decodes the JWT claims *without verification* (display only — fastf1 does the real
   verification at connect time) and publishes `{"state","expiresUtc","tier","product"}`

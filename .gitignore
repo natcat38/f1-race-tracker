@@ -38,3 +38,6 @@ Thumbs.db
 m3a-live-lane-silverstone.png
 m3b-python-live-lane.png
 m4-compare-monza-2023-vs-2024.png
+
+# Host-linked F1TV token for the beta live path (ADR-0007) — never committed.
+secrets/
