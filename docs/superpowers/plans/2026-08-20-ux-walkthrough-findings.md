@@ -28,7 +28,7 @@ Stack: `docker compose up --build -d` at `http://localhost:8080` for good paths;
 - **Board, full stack** — chip `▶ REPLAY`, clock ticks (1:13:25 → 1:13:28 over 2.5 s), `LAP 13/53`, weather `TRK 48° · AIR 33°`, 20 timing rows, 20 car markers present — matches expectation — *no defect* (map motion *unverified*, see environment note).
 - **Car selection** — clicking a timing row populates telemetry (`PIA McLaren · 306 km/h · G8 · DRS`, throttle/brake bars); picking `LEC` as rival renders a second telemetry block with its own readouts — matches expectation — *no defect*.
 - **Source toggle** — `● Live (demo)` switches the session to `Silverstone 2024 · Race` and the chip to `● LIVE (DEMO)`; switching back returns `Monza 2024 · Race` / `▶ REPLAY`; no error text either way. The `Switching…` pending label was not observable — the round trip completes in well under 300 ms — matches expectation — *no defect*.
-- **Mid-session disconnect (`docker compose stop gateway`)** — the chip stays on `⚠ Waiting for timing data — last frame Ns ago` for the entire outage and the map's `↺ Reconnecting…` overlay never appears at all (sampled every 700 ms for 30 s: zero occurrences) — expected `↺ Reconnecting…` within ~1 s — **blocker**. Same root cause as the flicker above. See *Not covered by this plan #1*.
+- **Mid-session disconnect (`docker compose stop gateway`)** — intermittent. In the first run the chip stayed on `⚠ Waiting for timing data — last frame Ns ago` for the entire 30 s outage and the map's `↺ Reconnecting…` overlay never appeared (sampled every 700 ms: zero occurrences). A later run of the same scenario showed a stable `↺ Reconnecting…` chip plus the map overlay, as expected. The difference is how fast a connection attempt to the dead port fails: while `open()` is in flight the status is `'connecting'`, which `StatusBadge` has no branch for, so a slow-failing attempt falls through to the stale chip — expected `↺ Reconnecting…` within ~1 s, every time — **blocker**. Same root cause as the flicker above. See *Not covered by this plan #1*.
 - **Mid-session reconnect (`docker compose start gateway`)** — recovers to live data with no page reload; took ~20 s, consistent with the 8 s backoff cap plus container start — matches expectation — *no defect*.
 - **Console after every board scenario** — no uncaught exceptions and no unhandled rejections — *no defect*.
 
@@ -66,8 +66,38 @@ Stack: `docker compose up --build -d` at `http://localhost:8080` for good paths;
 
 ## Not covered by this plan
 
-1. **A dead connection never says so; it reads as a slow feed.** `connectRace`'s `open()` calls `onStatus?.('connecting')` at the top of every reconnect attempt (`web/src/realtime/socket.ts:27`), which immediately overwrites the `'reconnecting'` that `onclose` emitted one tick earlier. `StatusBadge` has no `'connecting'` branch, so once a session has data (`state.rev > 0`) an outage falls through to `⚠ Waiting for timing data — last frame Ns ago` — which describes a stalled feed, not a lost connection — and `App.tsx:69`'s `↺ Reconnecting…` map overlay never renders at all. Before any data has arrived the same race makes the chip flicker between `Reconnecting…` and `Warming up…`. Severity **blocker**: the board silently misreports a dead backend for the whole outage. Likely fix: emit `'connecting'` only for the first attempt, or add a distinct `'retrying'` state that survives the retry. Fixing this changes `ConnStatus` semantics and would collide with Task 2's edits to the same union, so it is deliberately left out of this plan.
+1. **`'connecting'` is unrepresented in the UI, so an outage can read as a slow feed.** `connectRace`'s `open()` calls `onStatus?.('connecting')` at the top of every reconnect attempt (`web/src/realtime/socket.ts:27`), overwriting the `'reconnecting'` that `onclose` emitted one tick earlier. `StatusBadge` has no `'connecting'` branch, so whenever a connection attempt is in flight the badge falls through: to `⚠ Waiting for timing data — last frame Ns ago` once a session has data (which describes a stalled feed, not a lost connection), or to `⏳ Warming up the timing feed…` before any data has arrived. `App.tsx`'s `↺ Reconnecting…` map overlay is gated on the same status and blinks out with it. How bad it looks depends entirely on how long each attempt takes to fail: fast-failing attempts leave the chip mostly on `↺ Reconnecting…` (correct), while a slow-failing attempt parks the UI on the stale chip for the whole outage (observed: 30 s straight). Severity **blocker**, because the bad case silently misreports a dead backend. Likely fix: emit `'connecting'` only for the first attempt, or add a distinct `'retrying'` state that survives the retry. Fixing this changes `ConnStatus` semantics and would collide with Task 2's edits to the same union, so it is deliberately left out of this plan.
 
 2. **Two cars share position 19 in the timing tower.** In the static-demo replay at lap 13, `TSU` and `HUL` both render as `19` and no row shows `20`. Data/ordering issue in `orderCars` or upstream, not an error-path UX gap. Severity **cosmetic**.
 
 3. **Empty `Driver` dropdown on `#ghost` before data arrives.** With no backend the select renders with zero options and no placeholder, next to a disabled `⏸ Pause` (which implies something is playing). Task 3 fixes the skeleton copy above it but not the controls. Severity **cosmetic**.
+
+---
+
+## Resolution status (Task 8, re-verified 2026-08-20)
+
+Gate: `npm run lint`, `npm test` (106 passing, 10 files), `npm run build` (`tsc -b` included) all exit 0.
+Bad paths re-checked against `npm run dev`; good paths re-checked against a rebuilt
+`docker compose up --build -d`.
+
+| Finding | Status | Evidence |
+| --- | --- | --- |
+| Board, no backend | **RESOLVED — no change needed** | chip still `↺ Reconnecting…`, skeleton still `Warming up the timing feed…` |
+| Board chip flickers between reconnect and warm-up | **STILL OPEN** | out of scope; see *Not covered #1* |
+| Timing panel, no cars | **RESOLVED (Task 4)** | renders `No cars yet — the timing tower fills in when data arrives.`; pinned by `TimingTower.render.test.tsx` |
+| Board, snapshot without a track outline | **RESOLVED (Task 7)** | `showSkeleton` now also gates on `state.track.length === 0`; the real replay (which always ships a track) still renders the map with no skeleton, so the gate does not false-positive |
+| Blocked radio clip silently ignored | **RESOLVED (Task 5)** | `replay()` now calls `setError(BLOCKED_ERROR)`; surfaced by the existing `Comms.tsx` banner. Not reachable from real data, so verified by code inspection plus the full hook test suite |
+| Compare, no backend, per-lane chip flickers | **STILL OPEN** | out of scope; same root cause as *Not covered #1* |
+| Ghost, no backend, eternal `Loading reference laps…` | **RESOLVED (Task 3)** | now reads `Connection lost — retrying automatically…`, stable across 5 s of sampling; pinned by `ghostSkeletonCopy` tests |
+| Static demo, clip not baked | **RESOLVED (Task 2)** | chip `⚠ Demo data failed to load — refresh the page to retry.`, skeleton `The demo replay could not be loaded. Refresh the page to retry.`, and the string `Reconnecting` is absent from the page |
+| Mid-session disconnect misreported as a stale feed | **STILL OPEN** | out of scope; see *Not covered #1* |
+| Whole-app blanking on a single panel crash | **RESOLVED (Task 6)** | with a temporary `throw` in `RaceControl`, only that panel showed `This panel hit an error — reload the page to restore it.`; map, timing, telemetry, strategy and comms all kept working and no `Something broke.` page appeared. Throw reverted (`git diff` clean) |
+
+Good paths re-verified unchanged after the fixes: board (chip `▶ REPLAY`, clock ticking, 20 rows,
+20 markers, no skeleton), car selection and rival telemetry, comms toggle and empty state,
+`#compare` (both lanes labelled and populated), `#ghost` (17 drivers, driver switch to `LEC`,
+pause toggle, scrub to `0:25.000` showing `-1.02s`, 150 delta bars), source toggle both
+directions, and reconnect-after-outage (recovers with no page reload). No uncaught exceptions or
+unhandled rejections in any scenario.
+
+Carried forward as follow-up work: *Not covered by this plan* items 1 (blocker), 2 and 3 (cosmetic).
