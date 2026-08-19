@@ -32,6 +32,9 @@ export function TimingTower({
   }, [state.rev, state.session]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const order = orderCars(state.cars);
+  if (order.length === 0) {
+    return <div className="empty">No cars yet — the timing tower fills in when data arrives.</div>;
+  }
   const [b1, b2, b3] = bestSectors(order);
   const cellColour = (v: number | undefined, best: number, dn: number, i: number) => {
     const c = sectorColour(v, best, pb[dn]?.[i] ?? Infinity);
