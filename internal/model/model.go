@@ -104,7 +104,11 @@ type Frame struct {
 	TimeMs     int64                `json:"timeMs"` // session clock
 	Cars       []CarState           `json:"cars"`
 	Messages   []RaceControlMessage `json:"messages,omitempty"`
-	Weather    *Weather             `json:"weather,omitempty"`
+	// Radio carries live-lane team-radio refs, sparse and accumulated onto the
+	// snapshot by Apply (ADR-0008). Replay lanes never set it — their radio
+	// rides the snapshot whole and fixed.
+	Radio   []RadioMessage `json:"radio,omitempty"`
+	Weather *Weather       `json:"weather,omitempty"`
 }
 
 // NewSnapshot returns an empty snapshot ready to receive frames. mode is a plain

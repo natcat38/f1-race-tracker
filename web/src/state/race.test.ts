@@ -223,4 +223,40 @@ describe('race-control messages', () => {
     expect(s.messages[0].message).toBe('msg-5'); // oldest 5 dropped
     expect(s.messages[29].message).toBe('msg-34');
   });
+  it('accumulates frame radio refs onto state (ADR-0008)', () => {
+    const s0 = applyMessage(emptyState(), {
+      type: 'snapshot',
+      data: {
+        session: 'live', mode: 'live', label: 'L', cars: {}, timeMs: 0, rev: 1,
+        radio: [{ timeMs: 100, driverNum: 1, clip: 'https://livetiming.formula1.com/a.mp3' }],
+      },
+    });
+    const s1 = applyMessage(s0, {
+      type: 'frame',
+      data: {
+        rev: 2, timeMs: 200, cars: [],
+        radio: [{ timeMs: 150, driverNum: 16, clip: 'https://livetiming.formula1.com/b.mp3' }],
+      },
+    });
+    expect(s1.radio).toHaveLength(2);
+    expect(s1.radio[1].driverNum).toBe(16);
+    // A frame without radio leaves the accumulated list untouched (same reference).
+    const s2 = applyMessage(s1, { type: 'frame', data: { rev: 3, timeMs: 300, cars: [] } });
+    expect(s2.radio).toBe(s1.radio);
+  });
+
+  it('rejects a frame whose radio is not an array', () => {
+    expect(parseMsg({ type: 'frame', data: { rev: 2, timeMs: 200, radio: 'nope' } })).toBeNull();
+  });
+
+  it('rejects radio elements that are not real refs (useComms holds them by identity)', () => {
+    const frame = (radio: unknown) => parseMsg({ type: 'frame', data: { rev: 2, timeMs: 200, radio } });
+    expect(frame(['oops'])).toBeNull();
+    expect(frame([null])).toBeNull();
+    expect(frame([{ timeMs: 1, driverNum: 1 }])).toBeNull();          // no clip
+    expect(frame([{ timeMs: '1', driverNum: 1, clip: 'x' }])).toBeNull(); // wrong type
+    expect(frame([])).not.toBeNull();
+    expect(frame([{ timeMs: 1, driverNum: 1, clip: 'https://livetiming.formula1.com/a.mp3' }]))
+      .not.toBeNull();
+  });
 });

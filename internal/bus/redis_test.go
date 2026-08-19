@@ -59,3 +59,26 @@ func TestBus_GetSnapshotNilWhenAbsent(t *testing.T) {
 		t.Fatalf("want (nil,nil), got (%+v,%v)", got, err)
 	}
 }
+
+func TestBus_GetAuthStatus(t *testing.T) {
+	b := newTestBus(t)
+	ctx := context.Background()
+
+	// Absent key: not an error, just nothing published yet.
+	raw, err := b.GetAuthStatus(ctx)
+	if err != nil || raw != nil {
+		t.Fatalf("absent key = (%q, %v), want (nil, nil)", raw, err)
+	}
+
+	want := `{"state":"linked","tier":"active"}`
+	if err := b.rdb.Set(ctx, authStatusKey, want, 0).Err(); err != nil {
+		t.Fatal(err)
+	}
+	raw, err = b.GetAuthStatus(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(raw) != want {
+		t.Fatalf("status = %q, want %q", raw, want)
+	}
+}

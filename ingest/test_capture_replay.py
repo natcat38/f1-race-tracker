@@ -71,7 +71,37 @@ def test_replay_capture_populates_timing_and_tyre_fields():
     assert r.published, "expected at least one frame published"
 
 
+CLIP_BASE = ("https://livetiming.formula1.com/static/"
+             "2024/2024-09-01_Italian_Grand_Prix/2024-09-01_Race/TeamRadio/")
+
+
+def test_replay_capture_delivers_live_radio_on_frames():
+    """Live radio refs ride frames and accumulate on the snapshot (ADR-0008).
+
+    The fixture carries TeamRadio in both shapes the feed uses: a list of captures
+    and an index-keyed dict (the incremental-patch shape). Both must parse.
+    """
+    r = FakeRedis()
+    _replay_capture(r, "test-session", "Test Capture", CAPTURE_PATH)
+
+    snap = json.loads(r.store["snapshot:test-session"])
+    refs = snap.get("radio", [])
+    assert len(refs) == 2, f"expected both capture shapes to parse, got {refs}"
+    assert [ref["driverNum"] for ref in refs] == [1, 1], refs
+    assert [ref["clip"] for ref in refs] == [
+        CLIP_BASE + "MAXVER01_1_20240901_125910.mp3",
+        CLIP_BASE + "MAXVER01_1_20240901_125940.mp3",
+    ], refs
+    # timeMs is the clip's own Utc as epoch ms — behind the live wall clock by design.
+    assert refs[0]["timeMs"] < refs[1]["timeMs"], refs
+
+    framed = [json.loads(msg) for _, msg in r.published if "radio" in json.loads(msg)]
+    assert framed, "expected at least one published frame to carry radio refs"
+    assert len(framed[0]["radio"]) == 2, framed[0]
+
+
 if __name__ == "__main__":
     test_replay_capture_populates_timing_and_tyre_fields()
+    test_replay_capture_delivers_live_radio_on_frames()
     print("capture-replay field-coverage self-check PASSED")
     sys.exit(0)

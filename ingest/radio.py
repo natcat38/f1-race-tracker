@@ -12,6 +12,19 @@ from resample import in_window_ms
 _ALLOWED_HOST_SUFFIX = "formula1.com"
 
 
+def _require_f1_host(base_url):
+    """Raise unless base_url is an https URL on formula1.com (or a subdomain).
+
+    Shared by the replay and live paths: clip URLs come from an untrusted external
+    feed and must not be able to point playback at a hostile origin (S5)."""
+    parsed = urlparse(base_url)
+    if parsed.scheme != "https":
+        raise ValueError(f"radio: base_url must use https, got scheme={parsed.scheme!r}")
+    host = (parsed.hostname or "").lower()
+    if host != _ALLOWED_HOST_SUFFIX and not host.endswith("." + _ALLOWED_HOST_SUFFIX):
+        raise ValueError(f"radio: base_url host {host!r} is not formula1.com or a subdomain")
+
+
 def _utc_to_session_ms(utc_str, t0_epoch_s):
     """Map an ISO-8601 UTC instant (e.g. '2024-09-01T12:24:46.541Z') to session
     milliseconds, where t0_epoch_s is session-time zero as a UTC epoch second."""
@@ -32,12 +45,7 @@ def extract_radio(captures, t0_epoch_s, window_start_s, window_end_s, base_url, 
     base_url must be an https URL on formula1.com (or a subdomain). The captures come from
     an untrusted external feed, so this guards clip playback against a spoofed/hostile
     origin (S5)."""
-    parsed = urlparse(base_url)
-    if parsed.scheme != "https":
-        raise ValueError(f"radio: base_url must use https, got scheme={parsed.scheme!r}")
-    host = (parsed.hostname or "").lower()
-    if host != _ALLOWED_HOST_SUFFIX and not host.endswith("." + _ALLOWED_HOST_SUFFIX):
-        raise ValueError(f"radio: base_url host {host!r} is not formula1.com or a subdomain")
+    _require_f1_host(base_url)
     out = []
     for cap in captures:
         utc, num, path = cap.get("Utc"), cap.get("RacingNumber"), cap.get("Path")
@@ -45,14 +53,54 @@ def extract_radio(captures, t0_epoch_s, window_start_s, window_end_s, base_url, 
             continue
         try:
             driver_num = int(num)
-        except (TypeError, ValueError):
+            time_ms = _utc_to_session_ms(utc, t0_epoch_s)
+        except (AttributeError, TypeError, ValueError):
             continue
-        time_ms = _utc_to_session_ms(utc, t0_epoch_s)
         if in_window_ms(time_ms, window_start_s, window_end_s):
             out.append({
                 "timeMs": time_ms,
                 "driverNum": driver_num,
                 "clip": base_url + api_path.rstrip("/") + "/" + path.lstrip("/"),
             })
+    out.sort(key=lambda m: m["timeMs"])
+    return out
+
+
+def _utc_to_epoch_ms(utc_str):
+    """Map an ISO-8601 UTC instant to UTC epoch milliseconds (no session t0)."""
+    dt = datetime.fromisoformat(utc_str.replace("Z", "+00:00")).astimezone(timezone.utc)
+    return round(dt.timestamp() * 1000)
+
+
+def live_radio_refs(captures, base_url, session_path, seen):
+    """Map live SignalR TeamRadio captures to wire radio refs (ADR-0008).
+
+    captures: list of {'Utc','RacingNumber','Path'} (the archived-feed schema, which
+    the live topic is assumed to share — see ADR-0008's schema assumption).
+    Returns [{timeMs, driverNum, clip}] sorted by time. timeMs is the capture's Utc as
+    UTC epoch ms — the live lane's clock domain, where frames stamp timeMs = wall clock.
+    seen: a set of already-emitted clip URLs, mutated here. SignalR re-sends the full
+    capture list at every (re)subscribe, so dedupe is by final URL.
+    Malformed entries are skipped rather than fatal, mirroring extract_radio.
+    """
+    _require_f1_host(base_url)
+    out = []
+    for cap in captures:
+        utc, num, path = cap.get("Utc"), cap.get("RacingNumber"), cap.get("Path")
+        if utc is None or num is None or path is None:
+            continue
+        try:
+            driver_num = int(num)
+            time_ms = _utc_to_epoch_ms(utc)
+        except (AttributeError, TypeError, ValueError):
+            # Parse BEFORE touching `seen`: a malformed entry must not mark its clip
+            # as emitted, or the resubscribe re-send would skip it for good. And it
+            # must not abort the batch — the good refs alongside it would be lost.
+            continue
+        clip = base_url.rstrip("/") + "/" + session_path.strip("/") + "/" + path.lstrip("/")
+        if clip in seen:
+            continue
+        seen.add(clip)
+        out.append({"timeMs": time_ms, "driverNum": driver_num, "clip": clip})
     out.sort(key=lambda m: m["timeMs"])
     return out

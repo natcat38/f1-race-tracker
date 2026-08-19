@@ -19,6 +19,7 @@ import { useLapHistory } from './hooks/useLapHistory';
 import { useGapHistory } from './hooks/useGapHistory';
 import { Compare } from './components/Compare';
 import { Ghost } from './components/Ghost';
+import { Settings } from './components/Settings';
 import { StintChart } from './components/StintChart';
 
 function SkeletonMap() {
@@ -53,6 +54,7 @@ export default function App() {
 
   if (hash === '#compare') return <Compare />;
   if (hash === '#ghost') return <Ghost initialSelected={selected} />;
+  if (hash === '#settings') return <Settings />;
 
   const showSkeleton = state.rev === 0;
 

@@ -57,7 +57,7 @@ def build_snapshot(session, label, track, radio, lap_trace, stints, total_laps, 
     }
 
 
-def build_frame(session, rev, time_ms, cars, messages=None, weather=None):
+def build_frame(session, rev, time_ms, cars, messages=None, weather=None, radio=None):
     frame = {
         "session": session, "rev": rev,
         "t": int(time.time() * 1000), "timeMs": time_ms, "cars": cars,
@@ -66,6 +66,9 @@ def build_frame(session, rev, time_ms, cars, messages=None, weather=None):
         frame["messages"] = messages
     if weather is not None:
         frame["weather"] = weather
+    if radio:
+        # Live team-radio refs, accumulated onto the snapshot by Apply (ADR-0008).
+        frame["radio"] = radio
     return frame
 
 
@@ -134,6 +137,10 @@ def main():
     args = parse_args()
     r = redis.from_url(args.redis_url, decode_responses=True)
     r.ping()
+    # Publish F1TV link status in every mode, so the settings page works in the
+    # demo too — status only, never the token (ADR-0007).
+    from f1tv_auth import start_status_publisher
+    start_status_publisher(r)
     if args.replay_clip:
         publish_clip(r, args.session, args.replay_clip, args.label)
     else:

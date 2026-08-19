@@ -27,6 +27,12 @@ func Apply(s *Snapshot, f Frame) (*Snapshot, bool) {
 			s.Messages = s.Messages[len(s.Messages)-maxMessages:]
 		}
 	}
+	if len(f.Radio) > 0 {
+		// ADR-0008: live radio refs accumulate, uncapped (~50-100 a session).
+		// Deliberately NOT cleared by the loop-reset branch above: only replay
+		// lanes loop, and replay frames never carry radio.
+		s.Radio = append(s.Radio, f.Radio...)
+	}
 	if f.Weather != nil {
 		s.Weather = f.Weather
 	}

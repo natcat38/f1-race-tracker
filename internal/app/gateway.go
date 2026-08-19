@@ -200,9 +200,33 @@ func (g *Gateway) Mount(mux *http.ServeMux, staticHandler http.Handler) {
 	mux.HandleFunc("/ws", g.wsHandler)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	mux.HandleFunc("/control/source", g.handleControl)
+	mux.HandleFunc("/api/f1auth", g.handleAuthStatus)
 	if staticHandler != nil {
 		mux.Handle("/", staticHandler)
 	}
+}
+
+// handleAuthStatus serves the Python-published F1TV auth status verbatim (ADR-0007).
+// The gateway stays read-only: the status is written only by the ingest side, and
+// only ever carries state/expiry/tier — never the token.
+func (g *Gateway) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	raw, err := g.bus.GetAuthStatus(r.Context())
+	if err != nil {
+		g.logger.Error("auth status read failed", "err", err)
+		http.Error(w, "auth status unavailable", http.StatusBadGateway)
+		return
+	}
+	if raw == nil {
+		// Nothing published yet (no ingester running, or an older one): the honest
+		// answer is "not linked", not an error the settings page has to decode.
+		raw = []byte(`{"state":"unlinked"}`)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(raw)
 }
 
 // handleControl: GET reports the active source; POST {"source":"replay"|"live"} switches.
