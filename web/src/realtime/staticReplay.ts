@@ -57,6 +57,7 @@ export function connectStaticReplay(
       schedulePlayback(messages);
     })
     .catch((err) => {
+      if (closed) return; // a superseded connection must not mark the live one failed
       console.error('connectStaticReplay: failed to load clip', err);
       onStatus?.('failed'); // terminal: nothing to reconnect to on a static page
     });

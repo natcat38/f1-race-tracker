@@ -22,14 +22,16 @@ import { Ghost } from './components/Ghost';
 import { Settings } from './components/Settings';
 import { StintChart } from './components/StintChart';
 
-function SkeletonMap({ failed }: { failed?: boolean }) {
-  return (
-    <div className="track-skeleton">
-      {failed
-        ? 'The demo replay could not be loaded. Refresh the page to retry.'
-        : 'Warming up the timing feed…'}
-    </div>
-  );
+// Three distinct reasons the map is missing, so the copy never contradicts what
+// the rest of the board is showing: an unrecoverable static-demo load failure,
+// a session streaming fine but without a track outline, or nothing yet at all.
+function SkeletonMap({ failed, trackless }: { failed?: boolean; trackless?: boolean }) {
+  const copy = failed
+    ? 'The demo replay could not be loaded. Refresh the page to retry.'
+    : trackless
+      ? 'No track outline for this session — timing still works.'
+      : 'Warming up the timing feed…';
+  return <div className="track-skeleton">{copy}</div>;
 }
 
 // Build-time flag: VITE_STATIC_DEMO=true selects the file-backed static player
@@ -62,9 +64,11 @@ export default function App() {
   if (hash === '#ghost') return <Ghost initialSelected={selected} />;
   if (hash === '#settings') return <Settings />;
 
-  // A snapshot without a track outline would render an invisible map — treat it
-  // as still warming up rather than drawing a blank panel.
-  const showSkeleton = state.rev === 0 || state.track.length === 0;
+  // A snapshot without a track outline would render an invisible map, so stand
+  // in for it — but say which of the two cases it is, because "warming up" is a
+  // lie once frames are arriving and the timing tower is already populated.
+  const trackless = state.rev > 0 && state.track.length === 0;
+  const showSkeleton = state.rev === 0 || trackless;
 
   return (
     <div className="page">
@@ -85,7 +89,7 @@ export default function App() {
             </div>
           )}
           {!showSkeleton && status !== 'reconnecting' && <Map state={state} />}
-          {showSkeleton && <SkeletonMap failed={status === 'failed'} />}
+          {showSkeleton && <SkeletonMap failed={status === 'failed'} trackless={trackless} />}
         </Panel>
         <Panel label="Timing">
           <TimingTower state={state} selected={selected} onSelect={setSelected} />
