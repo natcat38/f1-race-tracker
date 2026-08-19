@@ -144,6 +144,10 @@ from live import (
     build_snapshot,
     build_frame,
 )
+from radio import live_radio_refs
+
+# Live team-radio clips resolve against this + SessionInfo.Path (ADR-0003 amended).
+STATIC_BASE = "https://livetiming.formula1.com"
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -239,6 +243,32 @@ class BoundBox:
 # Capture-file replay (offline path, using LiveTimingData)
 # ---------------------------------------------------------------------------
 
+def _radio_from_payload(payload, session_path, seen):
+    """Map one TeamRadio message to wire radio refs, or [] if it carries none.
+
+    The feed sends Captures either as a list or, for incremental patches, as an
+    index-keyed dict (ADR-0008's schema assumption). Both shapes land here. Without
+    a SessionInfo.Path yet there is nothing to resolve clip URLs against, so refs
+    are dropped rather than guessed at.
+    """
+    if not isinstance(payload, dict) or not session_path:
+        return []
+    caps = payload.get('Captures')
+    if isinstance(caps, dict):
+        caps = [v for _, v in sorted(caps.items(), key=lambda kv: _safe_int(kv[0]))]
+    if not isinstance(caps, list):
+        return []
+    return live_radio_refs([c for c in caps if isinstance(c, dict)],
+                           STATIC_BASE, session_path, seen)
+
+
+def _session_path_from_payload(payload):
+    """Extract the static-feed path from a SessionInfo message, or '' if absent."""
+    if isinstance(payload, dict) and isinstance(payload.get('Path'), str):
+        return "/static/" + payload['Path']
+    return ""
+
+
 def _replay_capture(r, session: str, label: str, capture_path: str) -> None:
     """Replay a saved SignalR capture file through the Redis contract.
 
@@ -302,6 +332,10 @@ def _replay_capture(r, session: str, label: str, capture_path: str) -> None:
     # being replaced wholesale each message.
     timing_extra: dict[str, dict] = {}
     tyre_extra: dict[str, dict] = {}
+    # Live team radio (ADR-0008): refs ride frames and accumulate on the snapshot.
+    session_path = ""
+    seen_clips: set[str] = set()
+    pending_radio: list[dict] = []
 
     bounds = BoundBox()
     rev = starting_rev(r, session)
@@ -309,10 +343,15 @@ def _replay_capture(r, session: str, label: str, capture_path: str) -> None:
     r.set(snap_key(session), json.dumps(snapshot, separators=(",", ":")))
 
     # Interleave events by timedelta
+    info_entries = livedata.get('SessionInfo') if livedata.has('SessionInfo') else []
+    radio_entries = livedata.get('TeamRadio') if livedata.has('TeamRadio') else []
+
     events = (
         [('pos', td, payload) for td, payload in pos_entries] +
         [('timing', td, payload) for td, payload in timing_entries] +
-        [('appdata', td, payload) for td, payload in appdata_entries]
+        [('appdata', td, payload) for td, payload in appdata_entries] +
+        [('sessioninfo', td, payload) for td, payload in info_entries] +
+        [('radio', td, payload) for td, payload in radio_entries]
     )
     events.sort(key=lambda e: e[1])
 
@@ -352,6 +391,14 @@ def _replay_capture(r, session: str, label: str, capture_path: str) -> None:
                     parsed = _parse_timing_line(drv_data)
                     if parsed:
                         timing_extra.setdefault(num_str, {}).update(parsed)
+            continue
+
+        if kind == 'sessioninfo':
+            session_path = _session_path_from_payload(payload) or session_path
+            continue
+
+        if kind == 'radio':
+            pending_radio.extend(_radio_from_payload(payload, session_path, seen_clips))
             continue
 
         if kind == 'appdata':
@@ -426,7 +473,12 @@ def _replay_capture(r, session: str, label: str, capture_path: str) -> None:
         snapshot['timeMs'] = time_ms
         snapshot['rev'] = rev
 
-        frame = build_frame(session, rev, time_ms, cars_list)
+        radio = list(pending_radio)
+        pending_radio.clear()
+        if radio:
+            snapshot['radio'] = snapshot.get('radio', []) + radio
+
+        frame = build_frame(session, rev, time_ms, cars_list, radio=radio)
         r.set(snap_key(session), json.dumps(snapshot, separators=(",", ":")))
         r.publish(frames_chan(session), json.dumps(frame, separators=(",", ":")))
 
@@ -470,6 +522,11 @@ def _run_live_signalr(r, session: str, label: str) -> None:
     timing_extra: dict[str, dict] = {}
     tyre_extra: dict[str, dict] = {}
     latest_cars: dict[str, dict] = {}
+    # Live team radio (ADR-0008). Holders, not plain names, because handle_message
+    # is a closure that rebinds nothing.
+    session_path_holder = ['']
+    seen_clips: set[str] = set()
+    pending_radio: list[dict] = []
     snapshot_holder = [build_snapshot(session, label or "Live F1", [], [], {}, {}, 0, rev_holder[0])]
     last_publish = [time.monotonic() - FRAME_INTERVAL_S]
 
@@ -527,6 +584,14 @@ def _run_live_signalr(r, session: str, label: str) -> None:
                 if parsed:
                     tyre_extra.setdefault(num_str, {}).update(parsed)
 
+        elif topic == 'SessionInfo':
+            session_path_holder[0] = (_session_path_from_payload(payload)
+                                      or session_path_holder[0])
+
+        elif topic == 'TeamRadio':
+            pending_radio.extend(
+                _radio_from_payload(payload, session_path_holder[0], seen_clips))
+
         elif topic == 'Position.z':
             try:
                 samples = _decode_position_payload(payload)
@@ -574,7 +639,11 @@ def _run_live_signalr(r, session: str, label: str) -> None:
                 snap['cars'][str(c['driverNum'])] = c
             snap['timeMs'] = t_ms
             snap['rev'] = rev
-            frame = build_frame(session, rev, t_ms, cars_list)
+            radio = list(pending_radio)
+            pending_radio.clear()
+            if radio:
+                snap['radio'] = snap.get('radio', []) + radio
+            frame = build_frame(session, rev, t_ms, cars_list, radio=radio)
             r.set(snap_key(session), json.dumps(snap, separators=(",", ":")))
             r.publish(frames_chan(session), json.dumps(frame, separators=(",", ":")))
 
@@ -830,7 +899,8 @@ def run_live(r, session: str, label: str | None) -> None:
     Behaviour:
         1. If env var CAPTURE_FILE is set and the file exists → replay offline
            (no network; always allowed).
-        2. Else, only if LIVE=1 is set, attempt a real SignalR connection.
+        2. Else, only if LIVE=1 AND LIVE_TIMING_MODE=beta are set and the operator's
+           F1TV account is linked, attempt a real SignalR connection.
            Reaching this function already requires the explicit --live CLI
            flag; LIVE=1 is a second, deliberate opt-in so a bare --live
            invocation can never silently dial out.
@@ -842,6 +912,9 @@ def run_live(r, session: str, label: str | None) -> None:
                       capture-<session>.txt)
         LIVE          set to '1' to allow the real SignalR connection attempt
                       (double opt-in alongside --live; unset/other = skip)
+        LIVE_TIMING_MODE
+                      set to 'beta' for the third opt-in; the connection also
+                      requires a linked F1TV account (ADR-0007), else exit 1
     """
     capture_file = os.environ.get('CAPTURE_FILE', '')
     live_enabled = os.environ.get('LIVE', '0') == '1'
@@ -858,6 +931,23 @@ def run_live(r, session: str, label: str | None) -> None:
         _log.info("LIVE=1 not set — skipping live connection (structural check mode)")
         _log.info("run_live is callable and would connect during a real session.")
         return
+
+    # Third opt-in: the beta path uses the operator's own F1TV subscription
+    # (ADR-0007). Missing or stale auth fails fast — never a silent degrade.
+    if os.environ.get('LIVE_TIMING_MODE') != 'beta':
+        _log.error("Real connection needs LIVE_TIMING_MODE=beta (ADR-0007) "
+                   "on top of --live and LIVE=1.")
+        sys.exit(1)
+
+    from f1tv_auth import auth_status
+    status = auth_status()
+    if status['state'] != 'linked':
+        _log.error(f"F1TV account is {status['state']} — run on the HOST: "
+                   "python ingest/f1tv_link.py")
+        _log.error("Then restart this service. See docs/runbooks/live-verification.md.")
+        sys.exit(1)
+    _log.info(f"F1TV linked (tier={status.get('tier', '?')}, "
+              f"expires {status.get('expiresUtc', '?')}) — connecting…")
 
     # Attempt live connection
     _log.info("LIVE=1 set → attempting live SignalR connection")
