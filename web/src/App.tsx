@@ -62,7 +62,9 @@ export default function App() {
   if (hash === '#ghost') return <Ghost initialSelected={selected} />;
   if (hash === '#settings') return <Settings />;
 
-  const showSkeleton = state.rev === 0;
+  // A snapshot without a track outline would render an invisible map — treat it
+  // as still warming up rather than drawing a blank panel.
+  const showSkeleton = state.rev === 0 || state.track.length === 0;
 
   return (
     <div className="page">
