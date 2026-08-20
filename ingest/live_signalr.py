@@ -294,6 +294,85 @@ def _session_path_from_payload(payload):
     return ""
 
 
+def _publish_trailing_radio_frame(r, session, snapshot, rev, time_ms, cars_list, radio):
+    """Emit one extra frame carrying only pending radio refs, at stream end.
+
+    Both `_replay_capture` and `_run_live_signalr` only drain `pending_radio`
+    inside the position-sample publish path, so refs collected after the last
+    published frame (a capture/stream ending shortly after a TeamRadio message,
+    or one arriving before any position data flows) were previously dropped
+    silently at process exit (issue #62). Call this once, on the way out,
+    with whatever refs are still pending.
+
+    Bumps `rev` once more than the stream otherwise would have and carries no
+    new car data — ADR-0008's amendment accepts this trade-off in exchange for
+    already-connected clients actually receiving the refs. `cars_list` is the
+    latest known car list (may be empty if no position data ever arrived); we
+    reuse it rather than inventing data, so the frame stays well-formed against
+    the event model (Frame.Cars has no `omitempty`, so `[]` is the correct
+    empty representation, not `None`).
+    """
+    rev += 1
+    snapshot['radio'] = snapshot.get('radio', []) + radio
+    snapshot['rev'] = rev
+    if time_ms > snapshot.get('timeMs', 0):
+        snapshot['timeMs'] = time_ms
+    frame = build_frame(session, rev, snapshot['timeMs'], cars_list, radio=radio)
+    r.set(snap_key(session), json.dumps(snapshot, separators=(",", ":")))
+    r.publish(frames_chan(session), json.dumps(frame, separators=(",", ":")))
+    _log.info(
+        f"Published trailing frame at stream end with {len(radio)} pending "
+        "radio ref(s) that had not yet ridden a frame"
+    )
+    return rev
+
+
+def _log_dropped_deferred_radio(deferred_radio):
+    """Log (rather than silently drop) TeamRadio payloads that never got a
+    SessionInfo.Path to resolve clip URLs against, at stream end."""
+    if deferred_radio:
+        _log.warning(
+            f"Dropping {len(deferred_radio)} TeamRadio payload(s) at stream end: "
+            "SessionInfo.Path never arrived, so clip URLs could never be resolved"
+        )
+
+
+def _shutdown_flush_radio(r, session, snapshot, rev, latest_cars, pending_radio, deferred_radio):
+    """`_run_live_signalr`'s shutdown-time radio flush: best-effort trailing
+    frame, then the deferred-drop log line — unconditionally. Returns the
+    (possibly bumped) rev.
+
+    Pulled out of the `finally` block so it can be driven directly in tests
+    without needing a real or faked SignalRClient, and so the ordering
+    guarantee (flush attempt, then deferred logging, no matter what) lives in
+    one place.
+
+    Called from a `finally` around `client.start()`: if that call raised
+    because Redis itself died (or is simply unreachable), an unguarded
+    `_publish_trailing_radio_frame` here would raise a *second* exception —
+    becoming the misleading proximate error in place of whatever
+    client.start() actually raised, and skipping `_log_dropped_deferred_radio`
+    entirely. Both defeat issue #62's "logged, never silent" guarantee. So the
+    flush is caught and logged at WARNING instead, and the deferred-drop log
+    always runs; the original exception from client.start(), if any, is
+    untouched by this function and propagates normally once `finally` exits.
+    """
+    if pending_radio:
+        n_pending = len(pending_radio)
+        try:
+            rev = _publish_trailing_radio_frame(
+                r, session, snapshot, rev, int(time.time() * 1000),
+                list(latest_cars.values()), list(pending_radio))
+            pending_radio.clear()
+        except Exception as exc:
+            _log.warning(
+                f"Failed to publish trailing frame: {n_pending} pending "
+                f"radio ref(s) lost at stream end: {exc}"
+            )
+    _log_dropped_deferred_radio(deferred_radio)
+    return rev
+
+
 def _replay_capture(r, session: str, label: str, capture_path: str) -> None:
     """Replay a saved SignalR capture file through the Redis contract.
 
@@ -510,6 +589,19 @@ def _replay_capture(r, session: str, label: str, capture_path: str) -> None:
         r.set(snap_key(session), json.dumps(snapshot, separators=(",", ":")))
         r.publish(frames_chan(session), json.dumps(frame, separators=(",", ":")))
 
+    # Issue #62: refs collected after the loop's last publish (the capture ends
+    # shortly after a TeamRadio message, or one arrived before any position data)
+    # would otherwise be dropped silently. `session_s` still holds the last
+    # event's session-relative time (the loop always runs at least once here —
+    # an empty `events` list returns earlier), so the trailing frame's timeMs
+    # keeps advancing rather than rewinding.
+    if pending_radio:
+        rev = _publish_trailing_radio_frame(
+            r, session, snapshot, rev, int(session_s * 1000),
+            list(latest_cars.values()), list(pending_radio))
+        pending_radio.clear()
+    _log_dropped_deferred_radio(deferred_radio)
+
     _log.info(f"Capture replay complete. Published {rev - starting_rev(r, session)} frames")
 
 
@@ -699,6 +791,16 @@ def _run_live_signalr(r, session: str, label: str) -> None:
         client.start()
     except KeyboardInterrupt:
         _log.info("Stopped by user")
+    finally:
+        # Issue #62: client.start() returning — by Ctrl-C, the 2-minute no-data
+        # timeout (session ended), or any other reason — must not silently drop
+        # radio refs collected since the last position-triggered publish. Runs
+        # on every exit path, including an exception propagating past here (see
+        # _shutdown_flush_radio's docstring for why the flush itself must be
+        # best-effort here, unlike _replay_capture's — this one is a `finally`).
+        rev_holder[0] = _shutdown_flush_radio(
+            r, session, snapshot_holder[0], rev_holder[0], latest_cars,
+            pending_radio, deferred_radio)
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,5 @@
+["SessionStatus", {"StatusSeries": [{"Utc": "2024-09-01T13:00:00.000Z", "SessionStatus": "Started"}]}, "2024-09-01T13:00:00.000Z"]
+["DriverList", {"1": {"RacingNumber": "1", "Tla": "VER", "TeamName": "Red Bull Racing"}}, "2024-09-01T13:00:00.000Z"]
+["SessionInfo", {"Path": "2024/2024-09-01_Italian_Grand_Prix/2024-09-01_Race/"}, "2024-09-01T13:00:00.000Z"]
+["Position.z", {"Position": [{"Timestamp": "2024-09-01T13:00:00.300Z", "Entries": {"1": {"X": 1000, "Y": 2000, "Z": 0, "Status": "OnTrack"}}}]}, "2024-09-01T13:00:00.300Z"]
+["TeamRadio", {"Captures": [{"Utc": "2024-09-01T13:00:00.5Z", "RacingNumber": "1", "Path": "TeamRadio/MAXVER01_1_20240901_130000.mp3"}]}, "2024-09-01T13:00:00.600Z"]
