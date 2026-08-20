@@ -1,7 +1,7 @@
 fastf1==3.8.3
 # numpy>=2.5.0 requires Python>=3.12; CI pins 3.11 (see ci.yml), so 2.4.6 is the
 # newest resolvable version. Bumping past this needs a CI python-version bump too.
-numpy==2.5.2
+numpy==2.4.6
 # Transitive via fastf1's CacheControl / signalrcore — pinned up from the resolved
 # 1.1.2 to fix GHSA-6v7p-g79w-8964.
 msgpack>=1.2.1
