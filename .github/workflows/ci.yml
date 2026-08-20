@@ -58,6 +58,9 @@ jobs:
         run: pip install ruff==0.14.5 && ruff check ingest bench
       - name: FILE-MAP is current
         run: python scripts/gen_file_map.py --check
+      - name: scripts self-checks (pytest)
+        run: python -m pytest .
+        working-directory: scripts
 
       - name: ingest self-checks (pytest)
         run: python -m pytest .

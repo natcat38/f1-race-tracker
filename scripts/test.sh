@@ -12,6 +12,9 @@ echo "== Go: go test ./... =="
 echo "== Web: npm test =="
 (cd "$root/web" && npm test)
 
+echo "== Python: pytest scripts =="
+"$py" -m pytest "$root/scripts"
+
 echo "== Python: pytest ingest =="
 "$py" -m pytest "$root/ingest"
 
