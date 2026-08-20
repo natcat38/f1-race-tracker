@@ -19,9 +19,11 @@ services:
     environment:
       REDIS_URL: redis://redis:6379
       SESSION_KEY: live
+      XDG_DATA_HOME: /secrets    # F1TV token resolves to /secrets/fastf1/f1auth.json (ADR-0007)
     command: ["--replay-clip", "/data/replays/silverstone-2024-race.jsonl", "--session", "live"]
     volumes:
       - ./data:/data:ro
+      - ./secrets:/secrets:ro    # host-linked F1TV token; git-ignored; absent = unlinked, still boots
     depends_on: [redis]
 
   compare-2023:                # COMPARE left  → session "compare-monza-2023"

@@ -59,6 +59,7 @@ interface SnapshotData {
 }
 interface FrameData {
   rev: number; timeMs: number; cars?: Car[]; messages?: RaceControlMessage[]; weather?: Weather;
+  radio?: RadioMessage[]; // live lane only — accumulated onto state.radio (ADR-0008)
 }
 type Msg =
   | { type: 'snapshot'; data: SnapshotData }
@@ -68,6 +69,18 @@ type Msg =
 // it's trusted as wire data, rejecting a malformed or evolved payload (missing
 // fields, wrong type, unknown message type) instead of letting it flow into
 // applyMessage as an unchecked cast.
+// Radio refs are the one wire field the comms hook holds by identity (a WeakSet of
+// live arrivals), and a WeakSet throws on a primitive — so an element check here is
+// the difference between a rejected frame and a crashed board.
+function isRadioRefs(v: unknown): boolean {
+  return Array.isArray(v) && v.every((m) => {
+    if (typeof m !== 'object' || m === null) return false;
+    const r = m as Record<string, unknown>;
+    return typeof r.timeMs === 'number' && typeof r.driverNum === 'number'
+      && typeof r.clip === 'string';
+  });
+}
+
 export function parseMsg(raw: unknown): Msg | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const r = raw as Record<string, unknown>;
@@ -85,7 +98,7 @@ export function parseMsg(raw: unknown): Msg | null {
     // through and downstream code (RaceControl/Comms) iterates them, so a wrong-typed value
     // would crash the render rather than being rejected here.
     if (data.messages !== undefined && !Array.isArray(data.messages)) return null;
-    if (data.radio !== undefined && !Array.isArray(data.radio)) return null;
+    if (data.radio !== undefined && !isRadioRefs(data.radio)) return null;
     if (data.track !== undefined && !Array.isArray(data.track)) return null;
     // stints/weather are objects, not arrays — reject an array (would spread wrong).
     if (data.stints !== undefined && (typeof data.stints !== 'object' || data.stints === null || Array.isArray(data.stints))) return null;
@@ -97,6 +110,7 @@ export function parseMsg(raw: unknown): Msg | null {
     // applyMessage iterates cars and spreads messages — reject a present-but-non-array value.
     if (data.cars !== undefined && !Array.isArray(data.cars)) return null;
     if (data.messages !== undefined && !Array.isArray(data.messages)) return null;
+    if (data.radio !== undefined && !isRadioRefs(data.radio)) return null;
     if (data.weather !== undefined && (typeof data.weather !== 'object' || data.weather === null || Array.isArray(data.weather))) return null;
     return { type: 'frame', data: data as unknown as FrameData };
   }
@@ -124,5 +138,7 @@ export function applyMessage(s: RaceState, msg: Msg): RaceState {
   const messages = d.messages?.length
     ? [...s.messages, ...d.messages].slice(-MAX_MESSAGES)
     : s.messages;
-  return { ...s, cars, timeMs: d.timeMs, rev: d.rev, messages, weather: d.weather ?? s.weather };
+  // Live radio accumulates uncapped, mirroring Go's Apply (ADR-0008).
+  const radio = d.radio?.length ? [...s.radio, ...d.radio] : s.radio;
+  return { ...s, cars, timeMs: d.timeMs, rev: d.rev, messages, radio, weather: d.weather ?? s.weather };
 }

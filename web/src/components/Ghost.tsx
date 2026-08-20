@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { connectRace } from '../realtime/socket';
+import { connectRace, type ConnStatus } from '../realtime/socket';
 import { emptyState, type RaceState } from '../state/race';
 import { teamColour } from './teamColours';
-import { commonDrivers, deltaSeries, indexAtTime } from '../state/ghost';
+import { commonDrivers, deltaSeries, indexAtTime, ghostSkeletonCopy } from '../state/ghost';
 import { fmtElapsed } from './timingHelpers';
 import { SIZE } from './geometry';
 import { Panel } from './Panel';
+import { TrackPath } from './TrackPath';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 import { StatusRail } from './StatusRail';
+import { Route } from './Route';
 
 const BAR_H = 90;
 const THIS = { session: 'compare-monza-2024', year: '2024' };
@@ -15,8 +18,10 @@ const LAST = { session: 'compare-monza-2023', year: '2023' };
 export function Ghost({ initialSelected }: { initialSelected?: number | null } = {}) {
   const [thisYear, setThisYear] = useState<RaceState>(emptyState());
   const [lastYear, setLastYear] = useState<RaceState>(emptyState());
-  useEffect(() => connectRace(setThisYear, undefined, THIS.session), []);
-  useEffect(() => connectRace(setLastYear, undefined, LAST.session), []);
+  const [statusThis, setStatusThis] = useState<ConnStatus>('connecting');
+  const [statusLast, setStatusLast] = useState<ConnStatus>('connecting');
+  useEffect(() => connectRace(setThisYear, setStatusThis, THIS.session), []);
+  useEffect(() => connectRace(setLastYear, setStatusLast, LAST.session), []);
 
   const drivers = useMemo(
     () => commonDrivers(thisYear.lapTrace, lastYear.lapTrace),
@@ -39,7 +44,10 @@ export function Ghost({ initialSelected }: { initialSelected?: number | null } =
   // live frames unused). tMsRef mirrors tMs so pause/resume/scrub can re-anchor
   // the rAF loop without waiting on a stale closure value.
   const [tMs, setTMs] = useState(0);
-  const [paused, setPaused] = useState(false);
+  // Reduced motion: the lap does not auto-play. The scrubber still works, so the
+  // overlay stays fully usable — the user drives the clock instead of a loop.
+  const reducedMotion = useReducedMotion();
+  const [paused, setPaused] = useState(reducedMotion);
   const tMsRef = useRef(0);
   const rafRef = useRef<number | undefined>(undefined);
   const startRef = useRef(0);
@@ -63,7 +71,7 @@ export function Ghost({ initialSelected }: { initialSelected?: number | null } =
   // continues from the frozen position instead of jumping forward by however
   // long it was paused.
   useEffect(() => {
-    if (!loopMs || paused) return;
+    if (!loopMs || paused || reducedMotion) return;
     startRef.current = performance.now() - tMsRef.current;
     const tick = (now: number) => {
       const v = (now - startRef.current) % loopMs;
@@ -75,7 +83,7 @@ export function Ghost({ initialSelected }: { initialSelected?: number | null } =
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
     // resolvedSelected is included so a driver switch always re-anchors startRef,
     // even in the edge case where two drivers happen to share the same loopMs.
-  }, [loopMs, paused, resolvedSelected]);
+  }, [loopMs, paused, resolvedSelected, reducedMotion]);
 
   function scrub(v: number) {
     tMsRef.current = v;
@@ -117,28 +125,28 @@ export function Ghost({ initialSelected }: { initialSelected?: number | null } =
   const ghost = ready ? track[Math.min(idxLast, track.length - 1)] : undefined;
 
   return (
-    <div className="page">
-      <StatusRail
-        active="ghost"
-        note={`${THIS.year} solid vs ${LAST.year} ghost · fastest lap (approx)`}
-      />
-
+    <Route
+      title={`Lap delta overlay — ${THIS.year} vs ${LAST.year}`}
+      rail={
+        <StatusRail
+          active="ghost"
+          note={`${THIS.year} solid vs ${LAST.year} ghost · fastest lap (approx)`}
+        />
+      }
+    >
       <Panel label="Track">
         {!ready ? (
           <div className="track-skeleton">
-            {lanesLoaded && drivers.length === 0
-              ? 'No driver appears in both seasons — ghost overlay needs a common driver.'
-              : 'Loading reference laps…'}
+            {ghostSkeletonCopy(lanesLoaded, drivers.length, statusThis, statusLast)}
           </div>
         ) : (
           <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="track-svg" role="img" aria-label="Ghost overlay track map">
-            <path d={trackPath} fill="none" stroke="#333" strokeWidth={10} strokeLinejoin="round" />
-            <path d={trackPath} fill="none" stroke="#1a1a1a" strokeWidth={6} strokeLinejoin="round" />
+            <TrackPath d={trackPath} />
             {/* ghost (last year) — translucent */}
             <circle cx={ghost!.x * SIZE} cy={ghost!.y * SIZE} r={7} fill={colour} opacity={0.4} stroke="#000" strokeWidth={1} />
             {/* solid (this year) */}
             <circle cx={solid!.x * SIZE} cy={solid!.y * SIZE} r={7} fill={colour} stroke="#fff" strokeWidth={1.5} />
-            <text x={solid!.x * SIZE + 10} y={solid!.y * SIZE + 4} fill="#eee" fontSize={11}>{code}</text>
+            <text x={solid!.x * SIZE + 10} y={solid!.y * SIZE + 4} fill="var(--track-label)" fontSize="var(--fs-xs)">{code}</text>
           </svg>
         )}
       </Panel>
@@ -152,34 +160,40 @@ export function Ghost({ initialSelected }: { initialSelected?: number | null } =
               const h = (Math.abs(d) / maxAbs) * (BAR_H / 2);
               const x = (i / delta.length) * SIZE;
               const y = d > 0 ? BAR_H / 2 - h : BAR_H / 2;
-              return <rect key={i} x={x} y={y} width={Math.max(1, SIZE / delta.length)} height={h} fill={d > 0 ? '#ff5252' : '#4caf50'} />;
+              return <rect key={i} x={x} y={y} width={Math.max(1, SIZE / delta.length)} height={h} fill={d > 0 ? 'var(--bad)' : 'var(--good)'} />;
             })}
             {/* playback cursor at this-year's current fraction */}
-            <line x1={(cursorIdx / delta.length) * SIZE} y1={0} x2={(cursorIdx / delta.length) * SIZE} y2={BAR_H} stroke="#fff" strokeWidth={1.5} />
+            <line x1={(cursorIdx / delta.length) * SIZE} y1={0} x2={(cursorIdx / delta.length) * SIZE} y2={BAR_H} stroke="var(--chalk)" strokeWidth={1.5} />
           </svg>
         </Panel>
       )}
 
       <Panel label="Controls">
         <div className="ghost-controls">
-          <label style={{ fontSize: 'var(--fs-lg)' }}>Driver</label>
+          <label htmlFor="ghost-driver" style={{ fontSize: 'var(--fs-lg)' }}>Driver</label>
           <select
+            id="ghost-driver"
             value={resolvedSelected ?? ''}
             onChange={(e) => setSelected(Number(e.target.value))}
+            disabled={drivers.length === 0}
             style={{ background: 'var(--asphalt)', color: 'var(--chalk)', border: '1px solid var(--edge)', padding: '4px 8px', borderRadius: 4 }}
           >
+            {/* An empty dropdown reads as "no drivers exist"; say we are waiting instead. */}
+            {drivers.length === 0 && <option value="">Waiting for driver data…</option>}
             {drivers.map((n) => {
               const c = thisYear.cars[n] ?? lastYear.cars[n];
               return <option key={n} value={n}>{c?.code ?? n}</option>;
             })}
           </select>
           {ready && (
-            <span style={{ fontSize: 'var(--fs-xl)', color: dNow > 0 ? '#ff5252' : '#4caf50' }}>
+            <span style={{ fontSize: 'var(--fs-xl)', color: dNow > 0 ? 'var(--bad)' : 'var(--good)' }}>
               {dNow > 0 ? '+' : ''}{dNow.toFixed(2)}s
             </span>
           )}
           <button className="btn" onClick={() => setPaused((p) => !p)} disabled={!ready}>
-            {paused ? '▶ Play' : '⏸ Pause'}
+            {/* Before playback exists there is nothing to pause — offering Pause
+                implies something is running. Show the inert Play instead. */}
+            {paused || !ready ? '▶ Play' : '⏸ Pause'}
           </button>
           <input
             type="range"
@@ -195,6 +209,6 @@ export function Ghost({ initialSelected }: { initialSelected?: number | null } =
           <span className="rail-clock">{fmtElapsed(tMs)}</span>
         </div>
       </Panel>
-    </div>
+    </Route>
   );
 }

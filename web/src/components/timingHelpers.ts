@@ -96,8 +96,14 @@ export function statusLabel(status: string): string | undefined {
 }
 
 // orderCars returns the cars sorted by running position.
+// The feed is not guaranteed to hand out unique positions — the Monza 2024 clip
+// reports two cars at pos 19 (and no 20) in every frame. Tie-break on laps
+// completed so the running order is still right, then driver number so the
+// result is stable rather than dependent on object key order.
 export function orderCars(cars: RaceState['cars']): Car[] {
-  return Object.values(cars).sort((a, b) => a.pos - b.pos);
+  return Object.values(cars).sort(
+    (a, b) => a.pos - b.pos || (b.lap ?? 0) - (a.lap ?? 0) || a.driverNum - b.driverNum,
+  );
 }
 
 // bestSectors finds the session-best (min across all cars) for each sector this frame.
@@ -126,8 +132,9 @@ export function updatePersonalBests(prev: Bests, cars: Car[]): Bests {
   return next;
 }
 
-const PURPLE = '#b14aff'; // session-best
-const GREEN = '#3bb273';  // personal-best
+// Tokens, not hexes, so a palette change reaches the sector cells too.
+const PURPLE = 'var(--best-session)'; // session-best
+const GREEN = 'var(--good)';          // personal-best
 
 // sectorColour returns the cell colour for a sector value: purple if it ties the
 // session-best, else green if it ties this driver's personal-best, else none.
@@ -137,6 +144,18 @@ export function sectorColour(
   if (!v || v <= 0) return undefined;
   if (v === sessionBest) return PURPLE;
   if (v === personalBest) return GREEN;
+  return undefined;
+}
+
+// sectorMark is the same information as sectorColour, as a glyph: colour alone
+// would leave a purple/green best sector indistinguishable to a colour-blind
+// reader. 'S' = session best, 'P' = personal best.
+export function sectorMark(
+  v: number | undefined, sessionBest: number, personalBest: number,
+): 'S' | 'P' | undefined {
+  if (!v || v <= 0) return undefined;
+  if (v === sessionBest) return 'S';
+  if (v === personalBest) return 'P';
   return undefined;
 }
 

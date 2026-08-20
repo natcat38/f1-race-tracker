@@ -13,16 +13,26 @@ import { SourceToggle } from './components/SourceToggle';
 import { Comms } from './components/Comms';
 import { RaceControl } from './components/RaceControl';
 import { Panel } from './components/Panel';
+import { Route } from './components/Route';
 import { StatusRail } from './components/StatusRail';
 import { useStale } from './hooks/useStale';
 import { useLapHistory } from './hooks/useLapHistory';
 import { useGapHistory } from './hooks/useGapHistory';
 import { Compare } from './components/Compare';
 import { Ghost } from './components/Ghost';
+import { Settings } from './components/Settings';
 import { StintChart } from './components/StintChart';
 
-function SkeletonMap() {
-  return <div className="track-skeleton">Warming up the timing feed…</div>;
+// Three distinct reasons the map is missing, so the copy never contradicts what
+// the rest of the board is showing: an unrecoverable static-demo load failure,
+// a session streaming fine but without a track outline, or nothing yet at all.
+function SkeletonMap({ failed, trackless }: { failed?: boolean; trackless?: boolean }) {
+  const copy = failed
+    ? 'The demo replay could not be loaded. Refresh the page to retry.'
+    : trackless
+      ? 'No track outline for this session — timing still works.'
+      : 'Warming up the timing feed…';
+  return <div className="track-skeleton">{copy}</div>;
 }
 
 // Build-time flag: VITE_STATIC_DEMO=true selects the file-backed static player
@@ -53,15 +63,23 @@ export default function App() {
 
   if (hash === '#compare') return <Compare />;
   if (hash === '#ghost') return <Ghost initialSelected={selected} />;
+  if (hash === '#settings') return <Settings />;
 
-  const showSkeleton = state.rev === 0;
+  // A snapshot without a track outline would render an invisible map, so stand
+  // in for it — but say which of the two cases it is, because "warming up" is a
+  // lie once frames are arriving and the timing tower is already populated.
+  const trackless = state.rev > 0 && state.track.length === 0;
+  const showSkeleton = state.rev === 0 || trackless;
 
   return (
-    <div className="page">
-      <StatusRail active="board" state={state} status={status} staleSec={staleSec}>
-        {!STATIC_DEMO && <SourceToggle state={state} />}
-      </StatusRail>
-
+    <Route
+      title={`Race board${state.label ? ` — ${state.label}` : ''}`}
+      rail={
+        <StatusRail active="board" state={state} status={status} staleSec={staleSec}>
+          {!STATIC_DEMO && <SourceToggle state={state} />}
+        </StatusRail>
+      }
+    >
       <div className="board-top">
         <Panel label="Track">
           {status === 'reconnecting' && !showSkeleton && (
@@ -75,7 +93,7 @@ export default function App() {
             </div>
           )}
           {!showSkeleton && status !== 'reconnecting' && <Map state={state} />}
-          {showSkeleton && <SkeletonMap />}
+          {showSkeleton && <SkeletonMap failed={status === 'failed'} trackless={trackless} />}
         </Panel>
         <Panel label="Timing">
           <TimingTower state={state} selected={selected} onSelect={setSelected} />
@@ -103,6 +121,6 @@ export default function App() {
           <RaceControl state={state} />
         </Panel>
       </div>
-    </div>
+    </Route>
   );
 }

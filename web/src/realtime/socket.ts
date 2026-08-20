@@ -4,7 +4,9 @@
  */
 import { applyMessage, emptyState, parseMsg, type RaceState } from '../state/race';
 
-export type ConnStatus = 'connecting' | 'live' | 'reconnecting';
+// 'failed' is terminal — only the static replay emits it (a missing/empty baked
+// clip has nothing to retry against); the live socket always keeps reconnecting.
+export type ConnStatus = 'connecting' | 'live' | 'reconnecting' | 'failed';
 
 // connectRace opens a reconnecting WebSocket. onState is called with the latest
 // RaceState on every message. The optional onStatus callback receives connection
@@ -18,15 +20,32 @@ export function connectRace(
   let ws: WebSocket | null = null;
   let closed = false;
   let backoff = 500;
+  let attempted = false;
 
   const base = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
   const url = session ? `${base}?session=${encodeURIComponent(session)}` : base;
 
   function open() {
     let live = false; // per-connection: emit 'live' on the first message of THIS connection
-    onStatus?.('connecting');
+    // Only the FIRST attempt is 'connecting' here. Re-emitting it at the top of
+    // every retry overwrote the 'reconnecting' onclose had just set, and since
+    // no consumer renders 'connecting' distinctly, an outage fell through to
+    // the staleness chip ("waiting for timing data") and the map's reconnect
+    // overlay blinked out — a dead backend read as a merely slow one.
+    if (!attempted) {
+      attempted = true;
+      onStatus?.('connecting');
+    }
     ws = new WebSocket(url);
-    ws.onopen = () => { backoff = 500; };
+    ws.onopen = () => {
+      backoff = 500;
+      // Back to 'connecting': the socket is established but no data has crossed
+      // it yet, so consumers should show their warming-up/staleness copy rather
+      // than keep claiming we are still retrying. 'live' follows on the first
+      // message. Safe to emit here (unlike at the top of open()) because this
+      // only fires on a connection that actually succeeded.
+      onStatus?.('connecting');
+    };
     ws.onmessage = (ev) => {
       let parsed: unknown;
       try {

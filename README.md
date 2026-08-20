@@ -44,6 +44,42 @@ The default view shows the Monza 2024 race clip (replay lane) — a mid-race win
 
 Open <http://localhost:8080/#compare> for the side-by-side **Monza 2023 vs 2024** view — two maps fed by two `compare-*` lanes through the same gateway via `/ws?session=<key>`, kept in phase by the replay lanes' wall-clock-phased loop. Switch views any time with the **BOARD / COMPARE / OVERLAY** tabs in the status rail; OVERLAY (<http://localhost:8080/#ghost>) is the computed ghost-overlay lap delta.
 
+### Beta: live timing with your own F1TV subscription
+
+F1's live timing feed sits behind an F1TV subscription. Everything this project ships
+runs on **free** data — but there is an optional beta path that connects for real using
+**your** account, linked on your own machine, and adds live team radio to the comms
+layer as clips arrive.
+
+```bash
+pip install -r ingest/requirements.txt -r ingest/requirements-live.txt
+pip install --no-deps -r ingest/requirements-live-nodeps.txt
+python ingest/f1tv_link.py          # prints a URL; sign in with your F1 account
+```
+
+(The `--no-deps` line is deliberate — `signalrcore` declares a vulnerable, conflicting
+`msgpack` pin that its code does not actually need. See the file's header.)
+
+Then open <http://localhost:8080/#settings> — the **LINK** tab — to see the status.
+Linking runs on the host because the F1 login extension posts the token to
+`127.0.0.1`, which Docker cannot forward into a container. Only the *status*
+(linked / expired, expiry, tier) crosses into the app; the token never leaves your
+machine, is never logged, and is never sent to the frontend.
+
+**Honest status:** the whole path is built and tested end-to-end against recorded
+sessions — auth status over the seam, the beta gate and its fail-fast, radio refs
+riding frames, firing on arrival in the UI. On 2026-08-20 the link flow and the
+authenticated connection were **verified for real**: a free account links, the
+websocket accepts the token, and the server pushes the full topic snapshot, which
+also confirmed the team-radio wire schema. What still blocks a live run is a
+**dependency conflict, not auth** — the `signalrcore` version pinned for msgpack
+security cannot talk to a modern websocket-client. Whether a *live* session's stream
+is tier-gated is still untested; that needs a race weekend. It is off by default and
+takes three separate opt-ins to reach. See
+[docs/runbooks/live-verification.md](docs/runbooks/live-verification.md) §5 and
+[ADR-0007](docs/adr/0007-f1tv-auth-delegated-operator-link.md) /
+[ADR-0008](docs/adr/0008-live-radio-rides-frames.md).
+
 ### What's not done
 
 The "Live (demo)" toggle is honestly labelled: it streams a second committed replay clip (Silverstone 2024) through Python to exercise the polyglot seam, not a real live-timing connection. True live ingestion (`ingest/live_signalr.py`) parses `TimingData`/`TimingAppData` for lap, gap/interval, and tyre fields alongside position, but every message shape is still `UNVERIFIED:` against a real session — see [docs/runbooks/live-verification.md](docs/runbooks/live-verification.md) for the checklist to run through and close out field-by-field the next time a live session is available.
@@ -100,5 +136,6 @@ The React UI toggle at the top of the page POSTs this endpoint. The active butto
 - `ingest/` — how to bake a new circuit clip or run the live SignalR ingester
 - `docs/F1_Race_Tracker_Tech_Scope.md` — technical architecture decisions
 - `docs/F1_Race_Tracker_Product_Scope.md` — product scope (as shipped)
-- `docs/runbooks/live-verification.md` — checklist for verifying true-live ingestion against a real session
+- `docs/runbooks/live-verification.md` — checklist for verifying true-live ingestion against a real session, plus §5 for the beta F1TV link flow
+- `docs/adr/` — the decision records, including 0007 (F1TV beta auth) and 0008 (live radio on frames)
 - `internal/model/model.go` — the shared Redis JSON contract

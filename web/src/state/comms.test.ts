@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { stepComms, isAllowedClip } from './comms';
+import { stepComms, isAllowedClip, liveArrivals } from './comms';
 import type { RadioMessage } from './race';
 
 const tl: RadioMessage[] = [
@@ -45,5 +45,36 @@ describe('isAllowedClip', () => {
     expect(isAllowedClip('https://notformula1.com/a.mp3')).toBe(false);
     expect(isAllowedClip('javascript:alert(1)')).toBe(false);
     expect(isAllowedClip('not a url')).toBe(false);
+  });
+});
+
+describe('liveArrivals', () => {
+  const refs = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ timeMs: i, driverNum: i, clip: `https://livetiming.formula1.com/${i}.mp3` }));
+
+  test('a frame fires only the refs appended since last step', () => {
+    expect(liveArrivals(refs(3), 1, false)).toEqual(refs(3).slice(1));
+  });
+  test('a snapshot fires nothing — its refs are history, seeded by stepComms', () => {
+    expect(liveArrivals(refs(3), 0, true)).toEqual([]);
+  });
+  test('no growth fires nothing, and a shrunk timeline never slices backwards', () => {
+    expect(liveArrivals(refs(2), 2, false)).toEqual([]);
+    expect(liveArrivals(refs(1), 5, false)).toEqual([]);
+  });
+});
+
+describe('live arrivals vs the clock window', () => {
+  test('a low-lag clip matches both paths, so callers must fire it once', () => {
+    // Regression note for useComms: stepComms and liveArrivals CAN both return the
+    // same clip when it is published within one frame interval of being spoken.
+    const clock = 1_000_000_000_000;
+    const clip = { timeMs: clock + 500, driverNum: 1, clip: 'https://livetiming.formula1.com/a.mp3' };
+    const clockFired = stepComms({ lastClock: clock }, clock + 1000, [clip], false).fired;
+    const arrived = liveArrivals([clip], 0, false);
+    expect(clockFired).toEqual([clip]);
+    expect(arrived).toEqual([clip]);
+    const fired = [...clockFired.filter((m) => !arrived.includes(m)), ...arrived];
+    expect(fired).toHaveLength(1);
   });
 });

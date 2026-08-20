@@ -155,7 +155,10 @@ The primary experience is the running app itself — a race engineer opens the b
 ## 7. Out of Scope
 
 - **Always-on hosting of the real system** — deliberately retired; the hands-on experience stays local `docker-compose`. (A free, zero-maintenance **static demo** of the frontend alone is not this — see ADR-0006.)
-- **Paid data tiers** — uses **free** F1 data only (FastF1; OpenF1 historical). Live uses FastF1's free client, best-effort.
+- **Paid data tiers for anything shipped** — every feature runs on **free** F1 data
+  (FastF1; OpenF1 historical). An optional **beta** live path may use the operator's own
+  F1TV subscription — their account, their login, linked locally and never required for
+  any shipped feature (ADR-0007).
 - **Full-race data files in the repo** — only short, curated, downsampled clips are committed; the recorder bakes more on demand.
 - **User accounts / auth** — none; runs locally, single-operator.
 - **Native mobile app** — responsive web only.

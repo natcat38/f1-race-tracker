@@ -1,0 +1,23 @@
+# Installed with --no-deps, deliberately. See ADR-0007 and
+# docs/superpowers/specs/2026-08-20-f1auth-spike-findings.md.
+#
+# signalrcore 1.0.2 declares `msgpack==1.1.2`, which is vulnerable
+# (GHSA-6v7p-g79w-8964) and conflicts with the patched `msgpack>=1.2.1` pinned in
+# requirements.txt — pip refuses the combination outright (ResolutionImpossible).
+# The declared pin is over-strict: verified 2026-08-20 that 1.0.2 runs correctly
+# against msgpack 1.2.1 (connected to the live-timing feed and captured 91 KB).
+#
+# --no-deps is safe here because msgpack is signalrcore 1.0.2's ONLY third-party
+# runtime import — it ships its own websocket layer rather than depending on
+# websocket-client (which is why 0.8.8, pinned here before, could not talk to any
+# modern websocket-client and died the instant the socket opened).
+#
+# Install AFTER requirements.txt so msgpack is already at the patched version:
+#   pip install -r ingest/requirements.txt -r ingest/requirements-live.txt
+#   pip install --no-deps -r ingest/requirements-live-nodeps.txt
+#
+# Audited in CI with `pip-audit --no-deps --ignore-vuln PYSEC-2026-3625`: --no-deps
+# alone still reports the msgpack==1.1.2 declared here, which this project never
+# installs (requirements.txt pins the patched 1.2.1, and the main audit checks it).
+# signalrcore itself stays audited, so a future advisory against it still fails CI.
+signalrcore==1.0.2

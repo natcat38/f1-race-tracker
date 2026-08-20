@@ -2,7 +2,7 @@ FROM python:3.11-slim
 WORKDIR /app
 COPY ingest/requirements-live.txt ./
 RUN pip install --no-cache-dir -r requirements-live.txt
-COPY ingest/live.py ./
+COPY ingest/live.py ingest/f1tv_auth.py ./
 RUN useradd --no-create-home --uid 1000 appuser
 USER appuser
 ENTRYPOINT ["python", "live.py"]

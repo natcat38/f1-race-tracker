@@ -32,6 +32,21 @@ export function stepComms(
   return { cursor: { lastClock: clock }, fired, history: [] };
 }
 
+// liveArrivals returns the refs a frame just appended to the timeline (ADR-0008).
+// Live clips cannot be fired by the clock: a clip's timeMs is the instant it was
+// spoken, which always lags the live lane's wall-clock timeMs, so stepComms' window
+// would never match. Arrival IS the trigger. A snapshot fires nothing — its refs are
+// history, seeded by stepComms — and a shrunk timeline (a source switch racing a
+// frame) is treated as no arrivals rather than slicing backwards.
+export function liveArrivals(
+  timeline: RadioMessage[],
+  prevLen: number,
+  isSnapshot: boolean,
+): RadioMessage[] {
+  if (isSnapshot || timeline.length <= prevLen) return [];
+  return timeline.slice(prevLen);
+}
+
 // isStale reports whether a queued clip has fallen too far behind the race clock to
 // auto-play (it is still shown in history). Best-effort sync, ~3s tolerance.
 export function isStale(msg: RadioMessage, currentClock: number, toleranceMs = 3000): boolean {

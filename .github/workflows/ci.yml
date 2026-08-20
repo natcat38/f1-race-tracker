@@ -96,6 +96,13 @@ jobs:
         run: |
           pip install pip-audit==2.7.3
           pip-audit -r ingest/requirements.txt -r ingest/requirements-dev.txt -r ingest/requirements-live.txt -r bench/requirements.txt
+          # signalrcore is installed --no-deps on purpose: its declared msgpack==1.1.2
+          # is vulnerable AND conflicts with the patched msgpack>=1.2.1 that
+          # requirements.txt pins and the audit above verifies. --no-deps alone still
+          # reports that declared pin, so PYSEC-2026-3625 is ignored HERE ONLY — it
+          # describes a version this project never installs. signalrcore itself stays
+          # audited, so a future advisory against it still fails the build.
+          pip-audit --no-deps --ignore-vuln PYSEC-2026-3625 -r ingest/requirements-live-nodeps.txt
 
   docs-links:
     name: Docs link check

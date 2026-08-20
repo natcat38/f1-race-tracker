@@ -21,13 +21,13 @@ export function Comms({ state }: { state: RaceState }) {
         className={enabled ? 'btn btn-active' : 'btn'}
         style={{ justifySelf: 'start' }}
       >
-        {enabled ? '📻 Comms ON' : '📻 Comms OFF'}
+        {enabled ? 'Comms ON' : 'Comms OFF'}
       </button>
 
       {enabled && nowPlaying && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
-          background: 'var(--asphalt)', borderRadius: 4, fontSize: 13,
+          background: 'var(--asphalt)', borderRadius: 4, fontSize: 'var(--fs-md)',
         }}>
           <span style={{ color: colourFor(nowPlaying.driverNum), fontWeight: 700 }}>
             {codeFor(nowPlaying.driverNum)}
@@ -35,8 +35,8 @@ export function Comms({ state }: { state: RaceState }) {
           <span style={{ color: 'var(--slate)' }}>radio</span>
           <button
             onClick={() => replay(nowPlaying)}
-            className="btn"
-            style={{ border: 'none', padding: '0 4px' }}
+            className="btn btn-icon"
+            style={{ border: 'none' }}
             aria-label="Replay current clip"
           >↻</button>
         </div>
@@ -47,13 +47,13 @@ export function Comms({ state }: { state: RaceState }) {
           {history.map((m, i) => (
             <div key={`${m.timeMs}-${i}`} style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              fontSize: 12, color: 'var(--slate)',
+              fontSize: 'var(--fs-sm)', color: 'var(--slate)',
             }}>
               <span style={{ color: colourFor(m.driverNum), fontWeight: 700 }}>{codeFor(m.driverNum)}</span>
               <button
                 onClick={() => replay(m)}
-                className="btn"
-                style={{ border: 'none', padding: '0 4px' }}
+                className="btn btn-icon"
+                style={{ border: 'none' }}
                 aria-label={`Play ${codeFor(m.driverNum)} radio`}
               >▶</button>
             </div>
@@ -67,9 +67,11 @@ export function Comms({ state }: { state: RaceState }) {
       {enabled && !nowPlaying && history.length === 0 && (
         <div className="empty">No radio yet — clips play as the replay reaches them.</div>
       )}
-      {error && (
-        <div className="empty" style={{ color: '#ff8c00' }}>{error}</div>
-      )}
+      {/* Announced, not just shown: a blocked or failed clip is the only feedback
+          a click on ▶/↻ gives, and the button itself does not change. */}
+      <div role="status" aria-live="polite">
+        {error && <div className="empty" style={{ color: 'var(--amber)' }}>{error}</div>}
+      </div>
     </div>
   );
 }

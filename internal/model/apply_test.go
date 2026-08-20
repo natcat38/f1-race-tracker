@@ -114,3 +114,36 @@ func TestApply_EmptyCarsFrameStillAdvancesRevAndTime(t *testing.T) {
 		t.Errorf("existing car lost on empty-Cars frame: %+v", s.Cars[1])
 	}
 }
+
+func TestApplyAccumulatesRadio(t *testing.T) {
+	s := NewSnapshot("live", "live", "Live F1")
+	s.Rev = 1
+	s.Radio = []RadioMessage{{TimeMs: 100, DriverNum: 1, Clip: "https://livetiming.formula1.com/a.mp3"}}
+
+	_, ok := Apply(s, Frame{Rev: 2, TimeMs: 200, Radio: []RadioMessage{
+		{TimeMs: 150, DriverNum: 16, Clip: "https://livetiming.formula1.com/b.mp3"},
+	}})
+	if !ok {
+		t.Fatal("frame with a higher rev should apply")
+	}
+	if len(s.Radio) != 2 || s.Radio[1].DriverNum != 16 {
+		t.Fatalf("radio not accumulated: %+v", s.Radio)
+	}
+}
+
+// Only replay lanes loop, and replay frames never carry radio — so the loop reset
+// must leave accumulated live radio alone (ADR-0008).
+func TestApplyLoopResetKeepsRadio(t *testing.T) {
+	s := NewSnapshot("replay", "replay", "Monza")
+	s.Rev, s.TimeMs = 5, 5000
+	s.Radio = []RadioMessage{{TimeMs: 100, DriverNum: 1, Clip: "https://livetiming.formula1.com/a.mp3"}}
+	s.Messages = []RaceControlMessage{{Rev: 5, T: 4000, Category: "Flag", Message: "GREEN"}}
+
+	Apply(s, Frame{Rev: 6, TimeMs: 100}) // clip loops back: TimeMs decreases
+	if len(s.Messages) != 0 {
+		t.Fatalf("loop reset must clear messages, got %+v", s.Messages)
+	}
+	if len(s.Radio) != 1 {
+		t.Fatalf("loop reset must NOT clear radio, got %+v", s.Radio)
+	}
+}
