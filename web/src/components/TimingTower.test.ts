@@ -129,8 +129,8 @@ describe('updatePersonalBests', () => {
 
 describe('sectorColour', () => {
   it('purple for session-best, green for personal-best, undefined otherwise', () => {
-    expect(sectorColour(25900, 25900, 25900)).toBe('#b14aff'); // session-best wins
-    expect(sectorColour(26100, 25900, 26100)).toBe('#3bb273'); // personal-best only
+    expect(sectorColour(25900, 25900, 25900)).toBe('var(--best-session)'); // session-best wins
+    expect(sectorColour(26100, 25900, 26100)).toBe('var(--good)'); // personal-best only
     expect(sectorColour(26500, 25900, 26100)).toBeUndefined();
     expect(sectorColour(undefined, 25900, 26100)).toBeUndefined();
   });

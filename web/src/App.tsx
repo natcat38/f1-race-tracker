@@ -13,6 +13,7 @@ import { SourceToggle } from './components/SourceToggle';
 import { Comms } from './components/Comms';
 import { RaceControl } from './components/RaceControl';
 import { Panel } from './components/Panel';
+import { Route } from './components/Route';
 import { StatusRail } from './components/StatusRail';
 import { useStale } from './hooks/useStale';
 import { useLapHistory } from './hooks/useLapHistory';
@@ -71,11 +72,14 @@ export default function App() {
   const showSkeleton = state.rev === 0 || trackless;
 
   return (
-    <div className="page">
-      <StatusRail active="board" state={state} status={status} staleSec={staleSec}>
-        {!STATIC_DEMO && <SourceToggle state={state} />}
-      </StatusRail>
-
+    <Route
+      title={`Race board${state.label ? ` — ${state.label}` : ''}`}
+      rail={
+        <StatusRail active="board" state={state} status={status} staleSec={staleSec}>
+          {!STATIC_DEMO && <SourceToggle state={state} />}
+        </StatusRail>
+      }
+    >
       <div className="board-top">
         <Panel label="Track">
           {status === 'reconnecting' && !showSkeleton && (
@@ -117,6 +121,6 @@ export default function App() {
           <RaceControl state={state} />
         </Panel>
       </div>
-    </div>
+    </Route>
   );
 }

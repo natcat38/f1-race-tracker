@@ -26,13 +26,15 @@ function StintChartInner({ state }: { state: RaceState }) {
   return (
     <div style={{ display: 'grid', gap: 3 }}>
       {order.map((c) => (
-        <div key={c.driverNum} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+        <div key={c.driverNum} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--fs-xs)' }}>
           <span style={{ width: 28, flexShrink: 0 }}>{c.code}</span>
           <div style={{ position: 'relative', flex: 1, height: 10, background: 'var(--edge)', borderRadius: 2 }}>
             {state.stints[c.driverNum].map((s, i) => (
               <div
                 key={i}
                 title={`${s.compound} · laps ${s.startLap}-${s.endLap}`}
+                role="img"
+                aria-label={`${c.code}: ${s.compound.toLowerCase()} tyres, laps ${s.startLap} to ${s.endLap}`}
                 style={{
                   position: 'absolute',
                   left: `${((s.startLap - 1) / total) * 100}%`,
@@ -45,19 +47,21 @@ function StintChartInner({ state }: { state: RaceState }) {
             ))}
             {!!leaderLap && (
               <div
+                role="img"
+                aria-label={`Leader is on lap ${leaderLap}`}
                 style={{
                   position: 'absolute',
                   left: `${((leaderLap - 1) / total) * 100}%`,
                   top: -1, bottom: -1,
                   width: 1,
-                  background: '#fff',
+                  background: 'var(--chalk)',
                 }}
               />
             )}
           </div>
         </div>
       ))}
-      <div className="empty" style={{ fontSize: 10, marginTop: 2 }}>
+      <div className="empty" style={{ fontSize: 'var(--fs-2xs)', marginTop: 2 }}>
         Full-race stint plan baked from session data — the replay window sits inside it.
       </div>
     </div>
