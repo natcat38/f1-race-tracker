@@ -1,7 +1,38 @@
+/* Skip link — first focusable element on every route. Off-screen until
+   focused, then pinned top-left over the rail. */
+
+.skip-link {
+  position: absolute;
+  left: var(--sp-2);
+  top: var(--sp-2);
+  z-index: 10;
+  transform: translateY(-200%);
+  background: var(--chalk);
+  color: var(--asphalt);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: 4px;
+  font-family: var(--display);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
 /* Page shell */
 
 .page {
+  position: relative;
   padding: var(--sp-4) var(--sp-6);
+  display: grid;
+  gap: var(--sp-6);
+}
+
+/* The <main> landmark inherits the page grid so wrapping the panels in it
+   does not change any spacing. */
+.route-main {
   display: grid;
   gap: var(--sp-6);
 }
@@ -82,6 +113,11 @@
   text-transform: uppercase;
 }
 
+.rail-tab:hover:not(.rail-tab-active) {
+  background: rgba(233, 237, 241, 0.06);
+  border-color: var(--slate);
+}
+
 .rail-tab-active {
   background: var(--chalk);
   color: var(--asphalt);
@@ -90,7 +126,7 @@
 
 .rail-tab-sub {
   font-family: var(--data);
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   font-weight: 400;
   letter-spacing: 0;
   text-transform: none;
@@ -115,9 +151,12 @@
   letter-spacing: 0.02em;
 }
 
+/* --onair is the brand red but only 3.4:1 as text over its own wash. The wash
+   stays (it carries the brand); the label uses --bad, which measures 4.9:1
+   over this exact composite. */
 .chip-live {
   background: rgba(225, 6, 0, 0.15);
-  color: var(--onair);
+  color: var(--bad);
 }
 
 .chip-replay {
@@ -154,10 +193,17 @@
   border-bottom: 1px solid var(--edge);
   font-family: var(--display);
   font-weight: 600;
-  font-size: var(--fs-xs);
+  font-size: var(--fs-sm);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--slate);
+}
+
+.panel-plate h2 {
+  margin: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
 }
 
 .panel-body {
@@ -175,6 +221,22 @@
   border-radius: 4px;
   font-family: var(--data);
   font-size: var(--fs-md);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn:hover:not(:disabled):not(.btn-active) {
+  background: rgba(233, 237, 241, 0.06);
+  border-color: var(--slate);
+}
+
+/* Icon-only controls (comms ▶/↻): square up toward a 44px target without
+   changing the text buttons around them. */
+.btn-icon {
+  min-width: 36px;
+  min-height: 36px;
+  padding: var(--sp-2);
+  line-height: 1;
 }
 
 .btn:disabled {
@@ -189,7 +251,7 @@
 }
 
 .src-error {
-  color: var(--onair);
+  color: var(--bad);
   font-family: var(--data);
   font-size: var(--fs-sm);
 }
@@ -250,7 +312,7 @@
   background: rgba(233, 237, 241, 0.04);
 }
 
-.tt-row[aria-selected="true"] {
+.tt-row-selected {
   background: var(--edge);
 }
 
@@ -325,4 +387,51 @@
   .chip {
     transition: background 200ms, color 200ms;
   }
+}
+
+/* Range input — the default Windows chrome is light even under color-scheme:
+   dark, so the ghost scrubber gets an explicit dark track and thumb. */
+
+.ghost-controls input[type="range"] {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  height: 20px;
+  cursor: pointer;
+}
+
+.ghost-controls input[type="range"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.ghost-controls input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--edge);
+}
+
+.ghost-controls input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--edge);
+}
+
+.ghost-controls input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: var(--chalk);
+  border: 1px solid var(--asphalt);
+}
+
+.ghost-controls input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--asphalt);
+  border-radius: 50%;
+  background: var(--chalk);
 }

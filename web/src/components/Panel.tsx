@@ -16,7 +16,7 @@ export function Panel({ label, actions, children }: {
   return (
     <section className="panel">
       <header className="panel-plate">
-        <span>{label}</span>
+        <h2>{label}</h2>
         {actions}
       </header>
       <div className="panel-body">

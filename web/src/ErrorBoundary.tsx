@@ -19,9 +19,11 @@ export class ErrorBoundary extends Component<
 
   render() {
     if (this.state.error) {
-      if (this.props.fallback) return this.props.fallback
+      if (this.props.fallback) {
+        return <div role="alert">{this.props.fallback}</div>
+      }
       return (
-        <div style={{ padding: 24, fontFamily: 'sans-serif' }}>
+        <div role="alert" style={{ padding: 24, fontFamily: 'sans-serif' }}>
           <h1>Something broke.</h1>
           <p>Reload the page. If it keeps happening, check the browser console.</p>
         </div>

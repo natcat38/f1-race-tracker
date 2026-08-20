@@ -3,7 +3,7 @@ import type { RaceState } from '../state/race';
 import {
   fmtLap, fmtSec, fmtGap, gapLabel, intLabel,
   orderCars, bestSectors, updatePersonalBests, sectorColour, sectorDelta,
-  TYRE_COLOUR, tyreLabel, statusLabel, sectorDeltaVs, fmtSigned,
+  TYRE_COLOUR, tyreLabel, statusLabel, sectorDeltaVs, fmtSigned, sectorMark,
 } from './timingHelpers';
 import type { Bests } from './timingHelpers';
 
@@ -40,6 +40,8 @@ export function TimingTower({
     const c = sectorColour(v, best, pb[dn]?.[i] ?? Infinity);
     return c ? { color: c } : undefined;
   };
+  const cellMark = (v: number | undefined, best: number, dn: number, i: number) =>
+    sectorMark(v, best, pb[dn]?.[i] ?? Infinity);
   // With a reference car selected, every OTHER row's delta compares against
   // that car's same sector (the rival-relative question a race engineer asks)
   // instead of this driver's own personal best.
@@ -55,7 +57,7 @@ export function TimingTower({
     <button
       onClick={() => setSecondsMode((m) => !m)}
       className="btn"
-      style={{ marginBottom: 6, fontSize: 11, padding: '2px 8px' }}
+      style={{ marginBottom: 6, fontSize: 'var(--fs-xs)', padding: '2px 8px' }}
     >
       {secondsMode ? 'Show laps' : 'Show seconds'}
     </button>
@@ -87,10 +89,13 @@ export function TimingTower({
           return (
             <tr
               key={c.driverNum}
-              className="tt-row"
+              // No aria-selected: a plain <tr> is not in a grid/listbox, so the
+              // attribute is invalid ARIA there. Selection shows as a class, and
+              // the row keeps its own accessible pressed-state via the button role.
+              className={isSel ? 'tt-row tt-row-selected' : 'tt-row'}
               role="button"
               tabIndex={0}
-              aria-selected={isSel}
+              aria-pressed={isSel}
               onClick={() => onSelect(c.driverNum)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -104,7 +109,7 @@ export function TimingTower({
               <td><b>{c.code}</b></td>
               {status ? (
                 <>
-                  <td style={{ color: c.status === 'Pit' ? '#e8c84a' : 'var(--slate)' }}>{status}</td>
+                  <td style={{ color: c.status === 'Pit' ? TYRE_COLOUR.MEDIUM : 'var(--slate)' }}>{status}</td>
                   <td>—</td>
                 </>
               ) : (
@@ -120,14 +125,23 @@ export function TimingTower({
               </td>
               {([[c.s1Ms, b1, 0], [c.s2Ms, b2, 1], [c.s3Ms, b3, 2]] as const).map(([v, best, i]) => {
                 const d = cellDelta(v, c.driverNum, i);
+                const mark = cellMark(v, best, c.driverNum, i);
                 const rivalMode = !!refCar && c.driverNum !== selected;
                 return (
                   <td key={i} style={cellColour(v, best, c.driverNum, i)}>
                     {fmtSec(v)}
+                    {mark && (
+                      <sup
+                        style={{ fontSize: 'var(--fs-3xs)', marginLeft: 2 }}
+                        title={mark === 'S' ? 'Session best' : 'Personal best'}
+                      >
+                        {mark}
+                      </sup>
+                    )}
                     {d !== undefined && (
                       <sup style={{
-                        fontSize: 9, marginLeft: 3,
-                        color: rivalMode ? (d < 0 ? '#3bb273' : 'var(--slate)') : 'var(--slate)',
+                        fontSize: 'var(--fs-3xs)', marginLeft: 3,
+                        color: rivalMode && d < 0 ? 'var(--good)' : 'var(--slate)',
                       }}>
                         {rivalMode ? fmtSigned(d) : fmtGap(d)}
                       </sup>
@@ -141,11 +155,11 @@ export function TimingTower({
       </tbody>
     </table>
     </div>
-    <div className="empty" style={{ fontSize: 10, marginTop: 4 }}>
+    <div className="empty" style={{ fontSize: 'var(--fs-2xs)', marginTop: 4 }}>
       Gap / Int are estimates derived from track position, not official timing.
       {refCar && ` Click a row to set the reference car — sector deltas compare against ${refCar.code}.`}
     </div>
-    <div className="empty" style={{ fontSize: 10, marginTop: 2, display: 'flex', gap: 10 }}>
+    <div className="empty" style={{ fontSize: 'var(--fs-2xs)', marginTop: 2, display: 'flex', gap: 10 }}>
       {([['SOFT', 'S Soft'], ['MEDIUM', 'M Medium'], ['HARD', 'H Hard'],
          ['INTERMEDIATE', 'I Inter'], ['WET', 'W Wet']] as const).map(([t, label]) => (
         <span key={t} style={{ color: TYRE_COLOUR[t] }}>{label}</span>

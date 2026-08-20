@@ -1,12 +1,18 @@
 import type { Car, RaceState } from '../state/race';
 import { fmtLap, fmtGap, type LapHistory, type GapHistory } from './timingHelpers';
 
-function Bar({ label, value }: { label: string; value: number }) {
+// Throttle and brake are opposite inputs, so they read as opposite colours —
+// both bars being green made a full-brake trace look like a full-throttle one
+// at a glance.
+function Bar({ label, value, tone }: { label: string; value: number; tone: 'good' | 'bad' }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--fs-sm)' }}>
       <span style={{ width: 64, color: 'var(--slate)' }}>{label}</span>
       <div style={{ flex: 1, height: 8, background: 'var(--edge)', borderRadius: 4 }}>
-        <div style={{ width: `${Math.max(0, Math.min(100, value))}%`, height: '100%', background: '#3bb273', borderRadius: 4 }} />
+        <div style={{
+          width: `${Math.max(0, Math.min(100, value))}%`, height: '100%',
+          background: tone === 'good' ? 'var(--good)' : 'var(--bad)', borderRadius: 4,
+        }} />
       </div>
       <span style={{ width: 36, textAlign: 'right' }}>{value}</span>
     </div>
@@ -17,23 +23,47 @@ function Bar({ label, value }: { label: string; value: number }) {
 // green = faster — the stint-degradation squint test. Reused for the gap
 // trend too, where the same colouring reads as "closing" (green) vs
 // "opening" (red).
-function Sparkline({ values }: { values: (number | undefined)[] }) {
+function Sparkline({ values, label }: { values: (number | undefined)[]; label: string }) {
   const known = values.filter((v): v is number => v != null);
   if (known.length === 0) return null;
   const min = Math.min(...known), max = Math.max(...known);
   const span = max - min || 1;
   return (
-    <svg width={values.length * 15} height={24} role="img" aria-label="Trend">
+    <svg width={values.length * 15} height={24} role="img" aria-label={label}>
       {values.map((v, i) => {
         if (v == null) return null;
         const h = 4 + ((v - min) / span) * 18;
         const prev = values[i - 1];
         const slower = i > 0 && prev != null && v > prev;
+        // Colour alone would be the only signal for a red/green-blind reader, so
+        // the worse bars also carry a hatch overlay — a shape difference that
+        // survives any palette.
         return (
-          <rect key={i} x={i * 15} y={24 - h} width={11} height={h}
-                fill={slower ? '#e1342e' : '#3bb273'} />
+          <g key={i}>
+            <rect x={i * 15} y={24 - h} width={11} height={h}
+                  fill={slower ? 'var(--bad)' : 'var(--good)'} />
+            {slower && (
+              <rect x={i * 15} y={24 - h} width={11} height={h}
+                    fill="url(#spark-hatch)" />
+            )}
+          </g>
         );
       })}
+    </svg>
+  );
+}
+
+// One shared hatch pattern for every Sparkline on the page.
+function SparkHatch() {
+  return (
+    <svg width={0} height={0} aria-hidden="true" style={{ position: 'absolute' }}>
+      <defs>
+        <pattern id="spark-hatch" patternUnits="userSpaceOnUse" width={4} height={4}
+                 patternTransform="rotate(45)">
+          <rect width={4} height={4} fill="none" />
+          <line x1={0} y1={0} x2={0} y2={4} stroke="var(--asphalt)" strokeWidth={1.5} />
+        </pattern>
+      </defs>
     </svg>
   );
 }
@@ -43,27 +73,31 @@ function CarTelemetry({ car, history, gapHistory }: {
 }) {
   return (
     <div style={{ display: 'grid', gap: 8, minWidth: 200 }}>
-      <div style={{ fontSize: 14 }}>
+      <div style={{ fontSize: 'var(--fs-lg)' }}>
         <b>{car.code}</b> <span style={{ color: 'var(--slate)' }}>{car.team}</span>
       </div>
-      <div style={{ fontFamily: 'var(--display)', fontSize: 28 }}>
-        {car.speed ?? 0} <span style={{ fontSize: 14, color: 'var(--slate)' }}>km/h</span>
+      <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-hero)' }}>
+        {car.speed ?? 0} <span style={{ fontSize: 'var(--fs-lg)', color: 'var(--slate)' }}>km/h</span>
         <span style={{ marginLeft: 16 }}>G{car.gear ?? 0}</span>
-        {car.drs ? <span style={{ marginLeft: 16, color: '#3bb273' }}>DRS</span> : <span style={{ marginLeft: 16, color: 'var(--edge)' }}>DRS</span>}
+        {/* The off state used --edge (a border colour, 1.2:1) and was effectively
+            invisible; --dim reads as deliberately-off at 3.4:1. */}
+        <span style={{ marginLeft: 16, color: car.drs ? 'var(--good)' : 'var(--dim)' }}>
+          DRS
+        </span>
       </div>
-      <Bar label="Throttle" value={car.throttle ?? 0} />
-      <Bar label="Brake" value={car.brake ?? 0} />
+      <Bar label="Throttle" value={car.throttle ?? 0} tone="good" />
+      <Bar label="Brake" value={car.brake ?? 0} tone="bad" />
       {history && history.length >= 2 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--fs-sm)' }}>
           <span style={{ width: 64, color: 'var(--slate)' }}>Laps</span>
-          <Sparkline values={history} />
+          <Sparkline values={history} label={`${car.code} lap time trend`} />
           <span>{fmtLap(history[history.length - 1])}</span>
         </div>
       )}
       {gapHistory && gapHistory.length >= 2 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--fs-sm)' }}>
           <span style={{ width: 64, color: 'var(--slate)' }}>Gap</span>
-          <Sparkline values={gapHistory} />
+          <Sparkline values={gapHistory} label={`${car.code} gap trend`} />
           <span>{fmtGap(gapHistory[gapHistory.length - 1])}</span>
         </div>
       )}
@@ -93,14 +127,15 @@ export function TelemetryPanel({
   const others = Object.values(state.cars).filter((c) => c.driverNum !== car.driverNum);
   return (
     <div style={{ display: 'grid', gap: 8 }}>
+      <SparkHatch />
       {others.length > 0 && onRivalChange && (
-        <label style={{ fontSize: 11, color: 'var(--slate)', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--slate)', display: 'flex', alignItems: 'center', gap: 6 }}>
           vs
           <select
             value={rival ?? ''}
             onChange={(e) => onRivalChange(e.target.value ? Number(e.target.value) : null)}
             className="btn"
-            style={{ fontSize: 11 }}
+            style={{ fontSize: 'var(--fs-xs)' }}
           >
             <option value="">— none —</option>
             {others.map((c) => (

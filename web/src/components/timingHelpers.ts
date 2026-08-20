@@ -132,8 +132,9 @@ export function updatePersonalBests(prev: Bests, cars: Car[]): Bests {
   return next;
 }
 
-const PURPLE = '#b14aff'; // session-best
-const GREEN = '#3bb273';  // personal-best
+// Tokens, not hexes, so a palette change reaches the sector cells too.
+const PURPLE = 'var(--best-session)'; // session-best
+const GREEN = 'var(--good)';          // personal-best
 
 // sectorColour returns the cell colour for a sector value: purple if it ties the
 // session-best, else green if it ties this driver's personal-best, else none.
@@ -143,6 +144,18 @@ export function sectorColour(
   if (!v || v <= 0) return undefined;
   if (v === sessionBest) return PURPLE;
   if (v === personalBest) return GREEN;
+  return undefined;
+}
+
+// sectorMark is the same information as sectorColour, as a glyph: colour alone
+// would leave a purple/green best sector indistinguishable to a colour-blind
+// reader. 'S' = session best, 'P' = personal best.
+export function sectorMark(
+  v: number | undefined, sessionBest: number, personalBest: number,
+): 'S' | 'P' | undefined {
+  if (!v || v <= 0) return undefined;
+  if (v === sessionBest) return 'S';
+  if (v === personalBest) return 'P';
   return undefined;
 }
 

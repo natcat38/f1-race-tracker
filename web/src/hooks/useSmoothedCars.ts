@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Car, RaceState, Point } from '../state/race';
+import { useReducedMotion } from './useReducedMotion';
 
 // Returns cars with positions interpolated at display refresh rate.
 // Cars glide from their previous position to their current position over one
 // frame interval (~100 ms at 10 Hz), keeping motion smooth at the display's
 // native refresh rate.
 export function useSmoothedCars(state: RaceState): Car[] {
+  const reducedMotion = useReducedMotion();
   const from = useRef<Record<number, Point>>({});
   const to = useRef<Record<number, Point>>({});
   const tFrom = useRef(0);
@@ -34,6 +36,9 @@ export function useSmoothedCars(state: RaceState): Car[] {
   // published to state so the component re-renders at the display's native
   // refresh rate with smooth motion.
   useEffect(() => {
+    // Reduced motion: no interpolation loop at all (see the return below, which
+    // hands back each frame's reported positions directly).
+    if (reducedMotion) return;
     let raf = 0;
     const loop = () => {
       const now = performance.now();
@@ -49,7 +54,10 @@ export function useSmoothedCars(state: RaceState): Car[] {
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [reducedMotion]);
 
-  return smoothed;
+  // Cars jump straight to each frame's reported position — still a positional
+  // update every 100ms, just without the continuous per-refresh glide. Derived
+  // rather than synced into state, so there is no second render per frame.
+  return reducedMotion ? Object.values(state.cars) : smoothed;
 }
