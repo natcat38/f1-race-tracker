@@ -51,7 +51,9 @@ export function SourceToggle({ state }: { state: RaceState }) {
           </button>
         ))}
       </div>
-      {error && <span className="src-error">{error}</span>}
+      <span role="status" aria-live="polite">
+        {error && <span className="src-error">{error}</span>}
+      </span>
     </div>
   );
 }

@@ -44,10 +44,12 @@ export function StatusRail({
           {state.weather && (
             <span className="rail-lap" title="Baked from session weather data">
               TRK {state.weather.trackTempC.toFixed(0)}° · AIR {state.weather.airTempC.toFixed(0)}°
-              {state.weather.rainfall && <span style={{ color: '#3671C6' }}> · RAIN</span>}
+              {state.weather.rainfall && <span style={{ color: 'var(--rain)' }}> · RAIN</span>}
             </span>
           )}
-          <StatusBadge status={status ?? 'connecting'} state={state} staleSec={staleSec} />
+          <span role="status" aria-live="polite">
+            <StatusBadge status={status ?? 'connecting'} state={state} staleSec={staleSec} />
+          </span>
         </>
       )}
       {note && <span className="rail-note">{note}</span>}

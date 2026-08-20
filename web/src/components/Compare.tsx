@@ -5,6 +5,7 @@ import { Map } from './Map';
 import { Standings } from './Standings';
 import { Panel } from './Panel';
 import { StatusRail } from './StatusRail';
+import { Route } from './Route';
 import { StatusBadge } from './StatusBadge';
 import { useStale } from '../hooks/useStale';
 
@@ -38,13 +39,15 @@ function Lane({ session, year }: { session: string; year: string }) {
 
 export function Compare() {
   return (
-    <div className="page">
-      <StatusRail active="compare" note="Fixed historical replay — Monza 2023 vs 2024" />
+    <Route
+      title="Compare — Monza 2023 vs 2024"
+      rail={<StatusRail active="compare" note="Fixed historical replay — Monza 2023 vs 2024" />}
+    >
       <div className="compare-lanes">
         {PAIR.map((p) => (
           <Lane key={p.session} session={p.session} year={p.year} />
         ))}
       </div>
-    </div>
+    </Route>
   );
 }

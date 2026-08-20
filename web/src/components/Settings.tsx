@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Panel } from './Panel';
 import { StatusRail } from './StatusRail';
+import { Route } from './Route';
 import { parseAuthStatus, relativeExpiry, type AuthStatus } from '../state/f1auth';
 
 const POLL_MS = 5000;
@@ -78,9 +79,10 @@ export function Settings() {
   const noSubscription = auth.state === 'linked' && auth.tier !== 'active';
 
   return (
-    <div className="page">
-      <StatusRail active="settings" note="F1TV link — beta" />
-
+    <Route
+      title="F1TV account link"
+      rail={<StatusRail active="settings" note="F1TV link — beta" />}
+    >
       <Panel
         label="F1TV Link — beta"
         actions={<span className={CHIP[auth.state]}>{CHIP_LABEL[auth.state]}</span>}
@@ -167,6 +169,6 @@ export function Settings() {
           </>
         )}
       </Panel>
-    </div>
+    </Route>
   );
 }
