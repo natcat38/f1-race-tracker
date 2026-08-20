@@ -26,6 +26,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 from live_signalr import _replay_capture  # noqa: E402
 
 CAPTURE_PATH = os.path.join(os.path.dirname(__file__), "tests", "capture_sample.txt")
+CAPTURE_PATH_RADIO_TAIL = os.path.join(
+    os.path.dirname(__file__), "tests", "capture_sample_radio_tail.txt")
 
 
 class FakeRedis:
@@ -100,8 +102,51 @@ def test_replay_capture_delivers_live_radio_on_frames():
     assert len(framed[0]["radio"]) == 2, framed[0]
 
 
+TAIL_CLIP = ("https://livetiming.formula1.com/static/"
+             "2024/2024-09-01_Italian_Grand_Prix/2024-09-01_Race/TeamRadio/"
+             "MAXVER01_1_20240901_130000.mp3")
+
+
+def test_replay_capture_flushes_trailing_radio_at_capture_end():
+    """Radio arriving after the last position-triggered frame must still reach
+    subscribers (issue #62). capture_sample_radio_tail.txt's *last* event is a
+    TeamRadio message — unlike capture_sample.txt, which ends on Position.z — so
+    with the pre-fix code (refs only drained inside the position-publish branch)
+    that ref never rides any frame and is silently dropped at replay end.
+    """
+    r = FakeRedis()
+    _replay_capture(r, "test-session", "Test Capture", CAPTURE_PATH_RADIO_TAIL)
+
+    snap = json.loads(r.store["snapshot:test-session"])
+    refs = snap.get("radio", [])
+    assert len(refs) == 1, f"expected the trailing TeamRadio ref to reach the snapshot, got {refs}"
+    assert refs[0]["clip"] == TAIL_CLIP, refs
+    assert refs[0]["driverNum"] == 1, refs
+
+    all_published = [json.loads(msg) for _, msg in r.published]
+    assert len(all_published) >= 2, (
+        "expected the Position.z sample's own frame plus a separate trailing "
+        f"radio-only frame, got {all_published}"
+    )
+    trailing = all_published[-1]
+    assert trailing.get("radio", []) and len(trailing["radio"]) == 1, trailing
+    assert trailing["radio"][0]["clip"] == TAIL_CLIP, trailing
+
+    # The trailing frame carries no new car data — it reuses the last known
+    # car list (from the one Position.z sample) rather than emitting nothing
+    # or something malformed against the Frame contract.
+    assert trailing["cars"], "expected the trailing frame to reuse the last known car list"
+    assert trailing["cars"][0]["driverNum"] == 1
+
+    # rev keeps advancing past the last regular frame (the trailing frame is a
+    # real, later frame, not a rewind), and timeMs does not go backwards.
+    assert trailing["rev"] > all_published[0]["rev"]
+    assert trailing["timeMs"] >= all_published[0]["timeMs"]
+
+
 if __name__ == "__main__":
     test_replay_capture_populates_timing_and_tyre_fields()
     test_replay_capture_delivers_live_radio_on_frames()
+    test_replay_capture_flushes_trailing_radio_at_capture_end()
     print("capture-replay field-coverage self-check PASSED")
     sys.exit(0)

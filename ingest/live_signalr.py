@@ -294,6 +294,49 @@ def _session_path_from_payload(payload):
     return ""
 
 
+def _publish_trailing_radio_frame(r, session, snapshot, rev, time_ms, cars_list, radio):
+    """Emit one extra frame carrying only pending radio refs, at stream end.
+
+    Both `_replay_capture` and `_run_live_signalr` only drain `pending_radio`
+    inside the position-sample publish path, so refs collected after the last
+    published frame (a capture/stream ending shortly after a TeamRadio message,
+    or one arriving before any position data flows) were previously dropped
+    silently at process exit (issue #62). Call this once, on the way out,
+    with whatever refs are still pending.
+
+    Bumps `rev` once more than the stream otherwise would have and carries no
+    new car data — ADR-0008's amendment accepts this trade-off in exchange for
+    already-connected clients actually receiving the refs. `cars_list` is the
+    latest known car list (may be empty if no position data ever arrived); we
+    reuse it rather than inventing data, so the frame stays well-formed against
+    the event model (Frame.Cars has no `omitempty`, so `[]` is the correct
+    empty representation, not `None`).
+    """
+    rev += 1
+    snapshot['radio'] = snapshot.get('radio', []) + radio
+    snapshot['rev'] = rev
+    if time_ms > snapshot.get('timeMs', 0):
+        snapshot['timeMs'] = time_ms
+    frame = build_frame(session, rev, snapshot['timeMs'], cars_list, radio=radio)
+    r.set(snap_key(session), json.dumps(snapshot, separators=(",", ":")))
+    r.publish(frames_chan(session), json.dumps(frame, separators=(",", ":")))
+    _log.info(
+        f"Published trailing frame at stream end with {len(radio)} pending "
+        "radio ref(s) that had not yet ridden a frame"
+    )
+    return rev
+
+
+def _log_dropped_deferred_radio(deferred_radio):
+    """Log (rather than silently drop) TeamRadio payloads that never got a
+    SessionInfo.Path to resolve clip URLs against, at stream end."""
+    if deferred_radio:
+        _log.warning(
+            f"Dropping {len(deferred_radio)} TeamRadio payload(s) at stream end: "
+            "SessionInfo.Path never arrived, so clip URLs could never be resolved"
+        )
+
+
 def _replay_capture(r, session: str, label: str, capture_path: str) -> None:
     """Replay a saved SignalR capture file through the Redis contract.
 
@@ -510,6 +553,19 @@ def _replay_capture(r, session: str, label: str, capture_path: str) -> None:
         r.set(snap_key(session), json.dumps(snapshot, separators=(",", ":")))
         r.publish(frames_chan(session), json.dumps(frame, separators=(",", ":")))
 
+    # Issue #62: refs collected after the loop's last publish (the capture ends
+    # shortly after a TeamRadio message, or one arrived before any position data)
+    # would otherwise be dropped silently. `session_s` still holds the last
+    # event's session-relative time (the loop always runs at least once here —
+    # an empty `events` list returns earlier), so the trailing frame's timeMs
+    # keeps advancing rather than rewinding.
+    if pending_radio:
+        rev = _publish_trailing_radio_frame(
+            r, session, snapshot, rev, int(session_s * 1000),
+            list(latest_cars.values()), list(pending_radio))
+        pending_radio.clear()
+    _log_dropped_deferred_radio(deferred_radio)
+
     _log.info(f"Capture replay complete. Published {rev - starting_rev(r, session)} frames")
 
 
@@ -699,6 +755,18 @@ def _run_live_signalr(r, session: str, label: str) -> None:
         client.start()
     except KeyboardInterrupt:
         _log.info("Stopped by user")
+    finally:
+        # Issue #62: client.start() returning — by Ctrl-C, the 2-minute no-data
+        # timeout (session ended), or any other reason — must not silently drop
+        # radio refs collected since the last position-triggered publish. Runs
+        # on every exit path, including an exception propagating past here.
+        if pending_radio:
+            rev_holder[0] = _publish_trailing_radio_frame(
+                r, session, snapshot_holder[0], rev_holder[0],
+                int(time.time() * 1000), list(latest_cars.values()),
+                list(pending_radio))
+            pending_radio.clear()
+        _log_dropped_deferred_radio(deferred_radio)
 
 
 # ---------------------------------------------------------------------------

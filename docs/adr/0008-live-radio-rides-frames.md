@@ -55,3 +55,28 @@ file `SignalRClient` already writes (`CAPTURE_OUT`): a single real session settl
   earlier clips from the history panel, and the list is tiny.
 - **Fire live clips on the clock anyway, with a widened window** — the lag is unbounded
   (clips can publish minutes late); any window wide enough is a window that misfires.
+
+## Amended 2026-08 — refs pending at stream end (issue #62)
+
+"Refs ride frames" quietly assumed a frame would always follow. Both `_replay_capture`
+and `_run_live_signalr` only drained `pending_radio` inside the position-sample publish
+path — so a capture/stream that ended shortly after a `TeamRadio` message, or a ref that
+arrived before any `Position.z` data had flowed, sat in `pending_radio` and was dropped
+silently when the process exited. Two genuine options, same as the original decision:
+
+1. **Emit a trailing frame** on shutdown / end-of-capture carrying the pending refs.
+   Faithful to "refs ride frames": already-connected clients get them without needing
+   to reconnect.
+2. **Fold the remainder into the snapshot only** (`SET` without `PUBLISH`) — cheaper,
+   but invisible to already-connected clients until they reconnect, which contradicts
+   the "refs ride frames, snapshot accumulates" split above.
+
+Chose **option 1**. Both ingest paths now flush `pending_radio` into one extra frame on
+their way out — `_replay_capture` after its event loop ends, `_run_live_signalr` in a
+`finally` around `client.start()` so it runs on every exit path (Ctrl-C, the SignalR
+client's own no-data timeout, or an exception propagating through). That frame bumps
+`rev` once more than the stream otherwise would have and carries no new car data; it
+reuses the last known car list rather than emitting an empty or invented one, so it
+stays well-formed against the `Frame` contract. The one case still deliberately dropped
+— a `TeamRadio` payload that arrived before `SessionInfo.Path` ever did, so its clip URL
+could never be resolved — is now logged at `WARNING` instead of vanishing silently.
