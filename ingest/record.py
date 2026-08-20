@@ -41,7 +41,7 @@ from fastf1 import _api
 from radio import extract_radio
 from race_control import extract_race_control
 from ghost import build_lap_trace
-from resample import nearest_index, step_value, in_window_ms
+from resample import nearest_index, step_value, in_window_ms, reconcile_positions, UNKNOWN_POS
 
 # ---------------------------------------------------------------------------
 # Args
@@ -332,10 +332,17 @@ for num in session.drivers:
     )
 
 def get_position(driver_num, session_time_s):
-    """Return driver's running position at a given session time (step lookup)."""
+    """Return driver's RAW running position at a given session time (step
+    lookup into this driver's own timeline only).
+
+    This is deliberately not reconciled against other drivers — two drivers'
+    lookups can disagree at the same instant (one's most recent update stale
+    relative to another's), which is exactly why every frame's cars list is
+    passed through reconcile_positions() before it's written (see #66).
+    """
     times, positions = order_lookup.get(driver_num, ([], []))
     if not positions:
-        return 99  # unknown
+        return UNKNOWN_POS
     return step_value(times, positions, session_time_s, positions[0])
 
 # ---------------------------------------------------------------------------
@@ -699,13 +706,25 @@ with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
                     car['drs'] = True
             cars.append(car)
 
+        # 'lap' is needed as reconcile_positions()'s tie-break, so it must be
+        # assigned before reconciliation rather than in the gap/interval pass below.
+        for car in cars:
+            car['lap'] = _lap_number(car['driverNum'], t_s)
+
+        # Reconcile 'pos' once per frame across all drivers (#66): get_position()
+        # above is an independent per-driver lookup, so raw values can collide,
+        # leave gaps, or carry the UNKNOWN_POS sentinel. This sorts by each
+        # driver's raw position (tie-broken by laps completed, then driver
+        # number) and renumbers 1..N so every frame's running order is unique
+        # and contiguous.
+        reconcile_positions(cars)
+
         # --- gap / interval pass (best-effort) ---
         # Race distance in "lap units" = whole lap number + fraction round the lap.
         lapn, frac, dist = {}, {}, {}
         for car in cars:
             dn = car['driverNum']
-            lapn[dn] = _lap_number(dn, t_s)
-            car['lap'] = lapn[dn]
+            lapn[dn] = car['lap']
             frac[dn] = _lap_fraction(car['p']['x'], car['p']['y'])
             dist[dn] = lapn[dn] + frac[dn]
         by_pos = sorted(cars, key=lambda c: c['pos'])
