@@ -337,6 +337,42 @@ def _log_dropped_deferred_radio(deferred_radio):
         )
 
 
+def _shutdown_flush_radio(r, session, snapshot, rev, latest_cars, pending_radio, deferred_radio):
+    """`_run_live_signalr`'s shutdown-time radio flush: best-effort trailing
+    frame, then the deferred-drop log line — unconditionally. Returns the
+    (possibly bumped) rev.
+
+    Pulled out of the `finally` block so it can be driven directly in tests
+    without needing a real or faked SignalRClient, and so the ordering
+    guarantee (flush attempt, then deferred logging, no matter what) lives in
+    one place.
+
+    Called from a `finally` around `client.start()`: if that call raised
+    because Redis itself died (or is simply unreachable), an unguarded
+    `_publish_trailing_radio_frame` here would raise a *second* exception —
+    becoming the misleading proximate error in place of whatever
+    client.start() actually raised, and skipping `_log_dropped_deferred_radio`
+    entirely. Both defeat issue #62's "logged, never silent" guarantee. So the
+    flush is caught and logged at WARNING instead, and the deferred-drop log
+    always runs; the original exception from client.start(), if any, is
+    untouched by this function and propagates normally once `finally` exits.
+    """
+    if pending_radio:
+        n_pending = len(pending_radio)
+        try:
+            rev = _publish_trailing_radio_frame(
+                r, session, snapshot, rev, int(time.time() * 1000),
+                list(latest_cars.values()), list(pending_radio))
+            pending_radio.clear()
+        except Exception as exc:
+            _log.warning(
+                f"Failed to publish trailing frame: {n_pending} pending "
+                f"radio ref(s) lost at stream end: {exc}"
+            )
+    _log_dropped_deferred_radio(deferred_radio)
+    return rev
+
+
 def _replay_capture(r, session: str, label: str, capture_path: str) -> None:
     """Replay a saved SignalR capture file through the Redis contract.
 
@@ -759,14 +795,12 @@ def _run_live_signalr(r, session: str, label: str) -> None:
         # Issue #62: client.start() returning — by Ctrl-C, the 2-minute no-data
         # timeout (session ended), or any other reason — must not silently drop
         # radio refs collected since the last position-triggered publish. Runs
-        # on every exit path, including an exception propagating past here.
-        if pending_radio:
-            rev_holder[0] = _publish_trailing_radio_frame(
-                r, session, snapshot_holder[0], rev_holder[0],
-                int(time.time() * 1000), list(latest_cars.values()),
-                list(pending_radio))
-            pending_radio.clear()
-        _log_dropped_deferred_radio(deferred_radio)
+        # on every exit path, including an exception propagating past here (see
+        # _shutdown_flush_radio's docstring for why the flush itself must be
+        # best-effort here, unlike _replay_capture's — this one is a `finally`).
+        rev_holder[0] = _shutdown_flush_radio(
+            r, session, snapshot_holder[0], rev_holder[0], latest_cars,
+            pending_radio, deferred_radio)
 
 
 # ---------------------------------------------------------------------------
