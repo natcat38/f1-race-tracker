@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { RaceState } from '../state/race';
 import type { ConnStatus } from '../realtime/socket';
 import { StatusBadge } from './StatusBadge';
-import { fmtClock } from './timingHelpers';
+import { fmtClock, orderCars } from './timingHelpers';
 
 const TABS = [
   { key: 'board', href: '#', label: 'BOARD', sub: 'live board' },
@@ -28,8 +28,12 @@ export function StatusRail({
 }) {
   // The race leader's current lap, out of the session's total — the recorder bakes
   // both from FastF1's lap data (ingest/record.py's _lap_number / TOTAL_LAPS), so
-  // this is exact, not a derived estimate like Gap/Int.
-  const leaderLap = state && Object.values(state.cars).find((c) => c.pos === 1)?.lap;
+  // this is exact, not a derived estimate like Gap/Int. Read off orderCars' running
+  // order (front of the sorted list) rather than matching pos===1 directly: the wire
+  // now reconciles pos into a unique, contiguous 1..N per frame (#66), but orderCars'
+  // tie-break stays as belt-and-braces, so this degrades honestly instead of the
+  // whole badge vanishing if a stale/malformed frame ever lacked a literal pos:1.
+  const leaderLap = state && orderCars(state.cars)[0]?.lap;
 
   return (
     <div className="rail">

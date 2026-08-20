@@ -145,6 +145,7 @@ from live import (
     build_frame,
 )
 from radio import live_radio_refs
+from resample import reconcile_positions, UNKNOWN_POS
 
 # Live team-radio clips resolve against this + SessionInfo.Path (ADR-0003 amended).
 STATIC_BASE = "https://livetiming.formula1.com"
@@ -555,7 +556,7 @@ def _replay_capture(r, session: str, label: str, capture_path: str) -> None:
                     'driverNum': _safe_int(num_str),
                     'code':      info['code'],
                     'team':      info['team'],
-                    'pos':       running_positions.get(num_str, 99),
+                    'pos':       running_positions.get(num_str, UNKNOWN_POS),
                     'p':         {'x': nx, 'y': ny},
                     'status':    status,
                 }
@@ -573,7 +574,12 @@ def _replay_capture(r, session: str, label: str, capture_path: str) -> None:
         last_publish = now
         rev += 1
         time_ms = int(session_s * 1000)
-        cars_list = list(latest_cars.values())
+        # Reconcile 'pos' once per frame across all drivers (#66): each car's raw
+        # 'pos' above is an independent per-driver lookup into running_positions,
+        # so values can collide, leave gaps, or carry the UNKNOWN_POS sentinel.
+        # Mutates the car dicts in place, so the reconciled pos also lands in
+        # `snapshot` below (same dict references).
+        cars_list = reconcile_positions(list(latest_cars.values()))
 
         for c in cars_list:
             snapshot['cars'][str(c['driverNum'])] = c
@@ -740,7 +746,7 @@ def _run_live_signalr(r, session: str, label: str) -> None:
                         'driverNum': _safe_int(num_str),
                         'code':      info['code'],
                         'team':      info['team'],
-                        'pos':       running_positions.get(num_str, 99),
+                        'pos':       running_positions.get(num_str, UNKNOWN_POS),
                         'p':         {'x': nx, 'y': ny},
                         'status':    _map_status(raw_status),
                     }
@@ -756,7 +762,9 @@ def _run_live_signalr(r, session: str, label: str) -> None:
             rev_holder[0] += 1
             rev = rev_holder[0]
             t_ms = int(time.time() * 1000)
-            cars_list = list(latest_cars.values())
+            # Reconcile 'pos' once per frame across all drivers (#66) — see the
+            # matching comment in _replay_capture above.
+            cars_list = reconcile_positions(list(latest_cars.values()))
             snap = snapshot_holder[0]
             for c in cars_list:
                 snap['cars'][str(c['driverNum'])] = c

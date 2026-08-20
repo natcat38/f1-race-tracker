@@ -9,6 +9,7 @@ from pathlib import Path
 
 from live import build_snapshot, build_frame, fold_messages
 from live_signalr import _parse_timing_line, _parse_tyre_line
+from resample import reconcile_positions, UNKNOWN_POS
 
 SNAP_KEYS = {"session", "mode", "label", "track", "radio", "lapTrace", "totalLaps", "stints", "cars", "timeMs", "rev"}
 FRAME_KEYS = {"session", "rev", "t", "timeMs", "cars"}
@@ -135,6 +136,38 @@ def test_key_sets_match_go_model():
     assert car_req <= car_keys, f"Go CarState requires keys Python omits: {car_req - car_keys}"
 
 
+def test_reconcile_positions_dedupes_and_fills_gaps():
+    """Demonstrates #66: get_position()/running_positions are independent
+    per-driver lookups, so nothing stops two drivers reporting the same
+    position, a position going unclaimed, or a stale car sitting on the
+    UNKNOWN_POS (99) sentinel forever. reconcile_positions() must turn that
+    into a unique, contiguous 1..N order every frame — this is the
+    regression test for the bug: it fails on the pre-fix code (which used
+    each car's raw, unreconciled 'pos' as-is) and passes once reconcile_positions
+    is applied.
+    """
+    cars = [
+        {'driverNum': 1, 'pos': 1, 'lap': 20},
+        {'driverNum': 4, 'pos': 4, 'lap': 20},    # tied on pos AND lap with 44 -> driver number breaks it
+        {'driverNum': 44, 'pos': 4, 'lap': 20},
+        {'driverNum': 55, 'pos': 4, 'lap': 19},   # tied on pos, fewer laps -> ranks behind 4 and 44
+        {'driverNum': 63, 'pos': UNKNOWN_POS, 'lap': 18},  # feed never updated this driver
+    ]
+
+    ordered = reconcile_positions(cars)
+
+    positions = [c['pos'] for c in ordered]
+    assert positions == sorted(set(positions)) == list(range(1, len(cars) + 1)), (
+        f"positions must be unique and contiguous 1..N, got {positions}"
+    )
+    assert all(c['pos'] != UNKNOWN_POS for c in ordered), "99 must never reach the wire"
+
+    by_num = {c['driverNum']: c['pos'] for c in ordered}
+    assert by_num[1] == 1
+    assert by_num[4] < by_num[44] < by_num[55], f"tie-break order wrong: {by_num}"
+    assert by_num[63] == 5, "UNKNOWN_POS car must sort last regardless of laps"
+
+
 def test_fold_messages_caps_at_30():
     existing = [{"rev": i} for i in range(28)]
     new = [{"rev": 28}, {"rev": 29}]
@@ -155,6 +188,7 @@ if __name__ == "__main__":
     test_frame_radio_key_optional()
     test_live_signalr_car_extras_match_contract()
     test_key_sets_match_go_model()
+    test_reconcile_positions_dedupes_and_fills_gaps()
     test_fold_messages_caps_at_30()
     print("live.py contract self-check PASSED")
     sys.exit(0)
