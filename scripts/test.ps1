@@ -13,6 +13,10 @@ Write-Host "== Web: npm test ==" -ForegroundColor Cyan
 Push-Location (Join-Path $root "web")
 try { npm test; if ($LASTEXITCODE -ne 0) { throw "npm test failed" } } finally { Pop-Location }
 
+Write-Host "== Python: pytest scripts ==" -ForegroundColor Cyan
+& $py -m pytest (Join-Path $root "scripts")
+if ($LASTEXITCODE -ne 0) { throw "pytest scripts failed" }
+
 Write-Host "== Python: pytest ingest ==" -ForegroundColor Cyan
 & $py -m pytest (Join-Path $root "ingest")
 if ($LASTEXITCODE -ne 0) { throw "pytest ingest failed" }

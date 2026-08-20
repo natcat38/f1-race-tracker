@@ -52,17 +52,48 @@ def _go_doc(path):
     return ""
 
 
+def _docstring_first_line(f):
+    """First line of f's module docstring, past any shebang/comment preamble."""
+    src = f.read_text(encoding="utf-8", errors="replace")
+    # Skip a shebang and any encoding/comment preamble: the docstring is
+    # still the module docstring when `#!/usr/bin/env python3` precedes it.
+    src = re.sub(r"\A(?:\s*#[^\n]*\n)+", "", src)
+    m = re.match(r'\s*(?:"""|\'\'\')(.*?)(?:"""|\'\'\')', src, re.S)
+    if m and m.group(1).strip():
+        return _first_sentence(m.group(1).strip().splitlines()[0])
+    return ""
+
+
+def _py_pkg_doc(path):
+    """Module docstring of <path>/__init__.py, if the directory declares one.
+
+    Mirrors _go_doc / _ts_doc: a package docstring is a deliberate declaration
+    of what the *directory* is for, so it takes precedence over guessing from
+    whichever module happens to be the largest (see _py_doc) — that heuristic
+    flips a directory's description whenever an unrelated file grows past
+    another one, which is not a signal of anything (#61).
+    """
+    init = path / "__init__.py"
+    if not init.is_file():
+        return ""
+    return _docstring_first_line(init)
+
+
 def _py_doc(path):
-    """Module docstring of the most substantial non-test .py file in the dir."""
-    cands = [f for f in path.glob("*.py") if not f.name.startswith(("test_", "check_"))]
+    """Module docstring of the most substantial non-test .py file in the dir.
+
+    Fallback for directories with no __init__.py package docstring (see
+    _py_pkg_doc) — used only when a directory hasn't declared its own purpose.
+    """
+    cands = [
+        f
+        for f in path.glob("*.py")
+        if f.name != "__init__.py" and not f.name.startswith(("test_", "check_"))
+    ]
     for f in sorted(cands, key=lambda p: p.stat().st_size, reverse=True):
-        src = f.read_text(encoding="utf-8", errors="replace")
-        # Skip a shebang and any encoding/comment preamble: the docstring is
-        # still the module docstring when `#!/usr/bin/env python3` precedes it.
-        src = re.sub(r"\A(?:\s*#[^\n]*\n)+", "", src)
-        m = re.match(r'\s*(?:"""|\'\'\')(.*?)(?:"""|\'\'\')', src, re.S)
-        if m and m.group(1).strip():
-            return _first_sentence(m.group(1).strip().splitlines()[0])
+        doc = _docstring_first_line(f)
+        if doc:
+            return doc
     return ""
 
 
@@ -97,7 +128,7 @@ def _describe(path):
     if any(path.glob("*.go")):
         return _go_doc(path)
     if any(path.glob("*.py")):
-        return _py_doc(path)
+        return _py_pkg_doc(path) or _py_doc(path)
     return _ts_doc(path)
 
 
