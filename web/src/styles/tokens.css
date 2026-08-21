@@ -7,11 +7,26 @@
   --carbon:  #14171C;  /* panel background */
   --edge:    #232A33;  /* 1px borders, dividers */
   --chalk:   #E9EDF1;  /* primary text */
-  --slate:   #8A94A0;  /* secondary text */
-  --dim:     #646D79;  /* deliberately-off states (DRS inactive) — 3.4:1 on carbon */
-  --amber:   #FFB000;  /* ATTENTION ONLY: stall, reconnect, flags, safety car */
+  --slate:   #8A94A0;  /* secondary text — 5.8:1 on carbon */
+  /* The one de-emphasis colour. Everything that used to say "quieter" with
+     `opacity` on top of --slate/--chalk (retired rows, DRS off) now says it with
+     this token instead: opacity multiplied against a palette already tuned near
+     the 4.5:1 floor and dropped straight through it (retired Gap cells measured
+     2.40:1, DRS-off 3.43:1). Raised from #646D79 to 4.8:1 on carbon / 5.2:1 on
+     asphalt, which still reads as clearly recessed next to full-strength --chalk
+     — relative contrast against neighbouring rows is what carries "de-emphasised",
+     and that survives fine above the threshold. */
+  --dim:     #7C8590;
+  --amber:   #FFB000;  /* ATTENTION ONLY: stall, reconnect, flags, safety car (9.8:1 on carbon) */
   --onair:   #E10600;  /* F1 brand red — FILLS ONLY (the LIVE chip wash). Too dark
                           for text on carbon at 3.6:1; use --bad for red text. */
+
+  /* "This car is in the pit lane" — an attention state on a timing tower, not a
+     tyre compound. It used to borrow TYRE_COLOUR.MEDIUM, so retuning the medium
+     swatch for legibility silently restyled the tower. Aliased to --amber rather
+     than given its own hex: the value is identical today and duplicating it would
+     be the same mistake in a new place. Named separately so the two CAN diverge. */
+  --pit: var(--amber);
 
   /* Semantic pair for "better/worse" readouts: DRS on, throttle vs brake,
      faster/slower sparkline bars, ghost delta sign, error text.
@@ -22,30 +37,105 @@
   --bad:  #FF4238;
 
   --best-session: #B14AFF;  /* purple sector — session best (4.5:1 on carbon) */
-  --rain: #5AB0F0;  /* weather readout — deliberately NOT Red Bull's #3671C6 */
+  --rain: #5AB0F0;  /* water on the circuit — deliberately NOT Red Bull's #3671C6
+                       so a weather readout is never mistaken for a car (7.6:1) */
 
-  /* Track map chrome, shared by the board map and the ghost overlay. */
-  --track-edge:  #333333;  /* outer casing stroke */
-  --track-fill:  #1A1A1A;  /* inner surface stroke */
+  /* Channel triplets for the same colours, so the rgba() washes below can be
+     composed FROM the token instead of re-typing its channels. Every hover state
+     and chip wash used to say `rgba(233, 237, 241, 0.06)`, which meant changing
+     --chalk left three hover states on the old hue — the single biggest reason a
+     palette swap was not a one-file edit. Keep each triplet in step with the hex
+     above it; they are the same colour written twice because CSS has no way to
+     decompose a hex into channels. */
+  --chalk-rgb: 233 237 241;
+  --onair-rgb: 225 6 0;
+  --amber-rgb: 255 176 0;
+
+  /* The one hover wash, named once. It appeared byte-identically at three sites
+     (.rail-tab, .btn, and a 0.04 variant on .tt-row). */
+  --hover-wash: rgb(var(--chalk-rgb) / 0.06);
+  --hover-wash-faint: rgb(var(--chalk-rgb) / 0.04);
+
+  /* Tyre compounds. These are brand data, like team colours — the compound
+     colours are set by F1, not by this theme — but they live here rather than as
+     literals in timingHelpers.ts so their relationship to the palette is visible
+     and deliberate. Two of them ARE palette colours and say so by aliasing;
+     the other three carry their own value because no palette colour matches.
+     They are text in the tower's "S5"/"W2" readout as well as fills in the
+     strategy bars, so all five are held to the 4.5:1 text floor on --carbon,
+     not the 3:1 non-text one. Ratios by WCAG relative-luminance math. */
+  --tyre-soft:   #F25A54;  /* 5.45:1. Deliberately NOT --bad: a soft tyre is not a
+                              "worse" readout, and pointing it at the error/slower
+                              red would be the same semantic borrow --pit just
+                              stopped doing. Lifted from F1's #e1342e (4.05:1). */
+  --tyre-medium: #e8c84a;  /* 10.9:1 */
+  --tyre-hard:   #e8e8e8;  /* 14.7:1 */
+  --tyre-inter:  var(--good);  /* was #3bb273 — a lowercase re-type of --good's
+                                  exact value. Aliased, not duplicated. 6.7:1 */
+  --tyre-wet:    var(--rain);  /* was #3671C6, which is EXACTLY Red Bull's blue —
+                                  the collision --rain's comment exists to prevent.
+                                  Water on the circuit already has a token; the wet
+                                  compound is the same idea, so it uses it. 7.6:1 */
+
+  /* Track map chrome, shared by the board map and the ghost overlay. A wide
+     casing stroke under a narrower surface stroke is the standard cartographic
+     way to draw a road — but the two values were the wrong way round for a dark
+     theme: the surface (#1A1A1A) was within a hair of the panel it sat on
+     (--carbon #14171C), so the "road" had no body and the circuit read as two
+     grey hairlines with nothing between them. The surface now sits a step ABOVE
+     --edge so it reads as tarmac, and the casing goes darker than the panel so
+     it reads as a seam cut into it. Both are decorative graphics, not readouts,
+     so no contrast floor applies; the driver-code label is the only text here. */
+  --track-fill:  #2B313A;  /* inner surface stroke — the road itself */
+  --track-edge:  var(--asphalt);  /* outer casing stroke — the gutter/shadow */
   --track-label: #EEEEEE;  /* driver code beside a car marker */
+
+  /* Car-marker chrome on those maps. Previously six hardcoded greys sitting
+     directly beside correct var(--track-*) usage in Map.tsx and Ghost.tsx. */
+  --marker-stroke: #000000;  /* outline that separates a car from the track */
+  --marker-halo:   #FFFFFF;  /* the solid (this-year) car in the ghost overlay */
+  --ghost-rule:    #444444;  /* delta-bar midline — a decorative axis, not a
+                                readout, so it is not held to a contrast floor */
+  --team-unknown:  #BBBBBB;  /* fallback fill for a team with no brand colour */
 
   --display: 'Chakra Petch', system-ui, sans-serif;
   --data: 'Martian Mono Variable', 'Martian Mono', ui-monospace, Consolas, monospace;
 
+  /* A dense timing UI legitimately needs a step below 4px — table cell padding,
+     superscript offsets, the nav tab's label/sub-label gap. It was there all
+     along as eight separate raw `2px` integers; naming it makes it a scale step
+     rather than drift. */
+  --sp-0: 2px;
   --sp-1: 4px;
   --sp-2: 8px;
   --sp-3: 12px;
   --sp-4: 16px;
   --sp-6: 24px;
 
-  --fs-3xs: 9px;
-  --fs-2xs: 10px;
-  --fs-xs: 11px;
-  --fs-sm: 12px;
-  --fs-md: 13px;
-  --fs-lg: 14px;
-  --fs-xl: 18px;
-  --fs-hero: 28px;
+  /* rem, not px, so raising the browser's default font size actually scales the
+     board — the accommodation a low-vision user reaches for before page zoom.
+     :root deliberately sets no font-size, so 1rem stays the user's own default
+     (16px unless they changed it) and the px values in the comments are just
+     what each token resolves to at that default.
+
+     The bottom two rungs are retired: --fs-3xs was 9px and --fs-2xs 10px, and
+     they carried real meaning (sector-best S/P marks, sector delta superscripts,
+     the tyre legend, Race Control timestamps) at a size a lot of sighted readers
+     can't parse either. They now alias --fs-xs/--fs-sm; the names stay so the
+     intent at each call site is still legible. */
+  --fs-3xs: 0.6875rem;  /* 11px */
+  --fs-2xs: 0.75rem;    /* 12px */
+  --fs-xs: 0.6875rem;   /* 11px */
+  --fs-sm: 0.75rem;     /* 12px */
+  --fs-md: 0.8125rem;   /* 13px */
+  --fs-lg: 0.875rem;    /* 14px */
+  --fs-xl: 1.125rem;    /* 18px */
+  /* The missing rung between 18px and the 28px hero. Broadcast graphics are
+     defined by scale contrast and this scale had a hole exactly where the
+     secondary headline numbers live — the Ghost delta readout, which was
+     rendering at control size beside a <select>. */
+  --fs-2xl: 1.375rem;   /* 22px */
+  --fs-hero: 1.75rem;   /* 28px */
 }
 
 * {

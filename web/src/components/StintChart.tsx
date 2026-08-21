@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import type { RaceState } from '../state/race';
-import { leaderLapOf, orderCars, sameRunningOrder, TYRE_COLOUR } from './timingHelpers';
+import { axisTicks, leaderLapOf, orderCars, sameRunningOrder, TYRE_COLOUR } from './timingHelpers';
 
 // StintChart is the full-race strategy timeline: one row per car (running
 // order), each stint drawn as a coloured segment on a 0..totalLaps axis, with
@@ -12,7 +12,9 @@ import { leaderLapOf, orderCars, sameRunningOrder, TYRE_COLOUR } from './timingH
 // mid-race; the row order and the leader-lap marker are what move. Memoized on
 // those (not `state` itself, which gets a new identity every 10Hz frame) so the
 // full sort + per-driver stint bars aren't rebuilt every tick.
-function StintChartInner({ state }: { state: RaceState }) {
+function StintChartInner({ state, selected, rival }: {
+  state: RaceState; selected?: number | null; rival?: number | null;
+}) {
   const order = orderCars(state.cars).filter((c) => state.stints[c.driverNum]?.length);
   if (order.length === 0) return <div className="empty">No stint data for this session.</div>;
 
@@ -22,9 +24,24 @@ function StintChartInner({ state }: { state: RaceState }) {
   const total = state.totalLaps || 1;
 
   return (
+    // Deliberately off the 2/4/8/12/16/24 scale, and the only value in the app
+    // that is. This gap repeats between twenty rows, so the nearest step either
+    // way moves the panel's height by ~19px — enough to re-flow the four-up
+    // bottom strip, which every other panel in it shares a grid row with. A
+    // named half-step for one call site would be worse than an annotated 3.
     <div style={{ display: 'grid', gap: 3 }}>
       {order.map((c) => (
-        <div key={c.driverNum} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--fs-xs)' }}>
+        <div
+          key={c.driverNum}
+          // The board's selection reaches this panel too: the chosen driver's row
+          // is outlined and its code brought up to full strength, so the strategy
+          // story can be read for the car the rest of the board is talking about.
+          className={
+            c.driverNum === selected ? 'stint-row stint-row-selected'
+              : c.driverNum === rival ? 'stint-row stint-row-rival' : 'stint-row'
+          }
+          style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', fontSize: 'var(--fs-xs)' }}
+        >
           <span style={{ width: 28, flexShrink: 0 }}>{c.code}</span>
           <div style={{ position: 'relative', flex: 1, height: 10, background: 'var(--edge)', borderRadius: 2 }}>
             {state.stints[c.driverNum].map((s, i) => (
@@ -61,8 +78,33 @@ function StintChartInner({ state }: { state: RaceState }) {
           </div>
         </div>
       ))}
-      <div className="empty" style={{ fontSize: 'var(--fs-2xs)', marginTop: 2 }}>
-        Full-race stint plan baked from session data — the replay window sits inside it.
+      {/* An unlabelled 0..53 axis: the chart had no lap numbers anywhere, no ticks,
+          and the chalk line marking the leader's lap was legible only to a screen
+          reader. The axis strip is offset by the 28px code gutter so its ticks line
+          up with the bars above them. */}
+      <div className="stint-axis" aria-hidden="true">
+        <span style={{ width: 28, flexShrink: 0 }} />
+        <div className="stint-axis-track">
+          {axisTicks(total).map((lap) => (
+            <span key={lap} className="stint-tick" style={{ left: `${((lap - 1) / total) * 100}%` }}>{lap}</span>
+          ))}
+          {leaderLap != null && (
+            <span className="stint-tick stint-tick-leader" style={{ left: `${((leaderLap - 1) / total) * 100}%` }}>
+              ▲L{leaderLap}
+            </span>
+          )}
+        </div>
+      </div>
+      {/* The tyre key lived in the Timing panel, several hundred pixels away and
+          in a different container — and on touch there is no hover to recover the
+          compound from. It costs one line to repeat it where the colours are. */}
+      <div className="empty tt-legend" style={{ fontSize: 'var(--fs-2xs)' }}>
+        {(['SOFT', 'MEDIUM', 'HARD', 'INTERMEDIATE', 'WET'] as const).map((t) => (
+          <span key={t} style={{ color: TYRE_COLOUR[t] }}>{t[0]}{t.slice(1).toLowerCase()}</span>
+        ))}
+      </div>
+      <div className="empty" style={{ fontSize: 'var(--fs-2xs)', marginTop: 'var(--sp-0)' }}>
+        Full-race stint plan baked from session data — the marker is where the replay currently sits.
       </div>
     </div>
   );
@@ -72,8 +114,12 @@ function StintChartInner({ state }: { state: RaceState }) {
 // from EVERY car's pos, so a position swap that left the leader's lap unchanged
 // used to leave the chart's order stale indefinitely — and it's cheaper besides,
 // one O(n) field walk instead of the two full sorts leaderLapOf used to do here.
+// selected/rival join the comparator: they change what the chart draws, so a
+// memo that ignored them would leave the highlight one selection behind.
 export const StintChart = memo(StintChartInner, (prev, next) => (
   prev.state.stints === next.state.stints &&
   prev.state.totalLaps === next.state.totalLaps &&
+  prev.selected === next.selected &&
+  prev.rival === next.rival &&
   sameRunningOrder(prev.state.cars, next.state.cars)
 ));

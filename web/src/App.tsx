@@ -2,7 +2,7 @@
  * The React app shell: mounts the root component, wires the live WebSocket or static-replay data source into race state, and lays out the dashboard panels.
  * @packageDocumentation
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { connectRace, type ConnStatus } from './realtime/socket';
 import { connectStaticReplay } from './realtime/staticReplay';
 import { emptyState, type RaceState } from './state/race';
@@ -15,6 +15,7 @@ import { RaceControl } from './components/RaceControl';
 import { Panel } from './components/Panel';
 import { Route } from './components/Route';
 import { StatusRail } from './components/StatusRail';
+import { leaderOf } from './components/timingHelpers';
 import { useStale } from './hooks/useStale';
 import { useLapHistory } from './hooks/useLapHistory';
 import { useGapHistory } from './hooks/useGapHistory';
@@ -22,6 +23,11 @@ import { Compare } from './components/Compare';
 import { Ghost } from './components/Ghost';
 import { Settings } from './components/Settings';
 import { StintChart } from './components/StintChart';
+import { STATIC_DEMO } from './staticDemo';
+
+// How long the clip-wrapped notice stays up. Long enough to be read after the
+// clock visibly jumps, short enough not to become part of the chrome.
+const LOOP_NOTICE_MS = 8000;
 
 // Three distinct reasons the map is missing, so the copy never contradicts what
 // the rest of the board is showing: an unrecoverable static-demo load failure,
@@ -35,31 +41,111 @@ function SkeletonMap({ failed, trackless }: { failed?: boolean; trackless?: bool
   return <div className="track-skeleton">{copy}</div>;
 }
 
-// Build-time flag: VITE_STATIC_DEMO=true selects the file-backed static player
-// instead of the real WebSocket connection. Set only by the GitHub Pages build
-// (see .github/workflows/pages.yml) — docker-compose and local dev never set it.
-const STATIC_DEMO = import.meta.env.VITE_STATIC_DEMO === 'true';
-
 export default function App() {
   const [state, setState] = useState<RaceState>(emptyState());
   const [status, setStatus] = useState<ConnStatus>('connecting');
   const [hash, setHash] = useState<string>(typeof location !== 'undefined' ? location.hash : '');
   const [selected, setSelected] = useState<number | null>(null);
   const [rival, setRival] = useState<number | null>(null);
+  // WCAG 2.2.2: the board starts moving on load and never stops — car markers
+  // animate via rAF indefinitely and the tower repaints at 10 Hz — with no pause,
+  // stop or hide control anywhere. prefers-reduced-motion removes the glide but
+  // not the 10 Hz positional jumps, and it is an OS-level setting besides. Freeze
+  // holds the rendered frame while the feed keeps arriving in the background;
+  // resuming snaps to whatever is current, so nothing is replayed or queued.
+  // (The #ghost route already had its own Play/Pause; this is the board's.)
+  const [frozen, setFrozen] = useState(false);
+  const frozenRef = useRef(false);
+  const latestRef = useRef<RaceState>(state);
   const staleSec = useStale(state);
   const lapHistory = useLapHistory(state);
   const gapHistory = useGapHistory(state);
 
-  useEffect(() => (STATIC_DEMO ? connectStaticReplay : connectRace)(setState, setStatus), []);
+  // The replay clip is a few minutes long and wraps forever. When it does, the
+  // race clock jumps backwards and the lap counter counts down — which, to anyone
+  // who follows the sport, is an unambiguous "this is broken" signal unless
+  // something says otherwise. state.loopSeq is bumped by applyMessage the moment
+  // timeMs goes backwards (the same signal the Go gateway uses); this turns that
+  // into a transient notice. Seeded from the live value and adjusted during
+  // render rather than in an effect — an effect here would be a second render
+  // pass, and this repo's lint config rejects setState in an effect body.
+  const [seenLoop, setSeenLoop] = useState(state.loopSeq);
+  const [justLooped, setJustLooped] = useState(false);
+  if (seenLoop !== state.loopSeq) {
+    setSeenLoop(state.loopSeq);
+    setJustLooped(true);
+  }
+  useEffect(() => {
+    if (!justLooped) return;
+    const t = setTimeout(() => setJustLooped(false), LOOP_NOTICE_MS);
+    return () => clearTimeout(t);
+  }, [justLooped, seenLoop]);
+
+  // Esc clears the reference car from anywhere on the board — the keyboard half
+  // of making the selection undoable (the tower's own "clear" button is the
+  // visible half). Skipped while focus is in a form control so it cannot steal
+  // Esc from a native picker.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      const el = document.activeElement;
+      if (el instanceof HTMLSelectElement || el instanceof HTMLInputElement) return;
+      setSelected(null);
+      setRival(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  useEffect(() => {
+    const onState = (s: RaceState) => {
+      latestRef.current = s;
+      if (!frozenRef.current) setState(s);
+    };
+    return (STATIC_DEMO ? connectStaticReplay : connectRace)(onState, setStatus);
+  }, []);
+
   useEffect(() => {
     const onHash = () => setHash(location.hash);
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
+  function toggleFrozen() {
+    const next = !frozenRef.current;
+    frozenRef.current = next;
+    setFrozen(next);
+    if (!next) setState(latestRef.current);
+  }
+
   // A rival only makes sense alongside a primary selection, and never as the
   // same car as the primary — derived rather than synced via effect.
   const effectiveRival = selected != null && rival !== selected ? rival : null;
+
+  // Cold open used to be one-third placeholder: Telemetry read "Select a car to
+  // see telemetry" and Comms explained a toggle, so two of the six board panels
+  // opened as empty boxes describing a setting instead of showing anything.
+  // Seeding the selection with the race leader on the first frame that has cars
+  // fills Telemetry immediately — and Telemetry is the one place --fs-hero was
+  // already wired up, so this also puts display type on the board for free.
+  //
+  // An "adjusting state during render" seed: an effect would be a cascading
+  // render, and useState's initialiser cannot see the first frame because it
+  // runs before any frame arrives. State rather than a ref because the flag is
+  // read during render, and the lint rule that governs this codebase is right
+  // that a ref read in render can leave the component not re-rendering.
+  //
+  // The flag, not `selected == null`, is what makes this fire exactly once: a
+  // user who clears the selection later (ui-ux M4, agent 5's) must not have the
+  // leader pushed back at them on the very next frame.
+  const [leaderSeeded, setLeaderSeeded] = useState(false);
+  if (!leaderSeeded) {
+    const leader = leaderOf(state.cars);
+    if (leader) {
+      setLeaderSeeded(true);
+      if (selected == null) setSelected(leader.driverNum);
+    }
+  }
 
   if (hash === '#compare') return <Compare />;
   if (hash === '#ghost') return <Ghost initialSelected={selected} />;
@@ -75,8 +161,29 @@ export default function App() {
     <Route
       title={`Race board${state.label ? ` — ${state.label}` : ''}`}
       rail={
-        <StatusRail active="board" state={state} status={status} staleSec={staleSec}>
+        <StatusRail
+          active="board"
+          state={state}
+          status={status}
+          // Frozen means "we are choosing not to apply frames", not "the feed has
+          // stopped" — so the staleness chip must not start claiming an outage the
+          // moment a user pauses to read a row.
+          staleSec={frozen ? 0 : staleSec}
+        >
           {!STATIC_DEMO && <SourceToggle state={state} />}
+          {/* Label swap rather than aria-pressed, matching the overlay's existing
+              Play/Pause: a transport control names the action it will take. The
+              resulting state is carried by the chip, in a region that is present
+              before it fills so the transition is actually announced. */}
+          <button type="button" className="btn" onClick={toggleFrozen}>
+            {frozen ? '▶ Resume' : '⏸ Freeze'}
+          </button>
+          <span role="status" aria-live="polite">
+            {frozen && <span className="chip chip-replay">⏸ FROZEN</span>}
+            {justLooped && (
+              <span className="chip chip-loop">↻ CLIP LOOPED — the recording restarted</span>
+            )}
+          </span>
         </StatusRail>
       }
     >
@@ -84,7 +191,7 @@ export default function App() {
         <Panel label="Track">
           {status === 'reconnecting' && !showSkeleton && (
             <div style={{ position: 'relative', display: 'inline-block' }}>
-              <Map state={state} />
+              <Map state={state} paused={frozen} selected={selected} rival={effectiveRival} />
               <div className="chip chip-reconnect" style={{
                 position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
               }}>
@@ -92,7 +199,9 @@ export default function App() {
               </div>
             </div>
           )}
-          {!showSkeleton && status !== 'reconnecting' && <Map state={state} />}
+          {!showSkeleton && status !== 'reconnecting' && (
+            <Map state={state} paused={frozen} selected={selected} rival={effectiveRival} />
+          )}
           {showSkeleton && <SkeletonMap failed={status === 'failed'} trackless={trackless} />}
         </Panel>
         <Panel label="Timing">
@@ -101,7 +210,10 @@ export default function App() {
       </div>
 
       <div className="board-bottom">
-        <Panel label="Telemetry">
+        {/* Two telemetry cards do not fit one quarter of the strip — the second
+            was cut mid-word at every viewport. With a rival picked the panel takes
+            two columns; below that width the cards stack (see .telemetry-cards). */}
+        <Panel label="Telemetry" className={effectiveRival != null ? 'panel-wide' : undefined}>
           <TelemetryPanel
             state={state}
             lapHistory={lapHistory}
@@ -112,13 +224,13 @@ export default function App() {
           />
         </Panel>
         <Panel label="Strategy">
-          <StintChart state={state} />
+          <StintChart state={state} selected={selected} rival={effectiveRival} />
         </Panel>
         <Panel label="Comms">
           <Comms state={state} />
         </Panel>
         <Panel label="Race Control">
-          <RaceControl state={state} />
+          <RaceControl state={state} selected={selected} />
         </Panel>
       </div>
     </Route>

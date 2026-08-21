@@ -22,10 +22,10 @@ docstring — an orientation gap, not an omission by the generator.
 | `internal/ws` | 7 | ws is the gateway-side WebSocket fan-out hub. |
 | `ingest` | 21 | Records FastF1 sessions to JSONL replay clips and runs the true-live SignalR ingest path. |
 | `bench` | 2 | Drive the loadtest sweeps behind BENCHMARKS.md by running cmd/loadtest at increasing concurrency and recording gateway resource usage. |
-| `web/src` | 3 | The React app shell: mounts the root component, wires the live WebSocket or static-replay data source into race state, and lays out the dashboard panels. |
-| `web/src/components` | 25 | The dashboard's presentational components — map, timing tower, standings, telemetry, comms, race control, ghost/compare overlays, and their shared layout/formatting helpers. |
+| `web/src` | 4 | The React app shell: mounts the root component, wires the live WebSocket or static-replay data source into race state, and lays out the dashboard panels. |
+| `web/src/components` | 30 | The dashboard's presentational components — map, timing tower, standings, telemetry, comms, race control, ghost/compare overlays, and their shared layout/formatting helpers. |
 | `web/src/hooks` | 7 | React hooks that derive UI-facing state (staleness, gap/lap history, smoothed car positions, comms playback) from the raw RaceState stream. |
 | `web/src/realtime` | 4 | The frontend's data-source connections: a reconnecting live WebSocket and a paced static-replay reader, both feeding the same RaceState reducer. |
 | `web/src/state` | 10 | The frontend's race state: wire message types, the applyMessage reducer, and the comms/ghost sub-state it composes. |
 
-17 source directories, 104 files, 0 without a declared purpose.
+17 source directories, 110 files, 0 without a declared purpose.

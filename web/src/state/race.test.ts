@@ -260,3 +260,51 @@ describe('race-control messages', () => {
       .not.toBeNull();
   });
 });
+
+// The replay clip is a fixed-length recording on repeat. When it wraps, the clock
+// jumps backwards and everything accumulated per play-through has to go with it —
+// otherwise the race-control feed fills with duplicates in an order that is
+// neither chronological nor newest-first, which is what the UX review found live.
+describe('clip loop detection', () => {
+  const frame = (rev: number, timeMs: number, messages?: { rev: number; t: number; category: string; message: string }[]) =>
+    ({ type: 'frame' as const, data: { rev, timeMs, messages } });
+
+  const withClock = (timeMs: number) => {
+    const s = applyMessage(emptyState(), snapMsg);
+    return applyMessage(s, frame(10, timeMs, [{ rev: 10, t: timeMs, category: 'Flag', message: 'GREEN FLAG' }]));
+  };
+
+  it('bumps loopSeq and drops the previous pass’s messages when the clock rewinds', () => {
+    const s = withClock(600000);
+    expect(s.messages).toHaveLength(1);
+    // Rev keeps climbing across a loop (the player bumps it), so a decreasing
+    // timeMs is the only signal there is — the same one internal/model/apply.go
+    // uses server-side.
+    const looped = applyMessage(s, frame(11, 1000, [{ rev: 11, t: 1000, category: 'Flag', message: 'GREEN FLAG' }]));
+    expect(looped.loopSeq).toBe(1);
+    expect(looped.messages).toHaveLength(1);
+    expect(looped.messages[0].t).toBe(1000);
+  });
+
+  it('clears the buffer even when the restarting frame carries no messages', () => {
+    const s = withClock(600000);
+    const looped = applyMessage(s, frame(11, 1000));
+    expect(looped.messages).toHaveLength(0);
+  });
+
+  it('does not call a frame arriving slightly out of order a loop', () => {
+    const s = withClock(600000);
+    const jitter = applyMessage(s, frame(11, 599900));
+    expect(jitter.loopSeq).toBe(0);
+    expect(jitter.messages).toHaveLength(1);
+  });
+
+  it('does not call a fresh snapshot a loop', () => {
+    // A reconnect mid-clip rebases the clock downwards, and that is a new
+    // baseline rather than a wrap — anything watching loopSeq (the tower's
+    // personal bests, the board's notice) must not fire on it.
+    const s = withClock(600000);
+    const resnap = applyMessage(s, snapMsg);
+    expect(resnap.loopSeq).toBe(0);
+  });
+});

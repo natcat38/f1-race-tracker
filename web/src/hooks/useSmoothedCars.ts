@@ -6,7 +6,11 @@ import { useReducedMotion } from './useReducedMotion';
 // Cars glide from their previous position to their current position over one
 // frame interval (~100 ms at 10 Hz), keeping motion smooth at the display's
 // native refresh rate.
-export function useSmoothedCars(state: RaceState): Car[] {
+// `paused` is the board's Freeze control (WCAG 2.2.2): with frames no longer
+// being applied, `state` stops changing and the glide would settle anyway — but
+// the rAF loop would keep publishing a fresh array 60 times a second for a
+// picture that never changes. Stopping the loop is the honest reading of "pause".
+export function useSmoothedCars(state: RaceState, paused = false): Car[] {
   const reducedMotion = useReducedMotion();
   const from = useRef<Record<number, Point>>({});
   const to = useRef<Record<number, Point>>({});
@@ -38,7 +42,7 @@ export function useSmoothedCars(state: RaceState): Car[] {
   useEffect(() => {
     // Reduced motion: no interpolation loop at all (see the return below, which
     // hands back each frame's reported positions directly).
-    if (reducedMotion) return;
+    if (reducedMotion || paused) return;
     let raf = 0;
     const loop = () => {
       const now = performance.now();
@@ -54,10 +58,10 @@ export function useSmoothedCars(state: RaceState): Car[] {
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [reducedMotion]);
+  }, [reducedMotion, paused]);
 
   // Cars jump straight to each frame's reported position — still a positional
   // update every 100ms, just without the continuous per-refresh glide. Derived
   // rather than synced into state, so there is no second render per frame.
-  return reducedMotion ? Object.values(state.cars) : smoothed;
+  return reducedMotion || paused ? Object.values(state.cars) : smoothed;
 }

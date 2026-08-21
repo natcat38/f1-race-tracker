@@ -1,12 +1,16 @@
 import type { Car, RaceState } from '../state/race';
-import { fmtLap, fmtGap, type LapHistory, type GapHistory } from './timingHelpers';
+import { fmtLap, fmtGapEstimate, type LapHistory, type GapHistory } from './timingHelpers';
+
+// Below this many points a sparkline is decoration: two bars with no axis convey
+// nothing, and a single bar beside an em-dash reads as a rendering fault.
+const MIN_SPARK_POINTS = 4;
 
 // Throttle and brake are opposite inputs, so they read as opposite colours —
 // both bars being green made a full-brake trace look like a full-throttle one
 // at a glance.
 function Bar({ label, value, tone }: { label: string; value: number; tone: 'good' | 'bad' }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--fs-sm)' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', fontSize: 'var(--fs-sm)' }}>
       <span style={{ width: 64, color: 'var(--slate)' }}>{label}</span>
       <div style={{ flex: 1, height: 8, background: 'var(--edge)', borderRadius: 4 }}>
         <div style={{
@@ -19,6 +23,11 @@ function Bar({ label, value, tone }: { label: string; value: number; tone: 'good
   );
 }
 
+// Matches MAX_LAP_HISTORY / MAX_GAP_HISTORY in timingHelpers — the cap both
+// series are sliced to, and so the widest a sparkline ever gets.
+const MAX_SPARK_BARS = 8;
+const BAR_W = 15;
+
 // Sparkline: one bar per completed lap, red = slower than previous lap,
 // green = faster — the stint-degradation squint test. Reused for the gap
 // trend too, where the same colouring reads as "closing" (green) vs
@@ -29,7 +38,13 @@ function Sparkline({ values, label }: { values: (number | undefined)[]; label: s
   const min = Math.min(...known), max = Math.max(...known);
   const span = max - min || 1;
   return (
-    <svg width={values.length * 15} height={24} role="img" aria-label={label}>
+    // minWidth reserves the full 8-lap span so the row does not reflow one bar at
+    // a time as history accumulates. Not flex-pinned: the panel is already tight
+    // when a rival card is open, and a hard floor there would push it wider still.
+    <svg
+      width={values.length * 15} height={24} role="img" aria-label={label}
+      style={{ minWidth: MAX_SPARK_BARS * BAR_W }}
+    >
       {values.map((v, i) => {
         if (v == null) return null;
         const h = 4 + ((v - min) / span) * 18;
@@ -68,37 +83,58 @@ function SparkHatch() {
   );
 }
 
-function CarTelemetry({ car, history, gapHistory }: {
+function CarTelemetry({ car, history, gapHistory, role }: {
   car: Car; history?: number[]; gapHistory?: (number | undefined)[];
+  role?: 'reference' | 'rival';
 }) {
+  const trend = (values: (number | undefined)[] | undefined) =>
+    (values?.filter((v) => v != null).length ?? 0) >= MIN_SPARK_POINTS;
   return (
-    <div style={{ display: 'grid', gap: 8, minWidth: 200 }}>
+    // min-width: 0 (via the CSS class) rather than a 200px floor: two cards with
+    // a hard floor could not shrink, so the second was clipped mid-word by the
+    // panel edge at every viewport instead of the pair getting narrower.
+    <div className="telemetry-card" style={{ display: 'grid', gap: 'var(--sp-2)' }}>
+      {role && (
+        <div className="telemetry-role">
+          {role === 'reference' ? 'Reference car' : 'Rival'}
+        </div>
+      )}
       <div style={{ fontSize: 'var(--fs-lg)' }}>
         <b>{car.code}</b> <span style={{ color: 'var(--slate)' }}>{car.team}</span>
       </div>
       <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-hero)' }}>
         {car.speed ?? 0} <span style={{ fontSize: 'var(--fs-lg)', color: 'var(--slate)' }}>km/h</span>
-        <span style={{ marginLeft: 16 }}>G{car.gear ?? 0}</span>
+        <span style={{ marginLeft: 'var(--sp-4)' }}>G{car.gear ?? 0}</span>
         {/* The off state used --edge (a border colour, 1.2:1) and was effectively
-            invisible; --dim reads as deliberately-off at 3.4:1. */}
-        <span style={{ marginLeft: 16, color: car.drs ? 'var(--good)' : 'var(--dim)' }}>
-          DRS
+            invisible; --dim was raised from there to 3.4:1 and then, in this pass,
+            to 4.8:1 — the threshold, not just an improvement on invisible.
+            On/off was also signalled by colour alone, which the sector marks and
+            the sparkline hatch elsewhere in this codebase already know not to do. */}
+        <span style={{ marginLeft: 'var(--sp-4)', color: car.drs ? 'var(--good)' : 'var(--dim)' }}>
+          DRS<span className="visually-hidden">{car.drs ? ' active' : ' inactive'}</span>
         </span>
       </div>
       <Bar label="Throttle" value={car.throttle ?? 0} tone="good" />
       <Bar label="Brake" value={car.brake ?? 0} tone="bad" />
-      {history && history.length >= 2 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--fs-sm)' }}>
+      {trend(history) && history && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', fontSize: 'var(--fs-sm)' }}>
           <span style={{ width: 64, color: 'var(--slate)' }}>Laps</span>
           <Sparkline values={history} label={`${car.code} lap time trend`} />
           <span>{fmtLap(history[history.length - 1])}</span>
         </div>
       )}
-      {gapHistory && gapHistory.length >= 2 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--fs-sm)' }}>
+      {trend(gapHistory) && gapHistory && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', fontSize: 'var(--fs-sm)' }}>
           <span style={{ width: 64, color: 'var(--slate)' }}>Gap</span>
           <Sparkline values={gapHistory} label={`${car.code} gap trend`} />
-          <span>{fmtGap(gapHistory[gapHistory.length - 1])}</span>
+          {/* The derived gap, at the derived gap's resolution — same rule as the
+              tower's Gap column. */}
+          <span>{fmtGapEstimate(gapHistory[gapHistory.length - 1])}</span>
+        </div>
+      )}
+      {!trend(history) && (
+        <div className="empty" style={{ fontSize: 'var(--fs-2xs)' }}>
+          Lap and gap trends build after {MIN_SPARK_POINTS} laps.
         </div>
       )}
     </div>
@@ -126,28 +162,41 @@ export function TelemetryPanel({
   const rivalCar = rival != null ? state.cars[rival] : undefined;
   const others = Object.values(state.cars).filter((c) => c.driverNum !== car.driverNum);
   return (
-    <div style={{ display: 'grid', gap: 8 }}>
+    <div style={{ display: 'grid', gap: 'var(--sp-2)' }}>
       <SparkHatch />
       {others.length > 0 && onRivalChange && (
-        <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--slate)', display: 'flex', alignItems: 'center', gap: 6 }}>
-          vs
+        <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--slate)', display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
+          {/* "vs" said nothing about what the control does; the empty option said
+              what the state IS rather than offering the action. */}
+          Compare with
           <select
             value={rival ?? ''}
             onChange={(e) => onRivalChange(e.target.value ? Number(e.target.value) : null)}
             className="btn"
             style={{ fontSize: 'var(--fs-xs)' }}
           >
-            <option value="">— none —</option>
+            <option value="">— pick a rival —</option>
             {others.map((c) => (
               <option key={c.driverNum} value={c.driverNum}>{c.code}</option>
             ))}
           </select>
         </label>
       )}
-      <div style={{ display: 'flex', gap: 16 }}>
-        <CarTelemetry car={car} history={lapHistory[car.driverNum]} gapHistory={gapHistory[car.driverNum]?.gaps} />
+      {/* A flex row that WRAPS, with shrinkable children: the two cards sit side
+          by side wherever the panel can hold them and stack when it cannot,
+          instead of the second being cut off by the panel border. */}
+      <div className="telemetry-cards">
+        <CarTelemetry
+          car={car} history={lapHistory[car.driverNum]}
+          gapHistory={gapHistory[car.driverNum]?.gaps}
+          role={rivalCar ? 'reference' : undefined}
+        />
         {rivalCar && (
-          <CarTelemetry car={rivalCar} history={lapHistory[rivalCar.driverNum]} gapHistory={gapHistory[rivalCar.driverNum]?.gaps} />
+          <CarTelemetry
+            car={rivalCar} history={lapHistory[rivalCar.driverNum]}
+            gapHistory={gapHistory[rivalCar.driverNum]?.gaps}
+            role="rival"
+          />
         )}
       </div>
     </div>

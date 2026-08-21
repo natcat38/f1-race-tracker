@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
-  fmtLap, fmtGap, fmtClock, fmtElapsed, gapLabel, intLabel, bestSectors, orderCars,
+  fmtLap, fmtGap, fmtClock, fmtElapsed, gapLabel, intLabel, lapsDown, bestSectors, orderCars,
   updatePersonalBests, sectorColour, sectorDelta, updateLapHistory, tyreLabel, statusLabel,
-  sectorDeltaVs, fmtSigned, updateGapHistory, leaderLapOf, sameRunningOrder,
+  sectorDeltaVs, fmtSigned, updateGapHistory, leaderLapOf, leaderOf, sameRunningOrder,
+  personalBestOf, sectorMark,
 } from './timingHelpers';
 import { car } from '../state/testCar';
 
@@ -41,10 +42,14 @@ describe('gapLabel (pit-wall)', () => {
     expect(gapLabel(184000, 2, false, false, 90000)).toBe('+2 LAPS');
   });
   it('shows seconds for lead-lap cars', () => {
-    expect(gapLabel(1234, 0, false, false, 90000)).toBe('+1.234');
+    // One decimal, not three: the estimate's resolution is ~0.566s (see
+    // GAP_RESOLUTION_MS), so the extra digits were invented precision.
+    expect(gapLabel(1234, 0, false, false, 90000)).toBe('+1.2');
   });
   it('seconds mode forces seconds even when lapped', () => {
-    expect(gapLabel(92000, 1, false, true, 90000)).toBe('+92.000');
+    // ...as m:ss.s, because "+92.000" (and, on a real lapped car, "+643.581")
+    // is a number nobody converts to minutes in their head.
+    expect(gapLabel(92000, 1, false, true, 90000)).toBe('+1:32.0');
   });
   it('suppresses the gap before the first completed lap', () => {
     expect(gapLabel(1234, 0, false, false, undefined)).toBe('—');
@@ -59,16 +64,36 @@ describe('intLabel (pit-wall)', () => {
     expect(intLabel(2, 1, 5000, false, false, 90000, 90000)).toBe('+1 LAP'); // this car 2 down, car ahead 1 down
   });
   it('shows seconds when on the same lap as the car ahead', () => {
-    expect(intLabel(1, 1, 800, false, false, 90000, 90000)).toBe('+0.800');
+    expect(intLabel(1, 1, 800, false, false, 90000, 90000)).toBe('+0.8');
   });
   it('seconds mode forces seconds', () => {
-    expect(intLabel(2, 1, 5000, false, true, 90000, 90000)).toBe('+5.000');
+    expect(intLabel(2, 1, 5000, false, true, 90000, 90000)).toBe('+5.0');
   });
   it('suppresses the interval until this car has completed a lap', () => {
     expect(intLabel(1, 1, 800, false, false, undefined, 90000)).toBe('—');
   });
   it('suppresses the interval until the car ahead has completed a lap', () => {
     expect(intLabel(1, 1, 800, false, false, 90000, undefined)).toBe('—');
+  });
+});
+
+describe('lapsDown', () => {
+  it('ignores the lap-number transient when the car is only seconds behind', () => {
+    // Leader just crossed the line (lap 17), P2 still on lap 16, 3.4s back.
+    expect(lapsDown(1, 3400, 85000)).toBe(0);
+  });
+  it('keeps a genuine lap down', () => {
+    expect(lapsDown(1, 86000, 85000)).toBe(1);
+    expect(lapsDown(1, 78000, 85000)).toBe(1); // within the 0.1-lap tolerance
+    expect(lapsDown(10, 850000, 85000)).toBe(10);
+  });
+  it('never exceeds the wire value', () => {
+    expect(lapsDown(1, 200000, 85000)).toBe(1);
+  });
+  it('trusts the wire without a reference lap or a gap', () => {
+    expect(lapsDown(2, 5000, undefined)).toBe(2);
+    expect(lapsDown(2, undefined, 85000)).toBe(2);
+    expect(lapsDown(0, 5000, 85000)).toBe(0);
   });
 });
 
@@ -128,6 +153,19 @@ describe('leaderLapOf', () => {
   });
 });
 
+describe('leaderOf', () => {
+  it('agrees with orderCars[0] — the car the board auto-selects on first paint', () => {
+    const cars = {
+      22: car({ driverNum: 22, code: 'TSU', pos: 19, lap: 7 }),
+      27: car({ driverNum: 27, code: 'HUL', pos: 19, lap: 12 }),
+      1: car({ driverNum: 1, code: 'VER', pos: 3, lap: 11 }),
+    };
+    expect(leaderOf(cars)?.driverNum).toBe(orderCars(cars)[0].driverNum);
+    expect(leaderOf(cars)?.code).toBe('VER');
+    expect(leaderOf({})).toBeUndefined();
+  });
+});
+
 describe('sameRunningOrder', () => {
   const a = { 1: car({ driverNum: 1, pos: 1, lap: 10 }), 16: car({ driverNum: 16, pos: 2, lap: 10 }) };
 
@@ -160,7 +198,44 @@ describe('updatePersonalBests', () => {
   it('accumulates the per-driver min across frames, ignoring zeros', () => {
     let b = updatePersonalBests({}, [car({ driverNum: 1, s1Ms: 26100, s2Ms: 0, s3Ms: 27000 })]);
     b = updatePersonalBests(b, [car({ driverNum: 1, s1Ms: 25900, s2Ms: 28000, s3Ms: 27500 })]);
-    expect(b[1]).toEqual([25900, 28000, 27000]); // s1 improved, s2 first real value, s3 kept faster
+    // s1 improved, s2 first real value, s3 kept the faster of the two
+    expect(b[1].map((s) => s.best)).toEqual([25900, 28000, 27000]);
+  });
+
+  it('counts a changed sector time as a sample, not a frame', () => {
+    // The wire re-broadcasts the same sector at 10 Hz between completions; if
+    // frames counted, the PB threshold would clear itself in 100ms.
+    let b = updatePersonalBests({}, [car({ driverNum: 1, s1Ms: 26100 })]);
+    for (let i = 0; i < 20; i++) b = updatePersonalBests(b, [car({ driverNum: 1, s1Ms: 26100 })]);
+    expect(b[1][0].samples).toBe(1);
+    b = updatePersonalBests(b, [car({ driverNum: 1, s1Ms: 25900 })]);
+    expect(b[1][0].samples).toBe(2);
+  });
+});
+
+describe('personalBestOf', () => {
+  it('withholds the personal best until the driver has two times in that sector', () => {
+    // The whole point of the threshold: a first observation cannot tie a record
+    // it just invented, so it renders neutral rather than green.
+    const one = updatePersonalBests({}, [car({ driverNum: 1, s1Ms: 26100 })]);
+    expect(personalBestOf(one, 1, 0)).toBe(Infinity);
+    expect(sectorColour(26100, 25000, personalBestOf(one, 1, 0))).toBeUndefined();
+    expect(sectorMark(26100, 25000, personalBestOf(one, 1, 0))).toBeUndefined();
+
+    const two = updatePersonalBests(one, [car({ driverNum: 1, s1Ms: 25900 })]);
+    expect(personalBestOf(two, 1, 0)).toBe(25900);
+    expect(sectorColour(25900, 25000, personalBestOf(two, 1, 0))).toBe('var(--good)');
+    expect(sectorMark(25900, 25000, personalBestOf(two, 1, 0))).toBe('P');
+  });
+
+  it('never withholds the session best — purple outranks the threshold', () => {
+    const one = updatePersonalBests({}, [car({ driverNum: 1, s1Ms: 25000 })]);
+    expect(sectorColour(25000, 25000, personalBestOf(one, 1, 0))).toBe('var(--best-session)');
+    expect(sectorMark(25000, 25000, personalBestOf(one, 1, 0))).toBe('S');
+  });
+
+  it('Infinity for a driver or sector with nothing recorded', () => {
+    expect(personalBestOf({}, 99, 0)).toBe(Infinity);
   });
 });
 

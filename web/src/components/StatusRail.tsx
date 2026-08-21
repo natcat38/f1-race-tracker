@@ -3,12 +3,18 @@ import type { RaceState } from '../state/race';
 import type { ConnStatus } from '../realtime/socket';
 import { StatusBadge } from './StatusBadge';
 import { fmtClock, leaderLapOf } from './timingHelpers';
+import { REPO_URL } from '../staticDemo';
 
+// Three views, not four. LINK is an operator runbook — pip commands, browser
+// extension setup, an ADR reference — and it was the fourth of four top-level
+// tabs, peer to the board. For the reader this app is built for, the fourth click
+// landed on shell commands. It keeps a permanent affordance (below, beside the
+// repo link) rather than a primary slot: quieter, still one click, and honest
+// about being a setting rather than a view.
 const TABS = [
   { key: 'board', href: '#', label: 'BOARD', sub: 'live board' },
-  { key: 'compare', href: '#compare', label: 'COMPARE', sub: 'side by side' },
+  { key: 'compare', href: '#compare', label: 'COMPARE', sub: 'two replays' },
   { key: 'ghost', href: '#ghost', label: 'OVERLAY', sub: 'lap delta' },
-  { key: 'settings', href: '#settings', label: 'LINK', sub: 'F1TV beta' },
 ] as const;
 
 // StatusRail is the persistent instrument strip on every route — the
@@ -50,9 +56,10 @@ export function StatusRail({
               {state.weather.rainfall && <span style={{ color: 'var(--rain)' }}> · RAIN</span>}
             </span>
           )}
-          <span role="status" aria-live="polite">
-            <StatusBadge status={status ?? 'connecting'} state={state} staleSec={staleSec} />
-          </span>
+          {/* No live-region wrapper here any more: StatusBadge carries its own, so
+              Compare's two lanes announce their transitions too and there is no
+              chance of nesting two polite regions and double-announcing. */}
+          <StatusBadge status={status ?? 'connecting'} state={state} staleSec={staleSec} />
         </>
       )}
       {note && <span className="rail-note">{note}</span>}
@@ -70,6 +77,26 @@ export function StatusRail({
           </a>
         ))}
       </nav>
+      <a
+        className={active === 'settings' ? 'rail-repo rail-repo-active' : 'rail-repo'}
+        href="#settings"
+        aria-current={active === 'settings' ? 'page' : undefined}
+      >
+        F1TV Link
+      </a>
+      {/* Deliberately outside <nav>: this is a way out of the app, not a fifth
+          view. It is the only path from any route back to the project, which
+          for a portfolio piece is the whole point of the artefact. */}
+      <a
+        className="rail-repo"
+        href={REPO_URL}
+        target="_blank"
+        rel="noreferrer"
+        title="Project source on GitHub"
+      >
+        GitHub<span aria-hidden="true"> ↗</span>
+        <span className="visually-hidden"> (opens in a new tab)</span>
+      </a>
     </div>
   );
 }

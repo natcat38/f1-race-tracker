@@ -732,7 +732,11 @@ with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
             has_lap = 'lastLapMs' in car
             behind = max(0.0, leader_dist - dist[dn])      # lap units behind leader
             gap_ms = int(behind * LEADER_LAP_MS)
-            gap_laps = max(0, leader_lap - car['lap'])      # whole-lap deficit (from LapNumber)
+            # Whole-lap deficit from DISTANCE, not LapNumber: the lap-number difference
+            # reads 1 for every car between the leader crossing the line and its own
+            # crossing, so the tower flashed "+1 LAP" for P2..P20 a few seconds per lap.
+            # 0.1 lap of tolerance keeps a car exactly a lap down from flickering.
+            gap_laps = int(behind + 0.1)
             # Suppress derived times until both ends have a completed reference lap —
             # the distance derivation is meaningless (and can be ~a lap wrong) before
             # then. Same lastLapMs signal the FE's gapLabel/intLabel guards use.

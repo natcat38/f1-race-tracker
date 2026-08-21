@@ -23,8 +23,8 @@ export class ErrorBoundary extends Component<
         return <div role="alert">{this.props.fallback}</div>
       }
       return (
-        <div role="alert" style={{ padding: 24, fontFamily: 'sans-serif' }}>
-          <h1>Something broke.</h1>
+        <div role="alert" style={{ padding: 'var(--sp-6)', fontFamily: 'var(--data)', color: 'var(--chalk)' }}>
+          <h1 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-hero)' }}>Something broke.</h1>
           <p>Reload the page. If it keeps happening, check the browser console.</p>
         </div>
       )

@@ -3,11 +3,48 @@ import { Panel } from './Panel';
 import { StatusRail } from './StatusRail';
 import { Route } from './Route';
 import { parseAuthStatus, relativeExpiry, type AuthStatus } from '../state/f1auth';
+import { StaticDemoNotice } from './StaticDemoNotice';
+import { REPO_URL, STACK_LINE, STATIC_DEMO } from '../staticDemo';
 
 const POLL_MS = 5000;
-const STATIC_DEMO = import.meta.env.VITE_STATIC_DEMO === 'true';
 
 const LINK_CMD = 'python ingest/f1tv_link.py';
+
+// The one control a setup page owes its reader, and the one it did not have: the
+// three commands here are meant to be run somewhere else, and selecting mono text
+// out of a wrapped paragraph by hand is the whole friction. Falls back to saying
+// so if the Clipboard API is unavailable (it needs a secure context).
+function Cmd({ children }: { children: string }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(children);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  }
+  return (
+    <span className="cmd">
+      <code>{children}</code>
+      <button type="button" className="btn cmd-copy" onClick={copy} aria-label={`Copy: ${children}`}>
+        {copied ? '✓ copied' : 'copy'}
+      </button>
+    </span>
+  );
+}
+
+// A URL the reader is meant to visit, rendered as the link it is. These were
+// inert <code> spans on a page whose entire job is "go here, then run this".
+function Url({ href }: { href: string }) {
+  return (
+    <a className="demo-notice-link" href={href} target="_blank" rel="noreferrer">
+      {href}<span aria-hidden="true"> ↗</span>
+      <span className="visually-hidden"> (opens in a new tab)</span>
+    </a>
+  );
+}
 
 // No green token exists (--amber is attention-only, by design) so "linked" reads as
 // the settled chalk chip rather than inventing a colour.
@@ -47,7 +84,7 @@ function NextStep({ auth }: { auth: AuthStatus }) {
   if (auth.state === 'unavailable') {
     return (
       <p>
-        <strong>Next:</strong> can&apos;t reach the link status — the gateway or the
+        <strong>Next:</strong> can’t reach the link status — the gateway or the
         ingest service is probably down. Check <code>docker compose ps</code>.
       </p>
     );
@@ -56,7 +93,7 @@ function NextStep({ auth }: { auth: AuthStatus }) {
     const left = relativeExpiry(auth.expiresUtc);
     return (
       <p>
-        <strong>Next:</strong> nothing — you&apos;re linked. This sign-in lapses{' '}
+        <strong>Next:</strong> nothing — you’re linked. This sign-in lapses{' '}
         {left ?? 'in a few days'}; when it does, run <code>{LINK_CMD}</code> again.
       </p>
     );
@@ -69,6 +106,28 @@ function NextStep({ auth }: { auth: AuthStatus }) {
   );
 }
 
+// The one place in the app that says what was built and links back to it — the
+// board, compare and overlay routes are all instruments with no room for prose
+// (ui-ux review M15). The rail carries a compact repo link on every route; this
+// is the sentence behind it.
+function About() {
+  return (
+    <Panel label="About this project">
+      <div className="demo-notice">
+        <p>
+          F1 Race Tracker is a broadcast-style timing board fed by a real telemetry
+          pipeline: {STACK_LINE}
+        </p>
+        <p>
+          <a className="demo-notice-link" href={REPO_URL} target="_blank" rel="noreferrer">
+            Source, architecture and ADRs on GitHub ↗
+          </a>
+        </p>
+      </div>
+    </Panel>
+  );
+}
+
 // Settings is the #settings route: the operator's view of the beta F1TV link.
 // It only ever reads status — linking itself is a host command, because fastf1's
 // browser login POSTs to host loopback and a container cannot receive that
@@ -78,22 +137,60 @@ export function Settings() {
   const expiresIn = relativeExpiry(auth.expiresUtc);
   const noSubscription = auth.state === 'linked' && auth.tier !== 'active';
 
+  // The static build has no ingest process to link an account with, and no
+  // /api/f1auth to ask — so it says so plainly instead of reporting the
+  // "UNAVAILABLE" chip that an unreachable gateway would otherwise produce.
+  if (STATIC_DEMO) {
+    return (
+      <Route
+        title="F1TV account link (not in this demo)"
+        rail={<StatusRail active="settings" note="Not available in the static demo" />}
+      >
+        <StaticDemoNotice
+          label="F1TV Link — beta"
+          what="This page links a Formula 1 account to the ingest service, so the
+                tracker can pull a live session's timing feed instead of a recorded
+                one. Signing in runs as a host command on your own machine — nothing
+                about it can work from a static page."
+        />
+        {/* No <About /> here: StaticDemoNotice already carries the stack line
+            and the repo link, and saying both twice on one screen reads as a
+            template rather than as writing. */}
+      </Route>
+    );
+  }
+
   return (
     <Route
       title="F1TV account link"
-      rail={<StatusRail active="settings" note="F1TV link — beta" />}
+      // No rail note: "F1TV" was on screen three times at once — the nav
+      // affordance, this note, and the panel plate below it.
+      rail={<StatusRail active="settings" />}
     >
       <Panel
         label="F1TV Link — beta"
-        actions={<span className={CHIP[auth.state]}>{CHIP_LABEL[auth.state]}</span>}
+        // The chip and the Next line are both driven by a 5s poll of /api/f1auth,
+        // and both change only on an actual state transition — so a polite region
+        // here announces "linked" once, rather than ticking. Without it, the user
+        // who has just run the link command in a terminal and switched back to this
+        // tab is told nothing at all: the page silently rewrites itself.
+        actions={
+          <span role="status" aria-live="polite">
+            {/* LINKED beside a body that says "no active F1 TV subscription" told
+                two opposite stories on one screen; the chip reports the useful
+                state, not just the auth one. */}
+            <span className={noSubscription ? 'chip chip-stall' : CHIP[auth.state]}>
+              {noSubscription ? 'LINKED · NO SUB' : CHIP_LABEL[auth.state]}
+            </span>
+          </span>
+        }
       >
-        {STATIC_DEMO ? (
-          <p>
-            Not available in the static demo — run the full system
-            (<code>docker compose up</code>) to link an account.
-          </p>
-        ) : (
-          <>
+        {/* A reading measure, not the panel's full width: this is the one page in
+            the app that is prose rather than instruments, and at 1440px it was
+            setting ~200 characters per line in 13px mono. The other prose block
+            (.demo-notice) already uses 68ch, so there is one measure in the app
+            rather than two. */}
+        <div className="prose">
             <p>
               <strong>You need a paid F1 TV Access subscription for this to show live
               data.</strong> Signing in with a free F1 account works and is worth doing —
@@ -102,7 +199,9 @@ export function Settings() {
               on free data and never touches any of this.
             </p>
 
-            <NextStep auth={auth} />
+            <div role="status" aria-live="polite">
+              <NextStep auth={auth} />
+            </div>
 
             {auth.state === 'linked' && (
               <p>
@@ -124,24 +223,24 @@ export function Settings() {
             <h3>Signing in</h3>
             <ol>
               <li>
-                Have a free F1 account — <code>https://account.formula1.com</code>
+                Have a free F1 account — <Url href="https://account.formula1.com" />
               </li>
               <li>
                 Install the f1login browser extension —{' '}
-                <code>https://f1login.fastf1.dev</code> (this is FastF1&apos;s own
+                <Url href="https://f1login.fastf1.dev" /> (this is FastF1’s own
                 extension; it is what hands the sign-in to this machine)
               </li>
               <li>
                 Install the Python dependencies:
                 <br />
-                <code>pip install -r ingest/requirements.txt -r ingest/requirements-live.txt</code>
+                <Cmd>pip install -r ingest/requirements.txt -r ingest/requirements-live.txt</Cmd>
                 <br />
-                <code>pip install --no-deps -r ingest/requirements-live-nodeps.txt</code>
+                <Cmd>pip install --no-deps -r ingest/requirements-live-nodeps.txt</Cmd>
               </li>
               <li>
-                Run <code>{LINK_CMD}</code>, then open the URL it prints and sign in.
-                It will say <em>&quot;requires an active F1TV Access/Pro/Premium
-                subscription&quot;</em> before the URL — that line is expected, not a
+                Run <Cmd>{LINK_CMD}</Cmd>, then open the URL it prints and sign in.
+                It will say <em>“requires an active F1TV Access/Pro/Premium
+                subscription”</em> before the URL — that line is expected, not a
                 rejection; a free account signs in fine.
               </li>
             </ol>
@@ -162,13 +261,13 @@ export function Settings() {
             <p>
               <strong>Beta.</strong> Verified on 2026-08-20: the account links, the feed
               accepts the sign-in, and the team-radio wire format is confirmed. Whether a
-              live session&apos;s stream is tier-gated is still untested — that needs a
+              live session’s stream is tier-gated is still untested — that needs a
               race weekend. See <code>docs/runbooks/live-verification.md</code> §5 and
               ADR-0007.
             </p>
-          </>
-        )}
+          </div>
       </Panel>
+      <About />
     </Route>
   );
 }
