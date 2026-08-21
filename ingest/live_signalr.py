@@ -145,7 +145,7 @@ from live import (
     build_frame,
 )
 from radio import live_radio_refs
-from resample import reconcile_positions, UNKNOWN_POS
+from resample import UNKNOWN_POS
 
 # Live team-radio clips resolve against this + SessionInfo.Path (ADR-0003 amended).
 STATIC_BASE = "https://livetiming.formula1.com"
@@ -295,6 +295,33 @@ def _session_path_from_payload(payload):
     return ""
 
 
+def _publish_frame(r, session, snapshot, rev, time_ms, latest_cars, running_positions, radio):
+    """Fold this frame's cars into the snapshot, store it, and publish the frame.
+
+    The reconcile-then-publish sequence `_replay_capture` and `_run_live_signalr`
+    both run on every rate-limited publish, in one place so the two can't drift.
+
+    `latest_cars`' dicts PERSIST across publishes (and are the very objects the
+    snapshot holds), while build_frame's reconciliation renumbers 'pos' in place.
+    So each car's raw feed position is re-stamped from `running_positions` first:
+    without it, a driver with no fresh Position.z sample this cycle would feed its
+    previous reconciled RANK back in as if it were raw feed data, letting its rank
+    stick or drift away from what the feed actually said.
+    """
+    for num_str, car in latest_cars.items():
+        car['pos'] = running_positions.get(num_str, UNKNOWN_POS)
+    # build_frame reconciles 'pos' into a unique, contiguous 1..N (see its comment).
+    frame = build_frame(session, rev, time_ms, list(latest_cars.values()), radio=radio)
+    for c in frame['cars']:
+        snapshot['cars'][str(c['driverNum'])] = c
+    snapshot['timeMs'] = time_ms
+    snapshot['rev'] = rev
+    if radio:
+        snapshot['radio'] = snapshot.get('radio', []) + radio
+    r.set(snap_key(session), json.dumps(snapshot, separators=(",", ":")))
+    r.publish(frames_chan(session), json.dumps(frame, separators=(",", ":")))
+
+
 def _publish_trailing_radio_frame(r, session, snapshot, rev, time_ms, cars_list, radio):
     """Emit one extra frame carrying only pending radio refs, at stream end.
 
@@ -311,7 +338,10 @@ def _publish_trailing_radio_frame(r, session, snapshot, rev, time_ms, cars_list,
     latest known car list (may be empty if no position data ever arrived); we
     reuse it rather than inventing data, so the frame stays well-formed against
     the event model (Frame.Cars has no `omitempty`, so `[]` is the correct
-    empty representation, not `None`).
+    empty representation, not `None`). Those cars go out reconciled like every
+    other frame's: build_frame does it, so this path can't ship the raw
+    duplicate/gapped/UNKNOWN_POS values it used to when the stream ended before
+    the rate limiter ever let a regular frame out.
     """
     rev += 1
     snapshot['radio'] = snapshot.get('radio', []) + radio
@@ -573,27 +603,10 @@ def _replay_capture(r, session: str, label: str, capture_path: str) -> None:
 
         last_publish = now
         rev += 1
-        time_ms = int(session_s * 1000)
-        # Reconcile 'pos' once per frame across all drivers (#66): each car's raw
-        # 'pos' above is an independent per-driver lookup into running_positions,
-        # so values can collide, leave gaps, or carry the UNKNOWN_POS sentinel.
-        # Mutates the car dicts in place, so the reconciled pos also lands in
-        # `snapshot` below (same dict references).
-        cars_list = reconcile_positions(list(latest_cars.values()))
-
-        for c in cars_list:
-            snapshot['cars'][str(c['driverNum'])] = c
-        snapshot['timeMs'] = time_ms
-        snapshot['rev'] = rev
-
         radio = list(pending_radio)
         pending_radio.clear()
-        if radio:
-            snapshot['radio'] = snapshot.get('radio', []) + radio
-
-        frame = build_frame(session, rev, time_ms, cars_list, radio=radio)
-        r.set(snap_key(session), json.dumps(snapshot, separators=(",", ":")))
-        r.publish(frames_chan(session), json.dumps(frame, separators=(",", ":")))
+        _publish_frame(r, session, snapshot, rev, int(session_s * 1000),
+                       latest_cars, running_positions, radio)
 
     # Issue #62: refs collected after the loop's last publish (the capture ends
     # shortly after a TeamRadio message, or one arrived before any position data)
@@ -760,23 +773,11 @@ def _run_live_signalr(r, session: str, label: str) -> None:
             last_publish[0] = now
 
             rev_holder[0] += 1
-            rev = rev_holder[0]
-            t_ms = int(time.time() * 1000)
-            # Reconcile 'pos' once per frame across all drivers (#66) — see the
-            # matching comment in _replay_capture above.
-            cars_list = reconcile_positions(list(latest_cars.values()))
-            snap = snapshot_holder[0]
-            for c in cars_list:
-                snap['cars'][str(c['driverNum'])] = c
-            snap['timeMs'] = t_ms
-            snap['rev'] = rev
             radio = list(pending_radio)
             pending_radio.clear()
-            if radio:
-                snap['radio'] = snap.get('radio', []) + radio
-            frame = build_frame(session, rev, t_ms, cars_list, radio=radio)
-            r.set(snap_key(session), json.dumps(snap, separators=(",", ":")))
-            r.publish(frames_chan(session), json.dumps(frame, separators=(",", ":")))
+            _publish_frame(r, session, snapshot_holder[0], rev_holder[0],
+                           int(time.time() * 1000), latest_cars,
+                           running_positions, radio)
 
     # Subclass SignalRClient to intercept messages after the file write.
     # UNVERIFIED: The exact structure of `msg` inside _on_message during a live

@@ -24,27 +24,11 @@ pytest.importorskip("fastf1", reason="needs fastf1 for LiveTimingData; not insta
 sys.path.insert(0, os.path.dirname(__file__))
 
 from live_signalr import _replay_capture, _shutdown_flush_radio  # noqa: E402
+from test_live_publish import FakeRedis  # noqa: E402  (shared fake, defined fastf1-free)
 
 CAPTURE_PATH = os.path.join(os.path.dirname(__file__), "tests", "capture_sample.txt")
 CAPTURE_PATH_RADIO_TAIL = os.path.join(
     os.path.dirname(__file__), "tests", "capture_sample_radio_tail.txt")
-
-
-class FakeRedis:
-    """Minimal in-memory stand-in for redis.Redis — get/set/publish only."""
-
-    def __init__(self):
-        self.store = {}
-        self.published = []
-
-    def get(self, key):
-        return self.store.get(key)
-
-    def set(self, key, value):
-        self.store[key] = value
-
-    def publish(self, channel, message):
-        self.published.append((channel, message))
 
 
 class FailingPublishRedis(FakeRedis):

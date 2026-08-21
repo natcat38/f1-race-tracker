@@ -26,6 +26,8 @@ import time
 
 import redis
 
+from resample import reconcile_positions
+
 
 def snap_key(s):
     return f"snapshot:{s}"
@@ -58,6 +60,14 @@ def build_snapshot(session, label, track, radio, lap_trace, stints, total_laps, 
 
 
 def build_frame(session, rev, time_ms, cars, messages=None, weather=None, radio=None):
+    # Every publish path in this package goes through here, so the unique-and-
+    # contiguous 1..N position invariant (#66) is enforced at this one choke
+    # point rather than at each call site — one of which (live_signalr.py's
+    # trailing radio frame) had already forgotten it. Sorts `cars` into running
+    # order and renumbers each dict's 'pos' IN PLACE; callers that fold the same
+    # dicts into a snapshot therefore see the reconciled value too. Idempotent,
+    # so an already-reconciled list (a baked clip) passes through unchanged.
+    cars = reconcile_positions(cars)
     frame = {
         "session": session, "rev": rev,
         "t": int(time.time() * 1000), "timeMs": time_ms, "cars": cars,

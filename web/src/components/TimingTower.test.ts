@@ -2,13 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   fmtLap, fmtGap, fmtClock, fmtElapsed, gapLabel, intLabel, bestSectors, orderCars,
   updatePersonalBests, sectorColour, sectorDelta, updateLapHistory, tyreLabel, statusLabel,
-  sectorDeltaVs, fmtSigned, updateGapHistory,
+  sectorDeltaVs, fmtSigned, updateGapHistory, leaderLapOf, sameRunningOrder,
 } from './timingHelpers';
-import type { Car } from '../state/race';
-
-const car = (over: Partial<Car>): Car => ({
-  driverNum: 1, code: 'VER', team: 'Red Bull', pos: 1, p: { x: 0, y: 0 }, status: 'OnTrack', ...over,
-});
+import { car } from '../state/testCar';
 
 describe('fmtLap', () => {
   it('formats ms as m:ss.SSS, dash when absent', () => {
@@ -109,6 +105,47 @@ describe('orderCars', () => {
       22: car({ driverNum: 22, code: 'TSU', pos: 19, lap: 12 }),
     };
     expect(orderCars(cars).map((c) => c.code)).toEqual(['TSU', 'HUL']);
+  });
+});
+
+describe('leaderLapOf', () => {
+  it('agrees with orderCars[0].lap without sorting', () => {
+    const cars = {
+      22: car({ driverNum: 22, code: 'TSU', pos: 19, lap: 7 }),
+      27: car({ driverNum: 27, code: 'HUL', pos: 19, lap: 12 }),
+      1: car({ driverNum: 1, code: 'VER', pos: 3, lap: 11 }),
+    };
+    expect(leaderLapOf(cars)).toBe(orderCars(cars)[0].lap);
+    expect(leaderLapOf(cars)).toBe(11);
+  });
+
+  it('returns 0 for a leader on the opening lap, undefined when there is no lap at all', () => {
+    // 0 is a real lap number, so callers must guard with != null. Distinguishing
+    // the two is the whole point of the undefined return.
+    expect(leaderLapOf({ 1: car({ pos: 1, lap: 0 }) })).toBe(0);
+    expect(leaderLapOf({ 1: car({ pos: 1 }) })).toBeUndefined();
+    expect(leaderLapOf({})).toBeUndefined();
+  });
+});
+
+describe('sameRunningOrder', () => {
+  const a = { 1: car({ driverNum: 1, pos: 1, lap: 10 }), 16: car({ driverNum: 16, pos: 2, lap: 10 }) };
+
+  it('is true for the same values in fresh objects (the 10 Hz no-op frame)', () => {
+    expect(sameRunningOrder(a, { ...a, 1: car({ driverNum: 1, pos: 1, lap: 10 }) })).toBe(true);
+  });
+
+  it('is false for a position swap that leaves the leader lap unchanged', () => {
+    // The staleness this guards: comparing only the leader's lap saw nothing
+    // change here, so StintChart's row order froze until the leader next
+    // completed a lap.
+    const swapped = { 1: car({ driverNum: 1, pos: 2, lap: 10 }), 16: car({ driverNum: 16, pos: 1, lap: 10 }) };
+    expect(sameRunningOrder(a, swapped)).toBe(false);
+  });
+
+  it('is false when a lap advances, or when the roster changes size', () => {
+    expect(sameRunningOrder(a, { ...a, 1: car({ driverNum: 1, pos: 1, lap: 11 }) })).toBe(false);
+    expect(sameRunningOrder(a, { ...a, 4: car({ driverNum: 4, pos: 3, lap: 10 }) })).toBe(false);
   });
 });
 
