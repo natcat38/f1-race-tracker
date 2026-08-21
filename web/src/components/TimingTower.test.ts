@@ -42,10 +42,14 @@ describe('gapLabel (pit-wall)', () => {
     expect(gapLabel(184000, 2, false, false, 90000)).toBe('+2 LAPS');
   });
   it('shows seconds for lead-lap cars', () => {
-    expect(gapLabel(1234, 0, false, false, 90000)).toBe('+1.234');
+    // One decimal, not three: the estimate's resolution is ~0.566s (see
+    // GAP_RESOLUTION_MS), so the extra digits were invented precision.
+    expect(gapLabel(1234, 0, false, false, 90000)).toBe('+1.2');
   });
   it('seconds mode forces seconds even when lapped', () => {
-    expect(gapLabel(92000, 1, false, true, 90000)).toBe('+92.000');
+    // ...as m:ss.s, because "+92.000" (and, on a real lapped car, "+643.581")
+    // is a number nobody converts to minutes in their head.
+    expect(gapLabel(92000, 1, false, true, 90000)).toBe('+1:32.0');
   });
   it('suppresses the gap before the first completed lap', () => {
     expect(gapLabel(1234, 0, false, false, undefined)).toBe('—');
@@ -60,10 +64,10 @@ describe('intLabel (pit-wall)', () => {
     expect(intLabel(2, 1, 5000, false, false, 90000, 90000)).toBe('+1 LAP'); // this car 2 down, car ahead 1 down
   });
   it('shows seconds when on the same lap as the car ahead', () => {
-    expect(intLabel(1, 1, 800, false, false, 90000, 90000)).toBe('+0.800');
+    expect(intLabel(1, 1, 800, false, false, 90000, 90000)).toBe('+0.8');
   });
   it('seconds mode forces seconds', () => {
-    expect(intLabel(2, 1, 5000, false, true, 90000, 90000)).toBe('+5.000');
+    expect(intLabel(2, 1, 5000, false, true, 90000, 90000)).toBe('+5.0');
   });
   it('suppresses the interval until this car has completed a lap', () => {
     expect(intLabel(1, 1, 800, false, false, undefined, 90000)).toBe('—');

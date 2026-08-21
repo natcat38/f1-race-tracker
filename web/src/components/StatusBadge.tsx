@@ -40,8 +40,11 @@ function Chip({ status, state, staleSec }: Props) {
   }
   if (state.mode === 'live') {
     return (
+      // "LIVE (DEMO)" put the qualifier in a parenthesis and the truth in a
+      // tooltip. The lane is a second recorded clip; the badge now says so on
+      // screen, where a touch user can read it.
       <span className="chip chip-live" title={LIVE_CAVEAT}>
-        ● LIVE (DEMO)
+        ● LIVE LANE · RECORDED CLIP
         {/* The caveat used to live only in that title attribute — invisible to
             touch, and to any keyboard user who never hovers. It is now part of the
             chip's own text (aria-describedby would be unreliable on a role-less
@@ -51,7 +54,11 @@ function Chip({ status, state, staleSec }: Props) {
       </span>
     );
   }
-  return <span className="chip chip-replay">▶ REPLAY</span>;
+  // A fixed-length recording on repeat, said up front: the clip wraps every few
+  // minutes, and a race clock that suddenly runs backwards reads as a bug unless
+  // the reader was told to expect it. The transient wrap notice on the board
+  // (App.tsx) is the other half of the same story.
+  return <span className="chip chip-replay">▶ REPLAY · LOOPING CLIP</span>;
 }
 
 // The polite live region lives here rather than around the badge at each call

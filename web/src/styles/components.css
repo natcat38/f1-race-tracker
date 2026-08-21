@@ -246,6 +246,14 @@
   color: var(--amber);
 }
 
+/* The clip-wrap notice. Amber like the other "read this" chips — it is not a
+   fault, but it is the explanation for a clock that has just run backwards, and
+   it has about eight seconds to be noticed. */
+.chip-loop {
+  background: rgb(var(--amber-rgb) / 0.15);
+  color: var(--amber);
+}
+
 /* Panel */
 
 .panel {
@@ -363,10 +371,14 @@ select.btn {
   background: var(--carbon);
 }
 
-/* #ghost is a single full-bleed panel with one map in it — the route with the
-   most room and, before this, the emptiest first frame in the app. */
+/* #ghost has the most room of any route. 640px was right while the map was the
+   FIRST thing on the page; now that the Controls panel sits above it (the route
+   used to open on a still image with the scrubber and Play button below the
+   fold), 640 pushed the delta chart — the densest graphic in the app — off a
+   900px viewport on its own. 520 keeps the map large and lets controls, track and
+   delta share one screen. */
 .ghost-track {
-  --track-h: 640px;
+  --track-h: 520px;
 }
 
 /* Fixed 600 × 90 strip, so it is width-driven like any ordinary chart. */
@@ -590,16 +602,48 @@ select.btn {
   gap: var(--sp-6);
 }
 
+/* Four EQUAL columns for four panels with wildly unequal content: Strategy wants
+   twenty rows, Telemetry wants ~440px for the comparison it exists to draw, and
+   Comms and Race Control routinely render three lines into 440px of emptiness.
+   The grid was symmetric; the information never was. */
 .board-bottom {
   display: grid;
-  grid-template-columns: repeat(4, minmax(220px, 1fr));
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.2fr) minmax(0, 0.75fr) minmax(0, 0.75fr);
   gap: var(--sp-6);
 }
 
+/* Telemetry with a rival picked: two cards do not fit a quarter of the strip at
+   any viewport, which is why the second was clipped mid-word. It takes two
+   columns instead — and the cards stack inside it below that. */
+.panel-wide {
+  grid-column: span 2;
+}
+
+/* One breakpoint used to take the board from 2/4 columns straight to 1, so every
+   tablet and small laptop between 700 and 1100px got the full phone stack: track,
+   then a twenty-row tower, then four full-width panels. A two-up tier is the
+   missing step. */
 @media (max-width: 1100px) {
-  .board-top,
+  .board-top {
+    grid-template-columns: 1fr;
+  }
+
+  .board-bottom {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .panel-wide {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 700px) {
   .board-bottom {
     grid-template-columns: 1fr;
+  }
+
+  .panel-wide {
+    grid-column: auto;
   }
 }
 
@@ -607,6 +651,15 @@ select.btn {
   display: flex;
   gap: var(--sp-6);
   flex-wrap: wrap;
+}
+
+/* Inside a lane the map sat beside the standings in a flex row, which on a phone
+   shrank it to a ~110px thumbnail with twenty dots on top of each other. Below
+   700px the map goes above the list instead, at full lane width. */
+@media (max-width: 700px) {
+  .lane-body {
+    flex-direction: column;
+  }
 }
 
 /* The lanes had no flex at all, so at 1600px they sized to content and left a
@@ -644,21 +697,24 @@ select.btn {
    reduce motion. One orchestrated moment (panel mount stagger) plus a quiet
    chip transition; nothing else animates. */
 
+/* Scoped to .page-intro, which Route puts on the FIRST page this app paints and
+   never again: the stagger is an arrival, and replaying its 240ms + 180ms cascade
+   on every hash change made switching tabs feel slower than it is. */
 @media (prefers-reduced-motion: no-preference) {
-  .panel {
+  .page-intro .panel {
     animation: panel-in 240ms ease-out both;
   }
 
-  .board-top .panel:nth-child(2),
-  .board-bottom .panel:nth-child(2) {
+  .page-intro .board-top .panel:nth-child(2),
+  .page-intro .board-bottom .panel:nth-child(2) {
     animation-delay: 60ms;
   }
 
-  .board-bottom .panel:nth-child(3) {
+  .page-intro .board-bottom .panel:nth-child(3) {
     animation-delay: 120ms;
   }
 
-  .board-bottom .panel:nth-child(4) {
+  .page-intro .board-bottom .panel:nth-child(4) {
     animation-delay: 180ms;
   }
 
@@ -774,7 +830,8 @@ select.btn {
 
 @media (pointer: coarse) {
   .btn,
-  .btn-icon {
+  .btn-icon,
+  .tt-clear {
     min-height: 44px;
   }
 
@@ -807,5 +864,343 @@ select.btn {
   .rail-tab {
     min-height: 44px;
     justify-content: center;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Interaction and UX pass — selection, the telemetry comparison, the phone
+   layout of the tower, and the small labelled bits that were missing.
+   --------------------------------------------------------------------------- */
+
+/* Telemetry: the vs-comparison.
+
+   The two cards were a flex row of two 200px-floored children inside a
+   quarter-width panel, with overflow-x visible — so the second card was cut off
+   by the panel border mid-word, at every viewport, with not even a scrollbar to
+   recover it. Three changes, in order of who does the work: the panel takes two
+   grid columns when a rival is picked (.panel-wide, above); the row WRAPS, so
+   the cards stack rather than overflow when two do not fit; and the children may
+   shrink, so they narrow before they wrap. */
+.telemetry-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+}
+
+.telemetry-card {
+  flex: 1 1 240px;
+  /* The floor that made the overflow inevitable, removed. A flex child's default
+     min-width is auto, i.e. its content — which for a card holding a
+     reserved-width sparkline is ~250px. */
+  min-width: 0;
+}
+
+/* The sparkline reserves its full 8-lap width (agent 2's L-3) so the row does not
+   reflow bar by bar. That reservation must not become an overflow on a phone. */
+.telemetry-card svg {
+  max-width: 100%;
+}
+
+/* Which card is which. With two live traces side by side and no labels, the only
+   thing telling them apart was the driver code — fine if you remember which one
+   you picked, useless if you are being shown the board. */
+.telemetry-role {
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--slate);
+}
+
+/* Timing tower — the clear affordance and the hint line */
+
+/* Selection was a one-way door: the sector deltas switched to rival-relative on
+   the first click and only a page reload put them back. Styled as a link rather
+   than a button so it reads as the quiet undo it is, but it IS a button — there
+   is no URL behind it. */
+.tt-clear {
+  appearance: none;
+  border: 0;
+  /* Inline-flex with a floor rather than a bare text button: at 17px tall it was
+     the one control on the board under WCAG 2.2's 24px target size (and 44px
+     under a coarse pointer, via the block at the end of this file). */
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0;
+  background: none;
+  font: inherit;
+  color: var(--chalk);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.tt-clear:hover {
+  color: var(--slate);
+}
+
+.tt-hint-key {
+  color: var(--slate);
+}
+
+/* The phone layout of the timing tower.
+
+   At 390px the table is 811px wide in a 311px window: six of ten columns,
+   including every column the reference-car feature exists to serve, sat behind a
+   horizontal scroll nested inside a 2900px vertical page — the classic ambiguous
+   gesture. The column drops above make that honest rather than clipped, but five
+   sparse columns in a 300px window is a compromise, not an answer; the answer at
+   this width is one card per driver, built below out of the same markup.
+
+   The cells keep the explicit role attributes set in TimingTower.tsx, because
+   changing display on a table element is precisely what makes a browser drop the
+   implicit table/row/cell roles — the semantics agent 2 restored survive this
+   layout only because they are named. */
+@container tt (max-width: 560px) {
+  .tt-table,
+  .tt-table tbody {
+    display: block;
+  }
+
+  /* The header row has no place in a card layout; every cell carries its own
+     label instead (::before, from data-label). Kept in the DOM and hidden the
+     accessible way, so the header association is not thrown away. */
+  .tt-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .tt-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--sp-1) var(--sp-2);
+    align-items: baseline;
+    padding: var(--sp-2) var(--sp-2) var(--sp-3);
+    border-bottom: 1px solid var(--edge);
+    /* The constructor rule moves from the position cell to the whole card — same
+       key, and at this size a 3px edge on one cell reads as a stray mark. */
+    border-left: 3px solid var(--team, transparent);
+  }
+
+  .tt-row-selected td:first-child {
+    box-shadow: none;
+  }
+
+  /* :nth-child(n) so this outranks the three column-drop rules above (same
+     specificity, later in the file) — a card shows every column. */
+  /* Label and value on ONE line, not stacked: stacking them made a card 162px
+     tall, which over twenty drivers is 3200px of scroll — trading a bad
+     horizontal gesture for an unreadable vertical one. */
+  .tt-table td:nth-child(n) {
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--sp-1);
+    padding: 0;
+    border-left: 0;
+    overflow: hidden;
+  }
+
+  .tt-table td:nth-child(n)::before {
+    content: attr(data-label);
+    font-size: var(--fs-3xs);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--slate);
+  }
+
+  /* Position and driver are the card's headline and need no label. */
+  .tt-table td:nth-child(-n + 2)::before {
+    content: none;
+  }
+
+  .tt-table td:nth-child(1) {
+    grid-column: 1;
+  }
+
+  .tt-table td:nth-child(2) {
+    grid-column: 2 / -1;
+    font-size: var(--fs-lg);
+  }
+
+  /* The sector cells are the widest of the eight and the least helped by a
+     shared row, so they get the full width between them. */
+  .tt-table td:nth-child(n + 8) {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The reserved delta width buys nothing in a cell-per-line layout and can push
+     a sector value out of its card cell. */
+  .tt-delta {
+    min-width: 0;
+  }
+}
+
+/* Track map — labels on a phone */
+
+/* Twenty three-letter labels at a fixed size, scaled into a ~330px square, print
+   over each other into noise. Below a phone-ish width only the cars the board is
+   actually talking about keep their label — which is the first time the map has
+   had a reason to know about the selection at all. */
+@media (max-width: 700px) {
+  .map-label {
+    display: none;
+  }
+
+  .map-label-marked {
+    display: initial;
+  }
+}
+
+/* Strategy chart — selection, axis, legend */
+
+.stint-row-selected {
+  outline: 1px solid var(--chalk);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.stint-row-selected > span:first-child,
+.stint-row-rival > span:first-child {
+  color: var(--chalk);
+  font-weight: 700;
+}
+
+.stint-row-rival {
+  outline: 1px dashed var(--slate);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Twenty stint bars on an unlabelled 0..53 axis: no lap numbers anywhere, and
+   the leader marker was legible only to a screen reader. The strip is offset by
+   the same 28px code gutter the rows use, so the ticks line up with the bars. */
+.stint-axis {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+}
+
+.stint-axis-track {
+  position: relative;
+  flex: 1;
+  height: 1.2em;
+  font-size: var(--fs-3xs);
+  color: var(--slate);
+  font-variant-numeric: tabular-nums;
+}
+
+.stint-tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+}
+
+.stint-tick-leader {
+  color: var(--chalk);
+}
+
+/* Race Control — the selected driver's messages */
+
+.rc-row-mine {
+  border-left: 2px solid var(--chalk);
+  padding-left: var(--sp-2);
+}
+
+/* Compare — the standings list */
+
+/* A fixed grid, not wrapped inline spans: entries broke mid-phrase (the unit
+   splitting from its number) and wrapped differently row to row, which made
+   twenty aligned numbers ragged. */
+.standings {
+  display: grid;
+  gap: var(--sp-1);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-sm);
+}
+
+.standings-row {
+  display: grid;
+  grid-template-columns: 2.5ch 4ch 4ch 1fr auto;
+  align-items: baseline;
+  gap: var(--sp-2);
+  white-space: nowrap;
+}
+
+.standings-pos {
+  color: var(--slate);
+  text-align: right;
+}
+
+/* Overlay — keys and the headline delta */
+
+.delta-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-4);
+  margin-bottom: var(--sp-2);
+  font-family: var(--data);
+  font-size: var(--fs-2xs);
+  color: var(--slate);
+}
+
+.ghost-delta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-0);
+  line-height: 1.1;
+}
+
+/* Settings — copyable commands */
+
+.cmd {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: 100%;
+}
+
+.cmd code {
+  overflow-wrap: anywhere;
+}
+
+.cmd-copy {
+  font-size: var(--fs-2xs);
+  min-height: 24px;
+  padding: var(--sp-0) var(--sp-2);
+  flex-shrink: 0;
+}
+
+/* The demoted F1TV link, when it is the current route: the rail-repo treatment
+   plus the underline an active tab carries, so "you are here" is never ambiguous
+   just because the affordance is quiet. */
+.rail-repo-active {
+  color: var(--chalk);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* Phone chrome */
+
+@media (max-width: 500px) {
+  /* Four sub-labels are ~34% of the first screen on a 390px phone, and the four
+     primary words say the same thing. */
+  .rail-tab-sub {
+    display: none;
+  }
+}
+
+/* The overlay's scrubber shared a wrapped flex line with the picker, the readout
+   and the Play button, which left it ~200px wide for a precision drag. Its own
+   full-width row on a phone. */
+@media (max-width: 700px) {
+  .ghost-controls input[type="range"] {
+    flex: 1 0 100%;
+    min-width: 0;
   }
 }

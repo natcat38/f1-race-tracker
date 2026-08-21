@@ -10,6 +10,42 @@ const POLL_MS = 5000;
 
 const LINK_CMD = 'python ingest/f1tv_link.py';
 
+// The one control a setup page owes its reader, and the one it did not have: the
+// three commands here are meant to be run somewhere else, and selecting mono text
+// out of a wrapped paragraph by hand is the whole friction. Falls back to saying
+// so if the Clipboard API is unavailable (it needs a secure context).
+function Cmd({ children }: { children: string }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(children);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  }
+  return (
+    <span className="cmd">
+      <code>{children}</code>
+      <button type="button" className="btn cmd-copy" onClick={copy} aria-label={`Copy: ${children}`}>
+        {copied ? '✓ copied' : 'copy'}
+      </button>
+    </span>
+  );
+}
+
+// A URL the reader is meant to visit, rendered as the link it is. These were
+// inert <code> spans on a page whose entire job is "go here, then run this".
+function Url({ href }: { href: string }) {
+  return (
+    <a className="demo-notice-link" href={href} target="_blank" rel="noreferrer">
+      {href}<span aria-hidden="true"> ↗</span>
+      <span className="visually-hidden"> (opens in a new tab)</span>
+    </a>
+  );
+}
+
 // No green token exists (--amber is attention-only, by design) so "linked" reads as
 // the settled chalk chip rather than inventing a colour.
 const CHIP: Record<AuthStatus['state'], string> = {
@@ -127,7 +163,9 @@ export function Settings() {
   return (
     <Route
       title="F1TV account link"
-      rail={<StatusRail active="settings" note="F1TV link — beta" />}
+      // No rail note: "F1TV" was on screen three times at once — the nav
+      // affordance, this note, and the panel plate below it.
+      rail={<StatusRail active="settings" />}
     >
       <Panel
         label="F1TV Link — beta"
@@ -138,7 +176,12 @@ export function Settings() {
         // tab is told nothing at all: the page silently rewrites itself.
         actions={
           <span role="status" aria-live="polite">
-            <span className={CHIP[auth.state]}>{CHIP_LABEL[auth.state]}</span>
+            {/* LINKED beside a body that says "no active F1 TV subscription" told
+                two opposite stories on one screen; the chip reports the useful
+                state, not just the auth one. */}
+            <span className={noSubscription ? 'chip chip-stall' : CHIP[auth.state]}>
+              {noSubscription ? 'LINKED · NO SUB' : CHIP_LABEL[auth.state]}
+            </span>
           </span>
         }
       >
@@ -180,22 +223,22 @@ export function Settings() {
             <h3>Signing in</h3>
             <ol>
               <li>
-                Have a free F1 account — <code>https://account.formula1.com</code>
+                Have a free F1 account — <Url href="https://account.formula1.com" />
               </li>
               <li>
                 Install the f1login browser extension —{' '}
-                <code>https://f1login.fastf1.dev</code> (this is FastF1’s own
+                <Url href="https://f1login.fastf1.dev" /> (this is FastF1’s own
                 extension; it is what hands the sign-in to this machine)
               </li>
               <li>
                 Install the Python dependencies:
                 <br />
-                <code>pip install -r ingest/requirements.txt -r ingest/requirements-live.txt</code>
+                <Cmd>pip install -r ingest/requirements.txt -r ingest/requirements-live.txt</Cmd>
                 <br />
-                <code>pip install --no-deps -r ingest/requirements-live-nodeps.txt</code>
+                <Cmd>pip install --no-deps -r ingest/requirements-live-nodeps.txt</Cmd>
               </li>
               <li>
-                Run <code>{LINK_CMD}</code>, then open the URL it prints and sign in.
+                Run <Cmd>{LINK_CMD}</Cmd>, then open the URL it prints and sign in.
                 It will say <em>“requires an active F1TV Access/Pro/Premium
                 subscription”</em> before the URL — that line is expected, not a
                 rejection; a free account signs in fine.

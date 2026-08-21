@@ -1,5 +1,5 @@
 import type { RaceControlMessage, RaceState } from '../state/race';
-import { fmtClock } from './timingHelpers';
+import { fmtClock, needsDriverTag } from './timingHelpers';
 
 const MAX_SHOWN = 8;
 
@@ -36,7 +36,7 @@ const CATEGORY: Record<string, { label: string; colour: string }> = {
 
 // RaceControl is a passive feed of the most recent race-control messages
 // (flags, safety car, investigations), newest first.
-export function RaceControl({ state }: { state: RaceState }) {
+export function RaceControl({ state, selected }: { state: RaceState; selected?: number | null }) {
   if (state.messages.length === 0) return <div className="empty">No incidents.</div>;
   const recent = state.messages.slice(-MAX_SHOWN).reverse();
 
@@ -50,7 +50,7 @@ export function RaceControl({ state }: { state: RaceState }) {
       {recent.map((m) => {
         const cat = CATEGORY[m.category] ?? { label: m.category.toUpperCase(), colour: 'var(--chalk)' };
         return (
-        <div key={idOf(m)} style={{
+        <div key={idOf(m)} className={m.driver != null && m.driver === selected ? 'rc-row rc-row-mine' : 'rc-row'} style={{
           display: 'flex', alignItems: 'baseline', gap: 'var(--sp-2)', fontSize: 'var(--fs-sm)', color: 'var(--slate)',
         }}>
           <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: 'var(--fs-2xs)' }}>{fmtClock(m.t)}</span>
@@ -58,7 +58,8 @@ export function RaceControl({ state }: { state: RaceState }) {
             {cat.label}
           </span>
           <span>{m.message}</span>
-          {m.driver != null && state.cars[m.driver] && (
+          {m.driver != null && state.cars[m.driver]
+            && needsDriverTag(m.message, state.cars[m.driver].code, m.driver) && (
             <span style={{ color: 'var(--slate)' }}>({state.cars[m.driver].code})</span>
           )}
         </div>

@@ -21,6 +21,9 @@ export interface RaceControlMessage {
 }
 // Rolling cap on the message buffer, mirroring internal/model/apply.go's maxMessages.
 const MAX_MESSAGES = 30;
+// How far the clock has to jump backwards before it counts as a clip wrap rather
+// than a frame arriving out of order. Frames are 100 ms apart; clips are minutes.
+const LOOP_REWIND_MS = 5000;
 // cars/lapTrace are Record<number, ...> but the wire (and JS object) keys are actually
 // strings (see internal/model/model.go's Cars map[int]CarState, which marshals with
 // string keys — JSON has no int keys). Object.keys(cars) is string[]; coerce with
@@ -37,12 +40,19 @@ export interface RaceState {
   // Bumped on every snapshot (never on a frame) — lets a consumer (useComms) tell
   // a reconnect or source-switch snapshot apart from steady-state frames.
   snapshotSeq: number;
+  // Bumped every time the replaying clip wraps back to its start (timeMs goes
+  // backwards). The board's clock and lap counter genuinely run backwards at that
+  // moment, which reads as a bug unless something says "this clip looped" — and
+  // anything accumulated per play-through (race-control messages, personal-best
+  // sector times) has to be dropped with it or it bleeds across passes.
+  loopSeq: number;
 }
 
 export function emptyState(): RaceState {
   return {
     session: '', mode: '', label: '', track: [], cars: {}, timeMs: 0, rev: 0,
     radio: [], lapTrace: {}, totalLaps: 0, stints: {}, messages: [], snapshotSeq: 0,
+    loopSeq: 0,
   };
 }
 
@@ -129,16 +139,36 @@ export function applyMessage(s: RaceState, msg: Msg): RaceState {
       stints: d.stints ?? {}, weather: d.weather,
       messages: d.messages ?? [],
       snapshotSeq: s.snapshotSeq + 1,
+      // A snapshot is a fresh baseline, not a wrap: keep the counter so a
+      // reconnect mid-clip doesn't read as a loop to anything watching it.
+      loopSeq: s.loopSeq,
     };
   }
   const d = msg.data;
   if (d.rev <= s.rev) return s; // stale
   const cars = { ...s.cars };
   for (const c of d.cars ?? []) cars[c.driverNum] = c;
+  // Loop restart: a replaying clip that reaches its end rewinds rather than
+  // stopping, so timeMs drops by however long the clip is. Rev keeps climbing
+  // (the player bumps it across laps), so this is the only signal there is —
+  // and it is the same one internal/model/apply.go uses server-side. The
+  // threshold keeps an out-of-order frame arriving a tick early from being
+  // mistaken for a wrap; a clip is minutes long, a reordered frame is ~100 ms.
+  const looped = s.rev > 0 && d.timeMs < s.timeMs - LOOP_REWIND_MS;
+  // The previous pass's race control belongs to the previous pass. Left alone it
+  // re-appends the same finite set of messages every lap, so the feed fills with
+  // duplicates in an order that reads as neither chronological nor newest-first.
+  const carried = looped ? [] : s.messages;
   const messages = d.messages?.length
-    ? [...s.messages, ...d.messages].slice(-MAX_MESSAGES)
-    : s.messages;
-  // Live radio accumulates uncapped, mirroring Go's Apply (ADR-0008).
+    ? [...carried, ...d.messages].slice(-MAX_MESSAGES)
+    : carried;
+  // Live radio accumulates uncapped, mirroring Go's Apply (ADR-0008) — and, like
+  // Go's, is deliberately NOT cleared on a wrap: only replay lanes loop, and
+  // replay frames never carry radio.
   const radio = d.radio?.length ? [...s.radio, ...d.radio] : s.radio;
-  return { ...s, cars, timeMs: d.timeMs, rev: d.rev, messages, radio, weather: d.weather ?? s.weather };
+  return {
+    ...s, cars, timeMs: d.timeMs, rev: d.rev, messages, radio,
+    weather: d.weather ?? s.weather,
+    loopSeq: looped ? s.loopSeq + 1 : s.loopSeq,
+  };
 }

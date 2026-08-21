@@ -25,6 +25,10 @@ import { Settings } from './components/Settings';
 import { StintChart } from './components/StintChart';
 import { STATIC_DEMO } from './staticDemo';
 
+// How long the clip-wrapped notice stays up. Long enough to be read after the
+// clock visibly jumps, short enough not to become part of the chrome.
+const LOOP_NOTICE_MS = 8000;
+
 // Three distinct reasons the map is missing, so the copy never contradicts what
 // the rest of the board is showing: an unrecoverable static-demo load failure,
 // a session streaming fine but without a track outline, or nothing yet at all.
@@ -56,6 +60,42 @@ export default function App() {
   const staleSec = useStale(state);
   const lapHistory = useLapHistory(state);
   const gapHistory = useGapHistory(state);
+
+  // The replay clip is a few minutes long and wraps forever. When it does, the
+  // race clock jumps backwards and the lap counter counts down — which, to anyone
+  // who follows the sport, is an unambiguous "this is broken" signal unless
+  // something says otherwise. state.loopSeq is bumped by applyMessage the moment
+  // timeMs goes backwards (the same signal the Go gateway uses); this turns that
+  // into a transient notice. Seeded from the live value and adjusted during
+  // render rather than in an effect — an effect here would be a second render
+  // pass, and this repo's lint config rejects setState in an effect body.
+  const [seenLoop, setSeenLoop] = useState(state.loopSeq);
+  const [justLooped, setJustLooped] = useState(false);
+  if (seenLoop !== state.loopSeq) {
+    setSeenLoop(state.loopSeq);
+    setJustLooped(true);
+  }
+  useEffect(() => {
+    if (!justLooped) return;
+    const t = setTimeout(() => setJustLooped(false), LOOP_NOTICE_MS);
+    return () => clearTimeout(t);
+  }, [justLooped, seenLoop]);
+
+  // Esc clears the reference car from anywhere on the board — the keyboard half
+  // of making the selection undoable (the tower's own "clear" button is the
+  // visible half). Skipped while focus is in a form control so it cannot steal
+  // Esc from a native picker.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      const el = document.activeElement;
+      if (el instanceof HTMLSelectElement || el instanceof HTMLInputElement) return;
+      setSelected(null);
+      setRival(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   useEffect(() => {
     const onState = (s: RaceState) => {
@@ -140,6 +180,9 @@ export default function App() {
           </button>
           <span role="status" aria-live="polite">
             {frozen && <span className="chip chip-replay">⏸ FROZEN</span>}
+            {justLooped && (
+              <span className="chip chip-loop">↻ CLIP LOOPED — the recording restarted</span>
+            )}
           </span>
         </StatusRail>
       }
@@ -148,7 +191,7 @@ export default function App() {
         <Panel label="Track">
           {status === 'reconnecting' && !showSkeleton && (
             <div style={{ position: 'relative', display: 'inline-block' }}>
-              <Map state={state} paused={frozen} />
+              <Map state={state} paused={frozen} selected={selected} rival={effectiveRival} />
               <div className="chip chip-reconnect" style={{
                 position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
               }}>
@@ -156,7 +199,9 @@ export default function App() {
               </div>
             </div>
           )}
-          {!showSkeleton && status !== 'reconnecting' && <Map state={state} paused={frozen} />}
+          {!showSkeleton && status !== 'reconnecting' && (
+            <Map state={state} paused={frozen} selected={selected} rival={effectiveRival} />
+          )}
           {showSkeleton && <SkeletonMap failed={status === 'failed'} trackless={trackless} />}
         </Panel>
         <Panel label="Timing">
@@ -165,7 +210,10 @@ export default function App() {
       </div>
 
       <div className="board-bottom">
-        <Panel label="Telemetry">
+        {/* Two telemetry cards do not fit one quarter of the strip — the second
+            was cut mid-word at every viewport. With a rival picked the panel takes
+            two columns; below that width the cards stack (see .telemetry-cards). */}
+        <Panel label="Telemetry" className={effectiveRival != null ? 'panel-wide' : undefined}>
           <TelemetryPanel
             state={state}
             lapHistory={lapHistory}
@@ -176,13 +224,13 @@ export default function App() {
           />
         </Panel>
         <Panel label="Strategy">
-          <StintChart state={state} />
+          <StintChart state={state} selected={selected} rival={effectiveRival} />
         </Panel>
         <Panel label="Comms">
           <Comms state={state} />
         </Panel>
         <Panel label="Race Control">
-          <RaceControl state={state} />
+          <RaceControl state={state} selected={selected} />
         </Panel>
       </div>
     </Route>

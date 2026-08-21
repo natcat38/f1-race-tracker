@@ -30,7 +30,7 @@ function Lane({ session, year }: { session: string; year: string }) {
       {state.rev === 0 ? (
         <div className="track-skeleton">Warming up the timing feed…</div>
       ) : (
-        <div style={{ display: 'flex', gap: 'var(--sp-4)', alignItems: 'flex-start' }}>
+        <div className="lane-body" style={{ display: 'flex', gap: 'var(--sp-4)', alignItems: 'flex-start' }}>
           <Map state={state} />
           <Standings state={state} />
         </div>

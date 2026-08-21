@@ -15,7 +15,8 @@ describe('Standings leader label', () => {
     };
     const html = renderToStaticMarkup(<Standings state={state} />);
     expect(html).toContain('LEADER');
-    expect(html).toContain('+1.200');
+    // The gap is an estimate at ~0.5s resolution, so it renders to one decimal.
+    expect(html).toContain('+1.2');
   });
 
   test('degrades honestly instead of labelling nobody when no car carries a literal pos:1 (#66)', () => {

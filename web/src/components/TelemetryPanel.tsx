@@ -1,5 +1,9 @@
 import type { Car, RaceState } from '../state/race';
-import { fmtLap, fmtGap, type LapHistory, type GapHistory } from './timingHelpers';
+import { fmtLap, fmtGapEstimate, type LapHistory, type GapHistory } from './timingHelpers';
+
+// Below this many points a sparkline is decoration: two bars with no axis convey
+// nothing, and a single bar beside an em-dash reads as a rendering fault.
+const MIN_SPARK_POINTS = 4;
 
 // Throttle and brake are opposite inputs, so they read as opposite colours —
 // both bars being green made a full-brake trace look like a full-throttle one
@@ -79,11 +83,22 @@ function SparkHatch() {
   );
 }
 
-function CarTelemetry({ car, history, gapHistory }: {
+function CarTelemetry({ car, history, gapHistory, role }: {
   car: Car; history?: number[]; gapHistory?: (number | undefined)[];
+  role?: 'reference' | 'rival';
 }) {
+  const trend = (values: (number | undefined)[] | undefined) =>
+    (values?.filter((v) => v != null).length ?? 0) >= MIN_SPARK_POINTS;
   return (
-    <div style={{ display: 'grid', gap: 'var(--sp-2)', minWidth: 200 }}>
+    // min-width: 0 (via the CSS class) rather than a 200px floor: two cards with
+    // a hard floor could not shrink, so the second was clipped mid-word by the
+    // panel edge at every viewport instead of the pair getting narrower.
+    <div className="telemetry-card" style={{ display: 'grid', gap: 'var(--sp-2)' }}>
+      {role && (
+        <div className="telemetry-role">
+          {role === 'reference' ? 'Reference car' : 'Rival'}
+        </div>
+      )}
       <div style={{ fontSize: 'var(--fs-lg)' }}>
         <b>{car.code}</b> <span style={{ color: 'var(--slate)' }}>{car.team}</span>
       </div>
@@ -101,18 +116,25 @@ function CarTelemetry({ car, history, gapHistory }: {
       </div>
       <Bar label="Throttle" value={car.throttle ?? 0} tone="good" />
       <Bar label="Brake" value={car.brake ?? 0} tone="bad" />
-      {history && history.length >= 2 && (
+      {trend(history) && history && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', fontSize: 'var(--fs-sm)' }}>
           <span style={{ width: 64, color: 'var(--slate)' }}>Laps</span>
           <Sparkline values={history} label={`${car.code} lap time trend`} />
           <span>{fmtLap(history[history.length - 1])}</span>
         </div>
       )}
-      {gapHistory && gapHistory.length >= 2 && (
+      {trend(gapHistory) && gapHistory && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', fontSize: 'var(--fs-sm)' }}>
           <span style={{ width: 64, color: 'var(--slate)' }}>Gap</span>
           <Sparkline values={gapHistory} label={`${car.code} gap trend`} />
-          <span>{fmtGap(gapHistory[gapHistory.length - 1])}</span>
+          {/* The derived gap, at the derived gap's resolution — same rule as the
+              tower's Gap column. */}
+          <span>{fmtGapEstimate(gapHistory[gapHistory.length - 1])}</span>
+        </div>
+      )}
+      {!trend(history) && (
+        <div className="empty" style={{ fontSize: 'var(--fs-2xs)' }}>
+          Lap and gap trends build after {MIN_SPARK_POINTS} laps.
         </div>
       )}
     </div>
@@ -144,24 +166,37 @@ export function TelemetryPanel({
       <SparkHatch />
       {others.length > 0 && onRivalChange && (
         <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--slate)', display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
-          vs
+          {/* "vs" said nothing about what the control does; the empty option said
+              what the state IS rather than offering the action. */}
+          Compare with
           <select
             value={rival ?? ''}
             onChange={(e) => onRivalChange(e.target.value ? Number(e.target.value) : null)}
             className="btn"
             style={{ fontSize: 'var(--fs-xs)' }}
           >
-            <option value="">— none —</option>
+            <option value="">— pick a rival —</option>
             {others.map((c) => (
               <option key={c.driverNum} value={c.driverNum}>{c.code}</option>
             ))}
           </select>
         </label>
       )}
-      <div style={{ display: 'flex', gap: 'var(--sp-4)' }}>
-        <CarTelemetry car={car} history={lapHistory[car.driverNum]} gapHistory={gapHistory[car.driverNum]?.gaps} />
+      {/* A flex row that WRAPS, with shrinkable children: the two cards sit side
+          by side wherever the panel can hold them and stack when it cannot,
+          instead of the second being cut off by the panel border. */}
+      <div className="telemetry-cards">
+        <CarTelemetry
+          car={car} history={lapHistory[car.driverNum]}
+          gapHistory={gapHistory[car.driverNum]?.gaps}
+          role={rivalCar ? 'reference' : undefined}
+        />
         {rivalCar && (
-          <CarTelemetry car={rivalCar} history={lapHistory[rivalCar.driverNum]} gapHistory={gapHistory[rivalCar.driverNum]?.gaps} />
+          <CarTelemetry
+            car={rivalCar} history={lapHistory[rivalCar.driverNum]}
+            gapHistory={gapHistory[rivalCar.driverNum]?.gaps}
+            role="rival"
+          />
         )}
       </div>
     </div>

@@ -1,6 +1,7 @@
 import type { RaceState } from '../state/race';
 import { useComms } from '../hooks/useComms';
 import { teamColour } from './teamColours';
+import { fmtClock } from './timingHelpers';
 
 // Comms is the toggleable team-radio layer: a now-playing banner + a short
 // replayable history. Audio streams from F1's public URL (ADR-0003).
@@ -50,20 +51,31 @@ export function Comms({ state }: { state: RaceState }) {
 
       {enabled && history.length > 0 && (
         <div style={{ display: 'grid', gap: 'var(--sp-1)' }}>
-          {history.map((m, i) => (
+          {/* The history used to be six identical "CODE ▶" rows: no time, no
+              ordering stated, and no way to tell which one was playing — so there
+              was no reason to press one button over another. */}
+          <div className="empty" style={{ fontSize: 'var(--fs-2xs)' }}>Newest first</div>
+          {history.map((m, i) => {
+            const playing = nowPlaying?.clip === m.clip;
+            return (
             <div key={`${m.timeMs}-${i}`} style={{
               display: 'flex', alignItems: 'center', gap: 'var(--sp-2)',
               fontSize: 'var(--fs-sm)', color: 'var(--slate)',
             }}>
+              <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: 'var(--fs-2xs)' }}>
+                {fmtClock(m.timeMs)}
+              </span>
               <span style={{ color: colourFor(m.driverNum), fontWeight: 700 }}>{codeFor(m.driverNum)}</span>
               <button
                 onClick={() => replay(m)}
                 className="btn btn-icon"
                 style={{ border: 'none' }}
-                aria-label={`Play ${codeFor(m.driverNum)} radio`}
+                aria-label={`Play ${codeFor(m.driverNum)} radio from ${fmtClock(m.timeMs)}`}
               >▶</button>
+              {playing && <span className="chip chip-replay">PLAYING</span>}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

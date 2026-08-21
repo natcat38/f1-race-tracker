@@ -8,13 +8,16 @@ import { ErrorBoundary } from '../ErrorBoundary';
 // Panel is the shared instrument frame: a carbon-bordered box with an
 // uppercase label plate along the top edge, and an optional actions slot
 // (e.g. a per-lane status chip) right-aligned in that same plate.
-export function Panel({ label, actions, children }: {
+export function Panel({ label, actions, className, children }: {
   label: string;
   actions?: ReactNode;
+  // An extra class on the frame, for a panel whose GRID placement depends on its
+  // contents — Telemetry spans two columns once a second car is in it.
+  className?: string;
   children: ReactNode;
 }) {
   return (
-    <section className="panel">
+    <section className={className ? `panel ${className}` : 'panel'}>
       <header className="panel-plate">
         <h2>{label}</h2>
         {actions}

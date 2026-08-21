@@ -4,21 +4,43 @@ import {
   fmtLap, fmtSec, fmtGap, gapLabel, intLabel,
   orderCars, bestSectors, updatePersonalBests, personalBestOf, sectorColour, sectorDelta,
   TYRE_COLOUR, tyreLabel, statusLabel, sectorDeltaVs, fmtSigned, sectorMark,
+  updateGapSmoothing, displayGaps, hasNoData, holdOrder,
 } from './timingHelpers';
-import type { Bests } from './timingHelpers';
+import type { Bests, GapSmoothing } from './timingHelpers';
 import { teamColour } from './teamColours';
+
+// The header row, in order. A list rather than ten literals because the phone
+// layout reads the same names back out of each cell's data-label.
+const COLUMNS = ['#', 'Driver', 'Gap', 'Int', 'Last', 'Best', 'Tyre', 'S1', 'S2', 'S3'] as const;
+
+// One sentence, on both estimated columns, saying what they are and how good
+// they are. "best-effort, derived" said the first half only.
+const GAP_TITLE = 'Estimated from track position, to about ±0.5s — not official timing';
 
 export function TimingTower({
   state, selected, onSelect,
 }: {
   state: RaceState;
   selected: number | null;
-  onSelect: (driverNum: number) => void;
+  // null clears the reference car. Selection used to be a one-way door: once a
+  // row was clicked the sector deltas switched to rival-relative for the rest of
+  // the session, and only a page reload — which also loses the lane, the comms
+  // toggle and the gap units — put them back.
+  onSelect: (driverNum: number | null) => void;
 }) {
   const [secondsMode, setSecondsMode] = useState(false);
   const [pb, setPb] = useState<Bests>({});
   const pbRef = useRef<Bests>({});
   const sessionRef = useRef(state.session);
+  const loopRef = useRef(state.loopSeq);
+  // The rolling windows behind the Gap/Int columns — see displayGaps.
+  const [smoothing, setSmoothing] = useState<GapSmoothing>({});
+  const smoothingRef = useRef<GapSmoothing>({});
+  // The running order re-sorts on every 10 Hz frame, so a row can move out from
+  // under the pointer between aiming and clicking — during the UX review a click
+  // aimed at PIA landed on SAI. While the pointer is over the table the order is
+  // held; the VALUES in every row keep updating, only the sequence is pinned.
+  const [heldOrder, setHeldOrder] = useState<number[] | null>(null);
   // Roving tabindex (below) tracked by driver number, not row index: the running
   // order re-sorts on every 10 Hz frame, so an index-based tab stop would wander
   // between drivers while the user is reading. Keyed by driver, the stop follows
@@ -48,27 +70,58 @@ export function TimingTower({
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const over = el.scrollWidth > el.clientWidth + 1;
-    setScrollable((s) => (s === over ? s : over));
+    // A DEADBAND, not a single threshold. This effect runs after every render —
+    // ~10 times a second — and the table's content width moves by a pixel or two
+    // between frames as digits change. With one threshold, a table sitting on the
+    // boundary flips the flag on alternate renders, and because each flip is a
+    // setState from an effect that then runs again, a burst (a clip wrap changes
+    // every sector cell at once) can chain far enough to trip React's nested
+    // update guard. Turning on needs 4px of real overflow; turning off needs the
+    // table to actually fit — so the two cannot alternate on a 1px wobble.
+    setScrollable((s) => {
+      const over = el.scrollWidth - el.clientWidth;
+      const next = s ? over > 0 : over > 4;
+      return s === next ? s : next;
+    });
   });
 
   useEffect(() => {
     // New session (e.g. replay <-> live switch): drop the previous clip's
     // personal bests so sector colours don't bleed across datasets.
-    if (sessionRef.current !== state.session) {
+    //
+    // A clip WRAP is the same problem inside one session, and it was missed: the
+    // recording restarts, every driver drives the same sectors again, and their
+    // bests from the previous pass are still standing — so on lap two of the loop
+    // nothing can be a personal best until a driver beats a time set in a pass
+    // the viewer never saw. Green stops meaning anything. Same reset, same reason.
+    if (sessionRef.current !== state.session || loopRef.current !== state.loopSeq) {
       sessionRef.current = state.session;
+      loopRef.current = state.loopSeq;
       pbRef.current = {};
+      smoothingRef.current = {};
     }
-    const next = updatePersonalBests(pbRef.current, orderCars(state.cars));
+    const cars = orderCars(state.cars);
+    const next = updatePersonalBests(pbRef.current, cars);
     pbRef.current = next;
     setPb(next);
-  }, [state.rev, state.session]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Returns the same reference when no window moved, so this is a no-op render
+    // for most of the ten ticks a second.
+    const sm = updateGapSmoothing(smoothingRef.current, cars);
+    if (sm !== smoothingRef.current) {
+      smoothingRef.current = sm;
+      setSmoothing(sm);
+    }
+  }, [state.rev, state.session, state.loopSeq]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const order = orderCars(state.cars);
+  const live = orderCars(state.cars);
+  const order = heldOrder ? holdOrder(live, heldOrder) : live;
   if (order.length === 0) {
     return <div className="empty">No cars yet — the timing tower fills in when data arrives.</div>;
   }
   const [b1, b2, b3] = bestSectors(order);
+  // Smoothed and made consistent with the running order — the raw per-car
+  // estimates jitter ±0.6 s between frames and can come out non-monotonic.
+  const gaps = displayGaps(order, smoothing);
   // personalBestOf, not a raw lookup: it withholds the personal best until the
   // driver has actually set two times in that sector, so the first observation of
   // a sector no longer paints itself green for tying a record it just invented.
@@ -139,34 +192,41 @@ export function TimingTower({
       tabIndex={scrollable ? 0 : -1}
       role={scrollable ? 'group' : undefined}
       aria-label={scrollable ? 'Timing tower — scroll sideways for the remaining columns' : undefined}
+      // Mouse only: on a touch screen pointerenter fires on the tap itself, so a
+      // touch user would pin the order by reading the table and never release it.
+      onPointerEnter={(e) => { if (e.pointerType === 'mouse') setHeldOrder(live.map((c) => c.driverNum)); }}
+      onPointerLeave={(e) => { if (e.pointerType === 'mouse') setHeldOrder(null); }}
     >
-    <table className="tt-table">
+    {/* Explicit roles that duplicate what <table> already implies. They are
+        redundant on the desktop layout and load-bearing on the phone one: below
+        ~560px the container query turns every row into a card, and changing a
+        table element's `display` is exactly what makes a browser drop its
+        implicit table/row/cell roles. Naming them keeps the semantics agent 2
+        restored from being undone by a layout rule. */}
+    <table className="tt-table" role="table">
       <thead>
-        <tr>
-          <th scope="col">#</th>
-          <th scope="col">Driver</th>
-          <th scope="col">Gap</th>
-          <th scope="col">Int</th>
-          <th scope="col">Last</th>
-          <th scope="col">Best</th>
-          <th scope="col">Tyre</th>
-          <th scope="col">S1</th>
-          <th scope="col">S2</th>
-          <th scope="col">S3</th>
+        <tr role="row">
+          {COLUMNS.map((c) => (
+            <th key={c} scope="col" role="columnheader">{c}</th>
+          ))}
         </tr>
       </thead>
       <tbody>
         {order.map((c, idx) => {
+          const g = gaps[idx] ?? {};
           // Number rows by their place in the sorted order, not the raw feed
           // pos: a duplicated pos would otherwise print the same number twice
           // and skip one entirely.
           const isLeader = idx === 0;
           const ahead = order[idx - 1];
           const isSel = c.driverNum === selected;
-          const status = statusLabel(c.status);
+          // A car the feed carries but has said nothing about used to render as
+          // six em-dashes with no explanation; NO DATA reads as a known state.
+          const status = statusLabel(c.status) ?? (!isLeader && hasNoData(c) ? 'NO DATA' : undefined);
           return (
             <tr
               key={c.driverNum}
+              role="row"
               // No role and no tabIndex on the <tr>. role="button" used to sit here
               // and it flattened the whole table body: a button has a presentational
               // children content model, so every <td> lost its cell role, the ten
@@ -194,11 +254,11 @@ export function TimingTower({
               // selection is not applied twice for one activation.
               onClick={(e) => {
                 if ((e.target as HTMLElement).closest('.tt-select')) return;
-                onSelect(c.driverNum);
+                onSelect(isSel ? null : c.driverNum);
               }}
             >
-              <td>{idx + 1}</td>
-              <td>
+              <td role="cell" data-label="Pos">{idx + 1}</td>
+              <td role="cell" data-label="Driver">
                 <button
                   type="button"
                   className="tt-select"
@@ -207,11 +267,11 @@ export function TimingTower({
                   tabIndex={c.driverNum === rovingDriver ? 0 : -1}
                   onFocus={() => setFocusedDriver(c.driverNum)}
                   onKeyDown={(e) => onRowKeyDown(e, c.driverNum)}
-                  onClick={() => onSelect(c.driverNum)}
+                  onClick={() => onSelect(isSel ? null : c.driverNum)}
                 >
                   <b>{c.code}</b>
                   <span className="visually-hidden">
-                    {isSel ? ' — reference car' : ' — set as reference car'}
+                    {isSel ? ' — reference car, choose again to clear' : ' — set as reference car'}
                   </span>
                 </button>
               </td>
@@ -220,22 +280,25 @@ export function TimingTower({
                   {/* --pit, not the medium-compound yellow: "in the pit lane" is a
                       race state, and borrowing a tyre colour for it meant the
                       swatch and the indicator could never be tuned apart. */}
-                  <td style={{ color: c.status === 'Pit' ? 'var(--pit)' : 'var(--slate)' }}>{status}</td>
-                  <td>—</td>
+                  <td role="cell" data-label="Gap" style={{ color: c.status === 'Pit' ? 'var(--pit)' : 'var(--slate)' }}>{status}</td>
+                  <td role="cell" data-label="Int">—</td>
                 </>
               ) : (
                 <>
-                  <td title="best-effort, derived">{gapLabel(c.gapMs, c.gapLaps, isLeader, secondsMode, c.lastLapMs)}</td>
-                  <td title="best-effort, derived">{intLabel(c.gapLaps, ahead?.gapLaps, c.intMs, isLeader, secondsMode, c.lastLapMs, ahead?.lastLapMs)}</td>
+                  {/* g.gapMs / g.intMs, not the raw wire values: smoothed over a
+                      half-second window and reconciled with the running order,
+                      then printed at the estimator's real resolution. */}
+                  <td role="cell" data-label="Gap" title={GAP_TITLE}>{gapLabel(g.gapMs, c.gapLaps, isLeader, secondsMode, c.lastLapMs)}</td>
+                  <td role="cell" data-label="Int" title={GAP_TITLE}>{intLabel(c.gapLaps, ahead?.gapLaps, g.intMs, isLeader, secondsMode, c.lastLapMs, ahead?.lastLapMs)}</td>
                 </>
               )}
-              <td>{fmtLap(c.lastLapMs)}</td>
+              <td role="cell" data-label="Last">{fmtLap(c.lastLapMs)}</td>
               {/* Best is the one derived, rarely-watched readout on the row, so
                   it is where the variable weight axis earns its keep: 300 and
                   --slate recede it without hiding it. A class rather than a
                   :nth-child rule so .tt-row-out's dimming still outranks it. */}
-              <td className="tt-quiet">{fmtLap(c.bestLapMs)}</td>
-              <td style={{ color: TYRE_COLOUR[c.tyre ?? ''] ?? 'var(--chalk)' }}>
+              <td role="cell" data-label="Best" className="tt-quiet">{fmtLap(c.bestLapMs)}</td>
+              <td role="cell" data-label="Tyre" style={{ color: TYRE_COLOUR[c.tyre ?? ''] ?? 'var(--chalk)' }}>
                 {tyreLabel(c.tyre, c.tyreAge)}
               </td>
               {([[c.s1Ms, b1, 0], [c.s2Ms, b2, 1], [c.s3Ms, b3, 2]] as const).map(([v, best, i]) => {
@@ -243,7 +306,7 @@ export function TimingTower({
                 const mark = cellMark(v, best, c.driverNum, i);
                 const rivalMode = !!refCar && c.driverNum !== selected;
                 return (
-                  <td key={i} style={cellColour(v, best, c.driverNum, i)}>
+                  <td key={i} role="cell" data-label={`S${i + 1}`} style={cellColour(v, best, c.driverNum, i)}>
                     {fmtSec(v)}
                     {mark && (
                       <sup className="tt-mark" title={mark === 'S' ? 'Session best' : 'Personal best'}>
@@ -272,8 +335,28 @@ export function TimingTower({
     </table>
     </div>
     <div className="empty tt-note">
-      Gap / Int are estimates derived from track position, not official timing.
-      {refCar && ` Choose a driver to set the reference car — sector deltas compare against ${refCar.code}.`}
+      {/* Rounded to one decimal because that is the resolution the estimate has:
+          the wire's values come out quantised to ~0.566s, so the three decimals
+          this column used to print were three digits of invented precision. */}
+      Gap / Int are estimated from track position and shown to 0.1s — not official timing.
+      {heldOrder && ' Order held while you point at the tower.'}
+    </div>
+    {/* The hint used to be gated on refCar, so it appeared only AFTER the user
+        had already found the interaction — the one moment it could not help. It
+        now states the invitation up front and becomes the status line (with a way
+        back out) once a reference car is set. */}
+    <div className="empty tt-note">
+      {refCar ? (
+        <>
+          Sector deltas compare against <b>{refCar.code}</b>.{' '}
+          <button type="button" className="tt-clear" onClick={() => onSelect(null)}>
+            Clear reference car
+          </button>
+          <span className="tt-hint-key"> (or press Esc)</span>
+        </>
+      ) : (
+        'Choose a driver row to set the reference car — sector deltas then compare against it.'
+      )}
     </div>
     <div className="empty tt-note tt-legend">
       {([['SOFT', 'S Soft'], ['MEDIUM', 'M Medium'], ['HARD', 'H Hard'],

@@ -131,3 +131,82 @@ describe('TimingTower constructor key', () => {
     expect(html).not.toContain('color:#B6BABD');
   });
 });
+
+describe('TimingTower selection affordances', () => {
+  test('the hint invites the interaction BEFORE it has been used', () => {
+    // It used to be gated on a reference car being set, i.e. it rendered only
+    // after the click it was supposed to prompt.
+    const html = renderToStaticMarkup(
+      <TimingTower state={field()} selected={null} onSelect={() => {}} />,
+    );
+    expect(html).toContain('Choose a driver row to set the reference car');
+    expect(html).not.toContain('Clear reference car');
+  });
+
+  test('and becomes a status line with a way back out once one is set', () => {
+    const html = renderToStaticMarkup(
+      <TimingTower state={field()} selected={4} onSelect={() => {}} />,
+    );
+    expect(html).toContain('compare against <b>NOR</b>');
+    expect(html).toContain('Clear reference car');
+    expect(html).toContain('press Esc');
+  });
+
+  test('the selected row says that choosing it again clears it', () => {
+    const html = renderToStaticMarkup(
+      <TimingTower state={field()} selected={4} onSelect={() => {}} />,
+    );
+    expect(html).toContain('reference car, choose again to clear');
+  });
+
+  test('the gap disclaimer states the precision it actually renders', () => {
+    const html = renderToStaticMarkup(
+      <TimingTower state={field()} selected={null} onSelect={() => {}} />,
+    );
+    expect(html).toContain('shown to 0.1s');
+  });
+});
+
+describe('TimingTower phone card layout', () => {
+  test('every cell carries the column name it will need as a card label', () => {
+    // Below a 560px container the table becomes one card per driver and the
+    // header row is hidden, so each cell prints its own label from data-label.
+    const html = renderToStaticMarkup(
+      <TimingTower state={field()} selected={null} onSelect={() => {}} />,
+    );
+    for (const label of ['Pos', 'Driver', 'Gap', 'Int', 'Last', 'Best', 'Tyre', 'S1', 'S2', 'S3']) {
+      expect(html).toContain(`data-label="${label}"`);
+    }
+  });
+
+  test('the table roles are explicit, because the card layout would otherwise drop them', () => {
+    // Changing `display` on a table element is exactly what makes a browser drop
+    // the implicit table/row/cell roles agent 2 restored.
+    const html = renderToStaticMarkup(
+      <TimingTower state={field()} selected={null} onSelect={() => {}} />,
+    );
+    expect(html).toContain('role="table"');
+    expect(html).toContain('role="row"');
+    expect(html).toContain('role="columnheader"');
+    expect(html).toContain('role="cell"');
+  });
+});
+
+describe('TimingTower absent data', () => {
+  test('a car the feed says nothing about reads NO DATA, not six em-dashes', () => {
+    const state = field([{ driverNum: 10, code: 'GAS', pos: 4 }]);
+    const html = renderToStaticMarkup(
+      <TimingTower state={state} selected={null} onSelect={() => {}} />,
+    );
+    expect(html).toContain('NO DATA');
+  });
+
+  test('the leader is never labelled NO DATA — their Gap cell reads LEADER', () => {
+    const state = field();
+    const html = renderToStaticMarkup(
+      <TimingTower state={state} selected={null} onSelect={() => {}} />,
+    );
+    expect(html.indexOf('LEADER')).toBeGreaterThan(-1);
+    expect(html.indexOf('LEADER')).toBeLessThan(html.indexOf('NO DATA'));
+  });
+});
