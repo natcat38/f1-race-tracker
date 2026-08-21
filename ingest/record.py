@@ -681,6 +681,9 @@ with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
                 "pos": pos_order,
                 "p": {"x": nx, "y": ny},
                 "status": status_str,
+                # Doubles as reconcile_positions()'s tie-break below, so it is set
+                # here rather than in the gap/interval pass that also reads it.
+                "lap": _lap_number(dnum, t_s),
             }
             # Only attach non-zero/non-empty timing fields (mirror Go omitempty).
             if t['tyre']:
@@ -706,43 +709,30 @@ with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
                     car['drs'] = True
             cars.append(car)
 
-        # 'lap' is needed as reconcile_positions()'s tie-break, so it must be
-        # assigned before reconciliation rather than in the gap/interval pass below.
-        for car in cars:
-            car['lap'] = _lap_number(car['driverNum'], t_s)
-
-        # Reconcile 'pos' once per frame across all drivers (#66): get_position()
-        # above is an independent per-driver lookup, so raw values can collide,
-        # leave gaps, or carry the UNKNOWN_POS sentinel. This sorts by each
-        # driver's raw position (tie-broken by laps completed, then driver
-        # number) and renumbers 1..N so every frame's running order is unique
-        # and contiguous.
+        # Reconcile 'pos' into a unique, contiguous 1..N running order (#66) —
+        # get_position() above is an independent per-driver lookup, so raw values
+        # can collide, gap, or carry UNKNOWN_POS. See reconcile_positions' docstring.
+        # Returns `cars` sorted into that order, so P1 is cars[0] from here on.
         reconcile_positions(cars)
 
         # --- gap / interval pass (best-effort) ---
         # Race distance in "lap units" = whole lap number + fraction round the lap.
-        lapn, frac, dist = {}, {}, {}
-        for car in cars:
-            dn = car['driverNum']
-            lapn[dn] = car['lap']
-            frac[dn] = _lap_fraction(car['p']['x'], car['p']['y'])
-            dist[dn] = lapn[dn] + frac[dn]
-        by_pos = sorted(cars, key=lambda c: c['pos'])
-        # Anchor the leader to the CLASSIFIED P1 (matches the FE pos===1 leader test),
-        # not the max-distance car (derivation noise could disagree).
-        leader_dn = by_pos[0]['driverNum'] if by_pos else None
-        leader_dist = dist.get(leader_dn, 0.0)
-        leader_lap = lapn.get(leader_dn, 0)
-        leader_car = by_pos[0] if by_pos else None
+        dist = {car['driverNum']: car['lap'] + _lap_fraction(car['p']['x'], car['p']['y'])
+                for car in cars}
+        # Anchor the leader to the CLASSIFIED P1, not the max-distance car
+        # (derivation noise could disagree).
+        leader_car = cars[0] if cars else None
+        leader_dist = dist.get(leader_car['driverNum'], 0.0) if leader_car else 0.0
+        leader_lap = leader_car['lap'] if leader_car else 0
         leader_has_lap = leader_car is not None and 'lastLapMs' in leader_car
         prev_dist = None
         prev_has_lap = False
-        for car in by_pos:
+        for car in cars:
             dn = car['driverNum']
             has_lap = 'lastLapMs' in car
             behind = max(0.0, leader_dist - dist[dn])      # lap units behind leader
             gap_ms = int(behind * LEADER_LAP_MS)
-            gap_laps = max(0, leader_lap - lapn[dn])        # whole-lap deficit (from LapNumber)
+            gap_laps = max(0, leader_lap - car['lap'])      # whole-lap deficit (from LapNumber)
             # Suppress derived times until both ends have a completed reference lap —
             # the distance derivation is meaningless (and can be ~a lap wrong) before
             # then. Same lastLapMs signal the FE's gapLabel/intLabel guards use.
@@ -848,14 +838,30 @@ for idx in check_indices:
 
 # Scan every frame line (not just the sample) for weather presence and, when a
 # lap window was requested, an actual pit stop — the whole point of the re-bake.
+# The same pass checks reconcile_positions' actual invariant (#66): every frame's
+# positions unique and contiguous 1..N, with no UNKNOWN_POS sentinel. The sampled
+# per-frame checks above only assert pos is an int, which a duplicate/gapped/99
+# frame passes — exactly the bug that shipped.
 saw_weather = False
 saw_pit = False
-for line in lines[1:]:
+bad_positions = None    # (line index, positions) of the first offending frame
+for n, line in enumerate(lines[1:], start=1):
     fr = json.loads(line)['frame']
     if 'weather' in fr:
         saw_weather = True
     if any(c.get('status') == 'Pit' for c in fr['cars']):
         saw_pit = True
+    positions = sorted(c['pos'] for c in fr['cars'])
+    if bad_positions is None and positions != list(range(1, len(fr['cars']) + 1)):
+        bad_positions = (n, positions)
+if bad_positions is None:
+    print(f"  Positions OK: all {len(lines) - 1} frames carry a unique, contiguous 1..N order")
+else:
+    bad_line, bad = bad_positions
+    print(f"  POSITION ERROR: line {bad_line}: positions must be unique and "
+          f"contiguous 1..{len(bad)}, got {bad}")
+    errors += 1
+
 try:
     assert saw_weather, "no frame carried a 'weather' field"
     print("  Weather OK: at least one frame carries weather")

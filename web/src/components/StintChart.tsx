@@ -1,15 +1,6 @@
 import { memo } from 'react';
 import type { RaceState } from '../state/race';
-import { orderCars, TYRE_COLOUR } from './timingHelpers';
-
-// Leader's current lap read off orderCars' running order (front of the sorted
-// list) rather than an exact pos===1 match: the wire now reconciles pos into a
-// unique, contiguous 1..N per frame (#66), but orderCars' tie-break stays as
-// belt-and-braces, so the marker degrades honestly instead of silently not
-// drawing if a stale/malformed frame ever lacked a literal pos:1.
-function leaderLapOf(state: RaceState): number | undefined {
-  return orderCars(state.cars)[0]?.lap;
-}
+import { leaderLapOf, orderCars, sameRunningOrder, TYRE_COLOUR } from './timingHelpers';
 
 // StintChart is the full-race strategy timeline: one row per car (running
 // order), each stint drawn as a coloured segment on a 0..totalLaps axis, with
@@ -18,16 +9,16 @@ function leaderLapOf(state: RaceState): number | undefined {
 // race so the strategy story reads at a glance (see ingest/record.py's stints).
 //
 // state.stints/state.totalLaps are baked once per session and never change
-// mid-race; only the leader-lap marker needs to move. Memoized on just those
-// three values (not `state` itself, which gets a new identity every 10Hz
-// frame) so the full sort + per-driver stint bars aren't rebuilt every tick.
+// mid-race; the row order and the leader-lap marker are what move. Memoized on
+// those (not `state` itself, which gets a new identity every 10Hz frame) so the
+// full sort + per-driver stint bars aren't rebuilt every tick.
 function StintChartInner({ state }: { state: RaceState }) {
   const order = orderCars(state.cars).filter((c) => state.stints[c.driverNum]?.length);
   if (order.length === 0) return <div className="empty">No stint data for this session.</div>;
 
   // Leader may have no stint data (rare) and so be filtered out of `order` above;
   // derive the marker from the full field, not the stint-filtered list.
-  const leaderLap = leaderLapOf(state);
+  const leaderLap = leaderLapOf(state.cars);
   const total = state.totalLaps || 1;
 
   return (
@@ -52,7 +43,9 @@ function StintChartInner({ state }: { state: RaceState }) {
                 }}
               />
             ))}
-            {!!leaderLap && (
+            {/* != null, not truthiness: lap 0 is a real value on the wire, and
+                `!!leaderLap` silently skipped the marker on the opening lap. */}
+            {leaderLap != null && (
               <div
                 role="img"
                 aria-label={`Leader is on lap ${leaderLap}`}
@@ -75,8 +68,12 @@ function StintChartInner({ state }: { state: RaceState }) {
   );
 }
 
+// Chose sameRunningOrder over comparing only the leader's lap: row order comes
+// from EVERY car's pos, so a position swap that left the leader's lap unchanged
+// used to leave the chart's order stale indefinitely — and it's cheaper besides,
+// one O(n) field walk instead of the two full sorts leaderLapOf used to do here.
 export const StintChart = memo(StintChartInner, (prev, next) => (
   prev.state.stints === next.state.stints &&
   prev.state.totalLaps === next.state.totalLaps &&
-  leaderLapOf(prev.state) === leaderLapOf(next.state)
+  sameRunningOrder(prev.state.cars, next.state.cars)
 ));

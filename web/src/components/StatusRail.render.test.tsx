@@ -2,11 +2,7 @@ import { describe, test, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { StatusRail } from './StatusRail';
 import { emptyState } from '../state/race';
-import type { Car } from '../state/race';
-
-const car = (over: Partial<Car>): Car => ({
-  driverNum: 1, code: 'VER', team: 'Red Bull', pos: 1, p: { x: 0, y: 0 }, status: 'OnTrack', ...over,
-});
+import { car } from '../state/testCar';
 
 describe('StatusRail leader-lap badge', () => {
   test('shows LAP n/m when a car is tagged pos:1', () => {
@@ -34,5 +30,28 @@ describe('StatusRail leader-lap badge', () => {
     };
     const html = renderToStaticMarkup(<StatusRail active="board" state={state} />);
     expect(html).toContain('LAP 12/53');
+  });
+
+  test('still shows the badge when the leader is on lap 0', () => {
+    // lap 0 is a real value on the wire (internal/model/model.go) — the opening
+    // lap, before anyone has crossed the line. A truthiness guard hid the badge
+    // for exactly the moment it is most interesting.
+    const state = {
+      ...emptyState(),
+      totalLaps: 53,
+      cars: { 1: car({ driverNum: 1, pos: 1, lap: 0 }) },
+    };
+    const html = renderToStaticMarkup(<StatusRail active="board" state={state} />);
+    expect(html).toContain('LAP 0/53');
+  });
+
+  test('omits the badge when the leader has no lap at all', () => {
+    const state = {
+      ...emptyState(),
+      totalLaps: 53,
+      cars: { 1: car({ driverNum: 1, pos: 1 }) },
+    };
+    const html = renderToStaticMarkup(<StatusRail active="board" state={state} />);
+    expect(html).not.toContain('LAP ');
   });
 });

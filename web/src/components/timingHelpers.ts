@@ -95,15 +95,50 @@ export function statusLabel(status: string): string | undefined {
   return undefined;
 }
 
+// byRunningOrder is the running-order comparator: position, then laps completed,
+// then driver number. The feed is not guaranteed to hand out unique positions —
+// the Monza 2024 clip reports two cars at pos 19 (and no 20) in every frame — so
+// laps completed keeps the order right, and driver number makes the result stable
+// rather than dependent on object key order. ingest/resample.py's
+// reconcile_positions sorts server-side by the same three keys, so a frame that
+// still needed a tie-break agrees with how the frontend would have broken it.
+const byRunningOrder = (a: Car, b: Car) =>
+  a.pos - b.pos || (b.lap ?? 0) - (a.lap ?? 0) || a.driverNum - b.driverNum;
+
 // orderCars returns the cars sorted by running position.
-// The feed is not guaranteed to hand out unique positions — the Monza 2024 clip
-// reports two cars at pos 19 (and no 20) in every frame. Tie-break on laps
-// completed so the running order is still right, then driver number so the
-// result is stable rather than dependent on object key order.
 export function orderCars(cars: RaceState['cars']): Car[] {
-  return Object.values(cars).sort(
-    (a, b) => a.pos - b.pos || (b.lap ?? 0) - (a.lap ?? 0) || a.driverNum - b.driverNum,
-  );
+  return Object.values(cars).sort(byRunningOrder);
+}
+
+// leaderLapOf is the race leader's current lap: the front of the running order
+// without the sort, so a caller that wants only this one number (StatusRail's LAP
+// badge, StintChart's marker) is O(n) rather than O(n log n) per 10 Hz frame.
+// Read off the running order rather than matching pos===1 directly: the wire now
+// reconciles pos into a unique, contiguous 1..N per frame (#66), but the tie-break
+// stays as belt-and-braces, so callers degrade honestly instead of showing nothing
+// if a stale/malformed frame ever lacked a literal pos:1.
+// undefined means "no cars, or the leader has no lap yet" — 0 is a real lap number
+// (internal/model/model.go), so callers must guard with != null, not truthiness.
+export function leaderLapOf(cars: RaceState['cars']): number | undefined {
+  let leader: Car | undefined;
+  for (const c of Object.values(cars)) {
+    if (leader === undefined || byRunningOrder(c, leader) < 0) leader = c;
+  }
+  return leader?.lap;
+}
+
+// sameRunningOrder: do these two car maps produce the same rendered running order?
+// Compares the two fields the order (and the leader-lap marker) depend on, per car,
+// without sorting either side — cheap enough to run in a React.memo comparator that
+// exists to avoid the sort.
+export function sameRunningOrder(a: RaceState['cars'], b: RaceState['cars']): boolean {
+  if (a === b) return true;
+  const keys = Object.keys(a);
+  if (keys.length !== Object.keys(b).length) return false;
+  return keys.every((k) => {
+    const ca = a[k as unknown as number], cb = b[k as unknown as number];
+    return cb !== undefined && ca.pos === cb.pos && ca.lap === cb.lap;
+  });
 }
 
 // bestSectors finds the session-best (min across all cars) for each sector this frame.

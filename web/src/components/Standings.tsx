@@ -9,7 +9,7 @@ export function Standings({ state }: { state: RaceState }) {
   const order = orderCars(state.cars);
   return (
     <ol style={{ lineHeight: 1.8, margin: 0, paddingLeft: '1.4em', fontVariantNumeric: 'tabular-nums' }}>
-      {order.map((c) => (
+      {order.map((c, idx) => (
         <li key={c.driverNum}>
           <b>{c.code}</b>{' '}
           <span style={{ color: TYRE_COLOUR[c.tyre ?? ''] ?? 'var(--slate)' }}>
@@ -17,7 +17,10 @@ export function Standings({ state }: { state: RaceState }) {
           </span>{' '}
           <span>{fmtLap(c.lastLapMs)}</span>{' '}
           <span style={{ color: 'var(--slate)' }}>
-            {gapLabel(c.gapMs, c.gapLaps, c.pos === 1, false, c.lastLapMs)}
+            {/* Leader is the front of orderCars' running order, not a literal
+                pos===1 match (#66) — same test TimingTower uses, so a frame with
+                no exact pos:1 still labels someone LEADER instead of nobody. */}
+            {gapLabel(c.gapMs, c.gapLaps, idx === 0, false, c.lastLapMs)}
           </span>
         </li>
       ))}

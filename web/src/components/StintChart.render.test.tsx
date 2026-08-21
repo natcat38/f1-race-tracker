@@ -2,11 +2,7 @@ import { describe, test, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { StintChart } from './StintChart';
 import { emptyState } from '../state/race';
-import type { Car } from '../state/race';
-
-const car = (over: Partial<Car>): Car => ({
-  driverNum: 1, code: 'VER', team: 'Red Bull', pos: 1, p: { x: 0, y: 0 }, status: 'OnTrack', ...over,
-});
+import { car } from '../state/testCar';
 
 describe('StintChart leader-lap marker', () => {
   test('draws the marker when a car is tagged pos:1', () => {
@@ -38,5 +34,18 @@ describe('StintChart leader-lap marker', () => {
     };
     const html = renderToStaticMarkup(<StintChart state={state} />);
     expect(html).toContain('Leader is on lap 12');
+  });
+
+  test('still draws the marker when the leader is on lap 0', () => {
+    // Same falsy-zero trap as StatusRail's LAP badge: lap 0 is the opening lap,
+    // not "no value", so the marker must sit at the start of the axis.
+    const state = {
+      ...emptyState(),
+      totalLaps: 53,
+      cars: { 1: car({ driverNum: 1, pos: 1, lap: 0 }) },
+      stints: { 1: [{ compound: 'SOFT', startLap: 1, endLap: 20 }] },
+    };
+    const html = renderToStaticMarkup(<StintChart state={state} />);
+    expect(html).toContain('Leader is on lap 0');
   });
 });

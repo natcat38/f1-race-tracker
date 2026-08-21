@@ -64,10 +64,24 @@ def reconcile_positions(cars):
     have broken it. Then renumber 1..N so every frame's running order is
     unique and contiguous, and 99 never reaches the wire.
 
+    KNOWN LIMITATIONS (accepted, not yet addressed):
+      - Cold start: the renumbering is over whoever is in `cars` right now, so a
+        partial roster (only some drivers have reported at session start) gets a
+        dense 1..N over that subset — i.e. a plausible-looking but wrong running
+        order until the whole field reports.
+      - Retired cars: a car with status 'Out' still takes a rank inline rather
+        than being sunk to the tail, so a retirement holds its last position
+        ahead of cars still racing.
+
     cars: list of dicts, each with at least 'driverNum' and 'pos' (raw,
     possibly stale/duplicate/UNKNOWN_POS), and optionally 'lap' (laps
     completed so far). Mutates each dict's 'pos' in place. Returns the same
     list, now sorted into running order (rank 1 first).
+
+    Callers must pass RAW feed positions, not a previous call's output mixed
+    with fresh values: this renumbers in place, so re-feeding a car's own rank
+    as if it were feed data lets that rank stick (see live_signalr's
+    _publish_frame, which re-stamps every car from running_positions first).
     """
     cars.sort(key=lambda c: (c.get('pos', UNKNOWN_POS), -(c.get('lap') or 0), c['driverNum']))
     for i, c in enumerate(cars):
