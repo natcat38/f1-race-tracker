@@ -3,7 +3,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  fmtLap, fmtGap, fmtClock, fmtElapsed, gapLabel, intLabel, lapsDown, bestSectors, orderCars,
+  fmtLap, fmtGap, fmtClock, fmtElapsed, gapLabel, intLabel, bestSectors, orderCars,
   updatePersonalBests, sectorColour, sectorDelta, updateLapHistory, tyreLabel, statusLabel,
   sectorDeltaVs, fmtSigned, updateGapHistory, leaderLapOf, leaderOf, sameRunningOrder,
   personalBestOf, sectorMark,
@@ -40,13 +40,20 @@ describe('gapLabel (pit-wall)', () => {
   it('reads LEADER for the leader', () => {
     expect(gapLabel(0, 0, true, false, 90000)).toBe('LEADER');
   });
+  it('takes the wire’s gapLaps at face value — it is distance-derived, not a lap-number difference', () => {
+    // The recorder floors metres-behind over the lap length, so a car three
+    // seconds back on a fresh lap reports 0, not 1. lapsDown() used to correct for
+    // clips that did the latter; no committed clip carries that shape any more.
+    expect(gapLabel(3400, 0, false, false, 85000)).toBe('+3.4');
+  });
   it('shows lap deficit when lapped, pluralising', () => {
     expect(gapLabel(92000, 1, false, false, 90000)).toBe('+1 LAP');
     expect(gapLabel(184000, 2, false, false, 90000)).toBe('+2 LAPS');
   });
   it('shows seconds for lead-lap cars', () => {
-    // One decimal, not three: the estimate's resolution is ~0.566s (see
-    // GAP_RESOLUTION_MS), so the extra digits were invented precision.
+    // One decimal, not three: the estimate is good to about a tenth (measured
+    // against official crossing times — see ingest/README.md), so the extra digits
+    // would be invented precision.
     expect(gapLabel(1234, 0, false, false, 90000)).toBe('+1.2');
   });
   it('seconds mode forces seconds even when lapped', () => {
@@ -77,26 +84,6 @@ describe('intLabel (pit-wall)', () => {
   });
   it('suppresses the interval until the car ahead has completed a lap', () => {
     expect(intLabel(1, 1, 800, false, false, 90000, undefined)).toBe('—');
-  });
-});
-
-describe('lapsDown', () => {
-  it('ignores the lap-number transient when the car is only seconds behind', () => {
-    // Leader just crossed the line (lap 17), P2 still on lap 16, 3.4s back.
-    expect(lapsDown(1, 3400, 85000)).toBe(0);
-  });
-  it('keeps a genuine lap down', () => {
-    expect(lapsDown(1, 86000, 85000)).toBe(1);
-    expect(lapsDown(1, 78000, 85000)).toBe(1); // within the 0.1-lap tolerance
-    expect(lapsDown(10, 850000, 85000)).toBe(10);
-  });
-  it('never exceeds the wire value', () => {
-    expect(lapsDown(1, 200000, 85000)).toBe(1);
-  });
-  it('trusts the wire without a reference lap or a gap', () => {
-    expect(lapsDown(2, 5000, undefined)).toBe(2);
-    expect(lapsDown(2, undefined, 85000)).toBe(2);
-    expect(lapsDown(0, 5000, 85000)).toBe(0);
   });
 });
 

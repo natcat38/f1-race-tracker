@@ -48,11 +48,13 @@ The Python side: records FastF1 sessions to JSONL clips and runs the true-live S
 | `Dockerfile.live` | Container image for the true-live SignalR ingest path (ingest/live.py). |
 | `README.md` | Bakes real F1 session data into the `.jsonl` clip format read by the Go replay player, and streams baked clips (or a true-live SignalR feed) to Redis so the gateway can fan them out. |
 | `__init__.py` | Records FastF1 sessions to JSONL replay clips and runs the true-live SignalR ingest path. |
+| `check_gap_estimator.py` | Measure the baked gap/interval estimator against official line-crossing times. |
 | `check_live_contract.py` | Assert live.py builds messages whose key sets exactly match the Go contract. |
 | `conftest.py` | Make the self-check scripts importable from any pytest invocation dir. |
 | `explore.py` | FastF1 data exploration script. |
 | `f1tv_auth.py` | F1TV auth status for the beta live path (ADR-0007). |
 | `f1tv_link.py` | Sign in to F1 for the beta live path (ADR-0007). |
+| `geometry.py` | Pure geometry behind the replay gap/interval estimator. |
 | `ghost.py` | Pure helper for baking a per-driver lap trace into a clip header. |
 | `live.py` | Live ingester — publishes normalized race frames to Redis using the SAME contract |
 | `live_signalr.py` | True-live FastF1 SignalR ingest mode (exploratory, session-only). |
@@ -68,6 +70,7 @@ The Python side: records FastF1 sessions to JSONL clips and runs the true-live S
 | `test_capture_replay.py` | Regression test for live_signalr.py's capture-replay path. |
 | `test_dispatch.py` | Self-check for live_signalr._dispatch_message / _decode_payload. |
 | `test_f1tv_auth.py` | Self-check for ingest/f1tv_auth.auth_status (no fastf1/network needed). |
+| `test_geometry.py` | Unit tests for the pure gap-estimator geometry in ingest/geometry.py. |
 | `test_ghost.py` | Self-check for ingest/ghost.build_lap_trace (no fastf1/numpy/network needed). |
 | `test_live_publish.py` | Unit tests for live_signalr.py's two publish paths, without fastf1 or Redis. |
 | `test_race_control.py` | Self-check for ingest/race_control.extract_race_control (no fastf1/network needed). |
@@ -485,4 +488,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-45 directories, 166 files listed, 0 without a declared purpose.
+45 directories, 169 files listed, 0 without a declared purpose.

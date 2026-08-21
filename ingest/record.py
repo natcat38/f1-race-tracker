@@ -42,6 +42,9 @@ from radio import extract_radio
 from race_control import extract_race_control
 from ghost import build_lap_trace
 from resample import nearest_index, step_value, in_window_ms, reconcile_positions, UNKNOWN_POS
+from geometry import (
+    resample_closed_loop, project_to_arc, wrap_counts, invert_distance_curve, lap_deficit,
+)
 
 # ---------------------------------------------------------------------------
 # Args
@@ -268,6 +271,10 @@ lap_pos = on_track[
 
 print(f"Track lap: SessionTime {lap_start_t} -> {lap_end_t}, {len(lap_pos)} raw points")
 
+# Keep the full-rate reference lap in RAW METRES before the outline downsample —
+# the gap estimator's centreline is built from it (see the centreline section).
+centreline_ref_xy = list(zip(lap_pos['X'].astype(float), lap_pos['Y'].astype(float)))
+
 # Downsample to ~TRACK_POINTS evenly spaced points
 if len(lap_pos) > TRACK_POINTS:
     indices = np.linspace(0, len(lap_pos) - 1, TRACK_POINTS, dtype=int)
@@ -420,22 +427,6 @@ def get_timing(driver_num, t_s):
     return {'tyre': tyre, 'tyreAge': tyre_age, 'lastLapMs': last_ms,
             'bestLapMs': best_ms, 's1Ms': s1, 's2Ms': s2, 's3Ms': s3}
 
-# ---------------------------------------------------------------------------
-# Gap / interval (BEST-EFFORT, derived). FastF1 gives no per-tick gap, so we
-# approximate race distance as lap_number + fraction-along-the-baked-outline,
-# and convert a distance-behind-leader into milliseconds via field pace.
-# ponytail: good enough for a labeled-approximate tower; swap for a real
-# timing-feed gap if broadcast accuracy is ever needed. Fallback if noisy:
-# lap-level position deltas (coarser, stable).
-# ---------------------------------------------------------------------------
-
-_track_xy = np.array([(p['x'], p['y']) for p in track_points])  # (N,2) in [0,1]
-
-def _lap_fraction(nx, ny):
-    """Fraction [0,1) around the lap = nearest baked-outline index / N."""
-    d = (_track_xy[:, 0] - nx) ** 2 + (_track_xy[:, 1] - ny) ** 2
-    return int(np.argmin(d)) / len(_track_xy)
-
 # Per-driver derivations, all from the same laps slice: the lap-number step
 # lookup (from 'LapNumber'), the whole-race tyre-stint plan (Phase 3, baked
 # once — not windowed like the frame stream, so the strategy chart can show
@@ -524,11 +515,6 @@ def _weather_at(t_s):
         "rainfall": bool(_wx_rain[idx]),
     }
 
-# Field pace: median completed lap time (ms) across the field; fallback 90s.
-_all_laps_ms = [_ms(t) for t in session.laps['LapTime'] if not pd.isna(t)]
-_all_laps_ms = [m for m in _all_laps_ms if m > 0]
-LEADER_LAP_MS = int(np.median(_all_laps_ms)) if _all_laps_ms else 90000
-
 # Total race distance in laps — the highest lap number anyone reached this session.
 TOTAL_LAPS = int(session.laps['LapNumber'].max()) if not session.laps.empty else 0
 
@@ -613,6 +599,81 @@ for num in session.drivers:
     }
 
 print(f"Active drivers in window: {len(driver_frames)}")
+
+# ---------------------------------------------------------------------------
+# Gap / interval (BEST-EFFORT, derived — FastF1 gives no per-tick gap).
+#
+# Each car's progress is measured in METRES of arc length along a
+# distance-parameterised centreline, and metres are converted to milliseconds by
+# inverting the *leader's own* distance-time curve ("when was the leader here?").
+# ingest/geometry.py holds the pure geometry and the full method write-up; the
+# short version is that this replaces snapping to one of 150 unevenly-spaced
+# outline points and pricing each step at the field-median lap time, which
+# quantised every gap to ~0.57 s and biased it by where on the lap the car was.
+#
+# Expected resolution ~50-100 ms, so the frontend prints one decimal, never three.
+# ---------------------------------------------------------------------------
+
+CENTRELINE_POINTS = 2000  # ~2.9 m per node at Monza; spacing is uniform by construction
+
+print("\nBuilding distance-parameterised centreline...")
+centreline, LAP_LENGTH_M = resample_closed_loop(centreline_ref_xy, CENTRELINE_POINTS)
+# FastF1 X/Y are in decimetres (1/10 m); convert so the printed length is metres.
+LAP_LENGTH_M /= 10.0
+print(f"Centreline: {CENTRELINE_POINTS} nodes, lap length {LAP_LENGTH_M:.0f} m "
+      f"({LAP_LENGTH_M * 10 / CENTRELINE_POINTS:.1f} raw units/node)")
+if not 2000 <= LAP_LENGTH_M <= 8000:
+    print(f"  WARNING: centreline lap length {LAP_LENGTH_M:.0f} m is not a plausible "
+          f"F1 circuit length — the reference lap may be corrupt.")
+
+_cl_arr = np.asarray(centreline)          # (N,2) raw FastF1 units
+_LAP_RAW = LAP_LENGTH_M * 10.0            # lap length in the same raw units as _cl_arr
+
+
+def _nearest_nodes(xs, ys):
+    """Nearest centreline node index for each frame, in memory-bounded chunks."""
+    out = np.empty(len(xs), dtype=int)
+    for a in range(0, len(xs), 512):
+        b = min(a + 512, len(xs))
+        dx = xs[a:b, None] - _cl_arr[None, :, 0]
+        dy = ys[a:b, None] - _cl_arr[None, :, 1]
+        out[a:b] = np.argmin(dx * dx + dy * dy, axis=1)
+    return out
+
+
+print("Projecting every car onto it (race distance in metres)...")
+t_grid_list = t_grid_s.tolist()  # plain list: geometry.py is numpy-free
+race_dist = {}   # driver_num -> [metres of race distance], one per frame
+pit_frames = {}  # driver_num -> [bool], True while the car is in the pit lane
+for dnum, fr in driver_frames.items():
+    xs, ys = np.asarray(fr['x'], dtype=float), np.asarray(fr['y'], dtype=float)
+    idx = _nearest_nodes(xs, ys)
+    s_raw = [project_to_arc(float(x), float(y), centreline, int(i), _LAP_RAW)
+             for x, y, i in zip(xs, ys, idx)]
+
+    # Pit lane: not on the centreline, so projecting a stopped car would smear it
+    # onto whichever track point happens to be nearest. Freeze arc length at its
+    # pit-entry value instead, and emit no gap/interval for those frames (the UI
+    # already renders IN PIT from status). A stop that straddles the start/finish
+    # line still counts its lap: the frozen value is late-lap and the resume value
+    # is early-lap, which wrap_counts reads as the crossing it was.
+    in_pit = [_in_pit(dnum, float(t)) for t in t_grid_s]
+    frozen = []
+    held = None
+    for s, pit in zip(s_raw, in_pit):
+        if pit and held is not None:
+            frozen.append(held)
+        else:
+            frozen.append(s)
+            held = s
+    counts = wrap_counts(frozen, _LAP_RAW)
+
+    lap0 = _lap_number(dnum, float(t_grid_s[0]))
+    d = np.array([(lap0 + c) * _LAP_RAW + s for c, s in zip(counts, frozen)]) / 10.0
+    # Race distance can only increase; a backwards step is position noise, and the
+    # curve must be monotone for invert_distance_curve's bisection to be sound.
+    race_dist[dnum] = np.maximum.accumulate(d).tolist()
+    pit_frames[dnum] = in_pit
 
 # ---------------------------------------------------------------------------
 # Emit JSONL
@@ -715,42 +776,58 @@ with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
         # Returns `cars` sorted into that order, so P1 is cars[0] from here on.
         reconcile_positions(cars)
 
-        # --- gap / interval pass (best-effort) ---
-        # Race distance in "lap units" = whole lap number + fraction round the lap.
-        dist = {car['driverNum']: car['lap'] + _lap_fraction(car['p']['x'], car['p']['y'])
-                for car in cars}
+        # --- gap / interval pass (best-effort; see the centreline section) ---
+        # Each car's race distance in metres this frame, then "how long ago was
+        # the reference car at that distance?" against that car's OWN curve.
         # Anchor the leader to the CLASSIFIED P1, not the max-distance car
         # (derivation noise could disagree).
         leader_car = cars[0] if cars else None
-        leader_dist = dist.get(leader_car['driverNum'], 0.0) if leader_car else 0.0
-        leader_lap = leader_car['lap'] if leader_car else 0
         leader_has_lap = leader_car is not None and 'lastLapMs' in leader_car
-        prev_dist = None
-        prev_has_lap = False
+        leader_curve = race_dist.get(leader_car['driverNum']) if leader_car else None
+        leader_dist = leader_curve[i] if leader_curve else 0.0
+
+        def _behind_ms(curve, d_car):
+            """ms since the reference car (whose curve this is) was at d_car.
+
+            None when the answer would be fabricated: the reference car was never
+            observed at that distance inside this window (window-edge case), or it
+            is somehow behind, which the classified order says it is not.
+            """
+            t_ref = invert_distance_curve(t_grid_list, curve, d_car)
+            if t_ref is None or t_ref > t_s:
+                return None
+            return int(round((t_s - t_ref) * 1000))
+
+        prev_car = None
+        prev_gap_ms = None
         for car in cars:
             dn = car['driverNum']
             has_lap = 'lastLapMs' in car
-            behind = max(0.0, leader_dist - dist[dn])      # lap units behind leader
-            gap_ms = int(behind * LEADER_LAP_MS)
-            # Whole-lap deficit from DISTANCE, not LapNumber: the lap-number difference
-            # reads 1 for every car between the leader crossing the line and its own
-            # crossing, so the tower flashed "+1 LAP" for P2..P20 a few seconds per lap.
-            # 0.1 lap of tolerance keeps a car exactly a lap down from flickering.
-            gap_laps = int(behind + 0.1)
-            # Suppress derived times until both ends have a completed reference lap —
-            # the distance derivation is meaningless (and can be ~a lap wrong) before
-            # then. Same lastLapMs signal the FE's gapLabel/intLabel guards use.
-            if gap_ms > 0 and has_lap and leader_has_lap:
+            d_car = race_dist[dn][i]
+            # Suppress while in the pit lane (distance is frozen, so any gap would
+            # be a stale reading) and until both ends have a completed reference
+            # lap — the same lastLapMs signal the FE's gapLabel/intLabel guards use.
+            quotable = has_lap and leader_has_lap and not pit_frames[dn][i]
+            gap_ms = _behind_ms(leader_curve, d_car) if quotable and leader_curve else None
+            if gap_ms and gap_ms > 0:
                 car['gapMs'] = gap_ms
+            gap_laps = lap_deficit(leader_dist - d_car, LAP_LENGTH_M)
             if gap_laps > 0:
                 car['gapLaps'] = gap_laps
-            if prev_dist is not None and has_lap and prev_has_lap:
-                int_ms = int(max(0.0, prev_dist - dist[dn]) * LEADER_LAP_MS)
-                # ponytail: clamp — an interval >= a lap is a lap-deficit case, not a time
-                if 0 < int_ms < LEADER_LAP_MS:
+
+            if (prev_car is not None and quotable and 'lastLapMs' in prev_car
+                    and not pit_frames[prev_car['driverNum']][i]):
+                int_ms = _behind_ms(race_dist[prev_car['driverNum']], d_car)
+                # Window edge: the car ahead's curve does not reach back far enough
+                # yet. The difference of the two leader-referenced gaps is the same
+                # quantity measured against a curve that does, and is non-negative
+                # because both come from one monotone curve.
+                if int_ms is None and gap_ms is not None and prev_gap_ms is not None:
+                    int_ms = gap_ms - prev_gap_ms
+                if int_ms is not None and 0 < int_ms:
                     car['intMs'] = int_ms
-            prev_dist = dist[dn]
-            prev_has_lap = has_lap
+            prev_car = car
+            prev_gap_ms = gap_ms
 
         frame = {"rev": rev, "timeMs": time_ms, "cars": cars}
         if i in msgs_by_idx:
