@@ -2,7 +2,7 @@
 // dispatch.
 
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
-import { connectRace } from './socket';
+import { connectRace, MAX_RECONNECT_ATTEMPTS } from './socket';
 import type { RaceState } from '../state/race';
 
 class MockWebSocket {
@@ -177,5 +177,126 @@ describe('connectRace reconnect/backoff', () => {
 
     vi.advanceTimersByTime(10_000); // well past the largest possible backoff
     expect(MockWebSocket.instances).toHaveLength(1); // no reconnect was scheduled
+  });
+});
+
+describe('connectRace reconnect budget', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  // Drives one failed attempt: close the newest socket and let its whole backoff
+  // elapse. 10s is past the 8s ceiling, so it covers every rung of the curve.
+  function failOnce() {
+    MockWebSocket.instances.at(-1)!.onclose?.();
+    vi.advanceTimersByTime(10_000);
+  }
+
+  const snapshot = JSON.stringify({
+    type: 'snapshot',
+    data: { session: 'x', mode: 'replay', label: 'L', cars: {}, timeMs: 0, rev: 1 },
+  });
+
+  test('the socket keeps retrying for the whole budget — a gateway restart still self-heals', () => {
+    const statuses: string[] = [];
+    connectRace(() => {}, (s) => statuses.push(s));
+
+    for (let i = 0; i < MAX_RECONNECT_ATTEMPTS; i++) failOnce();
+
+    // One socket per attempt, on top of the original.
+    expect(MockWebSocket.instances).toHaveLength(MAX_RECONNECT_ATTEMPTS + 1);
+    expect(statuses.at(-1)).toBe('reconnecting');
+    expect(statuses).not.toContain('offline');
+  });
+
+  test('one attempt past the budget it goes offline and stops dialling', () => {
+    const statuses: string[] = [];
+    connectRace(() => {}, (s) => statuses.push(s));
+
+    for (let i = 0; i <= MAX_RECONNECT_ATTEMPTS; i++) failOnce();
+
+    expect(statuses.at(-1)).toBe('offline');
+    const opened = MockWebSocket.instances.length;
+    vi.advanceTimersByTime(60_000); // a minute of nothing
+    expect(MockWebSocket.instances).toHaveLength(opened); // no timer was left running
+  });
+
+  test('offline hands over a retry that resets the budget and dials immediately', () => {
+    const statuses: string[] = [];
+    let retry: (() => void) | undefined;
+    connectRace(() => {}, (s, r) => { statuses.push(s); if (r) retry = r; });
+
+    for (let i = 0; i <= MAX_RECONNECT_ATTEMPTS; i++) failOnce();
+    expect(retry).toBeTypeOf('function');
+
+    const before = MockWebSocket.instances.length;
+    retry!();
+    expect(MockWebSocket.instances).toHaveLength(before + 1); // no wait, no backoff
+    expect(statuses.at(-1)).toBe('reconnecting');
+
+    // The budget is genuinely reset, not merely nudged: a full budget's worth of
+    // failures is survivable again, and the backoff restarts at 500ms.
+    MockWebSocket.instances.at(-1)!.onclose?.();
+    vi.advanceTimersByTime(499);
+    expect(MockWebSocket.instances).toHaveLength(before + 1);
+    vi.advanceTimersByTime(1);
+    expect(MockWebSocket.instances).toHaveLength(before + 2);
+
+    for (let i = 0; i < MAX_RECONNECT_ATTEMPTS - 1; i++) failOnce();
+    expect(statuses.at(-1)).toBe('reconnecting');
+    failOnce();
+    expect(statuses.at(-1)).toBe('offline');
+  });
+
+  test('retry is idempotent — a double press opens one socket, not two', () => {
+    let retry: (() => void) | undefined;
+    connectRace(() => {}, (_s, r) => { if (r) retry = r; });
+    for (let i = 0; i <= MAX_RECONNECT_ATTEMPTS; i++) failOnce();
+
+    const before = MockWebSocket.instances.length;
+    retry!();
+    retry!();
+    retry!();
+    expect(MockWebSocket.instances).toHaveLength(before + 1);
+  });
+
+  test('a frame refills the budget; a handshake alone does not', () => {
+    const statuses: string[] = [];
+    connectRace(() => {}, (s) => statuses.push(s));
+
+    // Nineteen failures, then a socket that opens and immediately drops without
+    // ever delivering a frame. A gateway flapping like this must still reach the
+    // terminal state rather than refilling its budget on every handshake.
+    for (let i = 0; i < MAX_RECONNECT_ATTEMPTS - 1; i++) failOnce();
+    MockWebSocket.instances.at(-1)!.onopen?.();
+    failOnce();
+    expect(statuses.at(-1)).toBe('reconnecting'); // attempt 20 — the last one in budget
+    failOnce();
+    expect(statuses.at(-1)).toBe('offline');
+  });
+
+  test('a single delivered frame resets the count, so a long outage later starts clean', () => {
+    const statuses: string[] = [];
+    connectRace(() => {}, (s) => statuses.push(s));
+
+    for (let i = 0; i < MAX_RECONNECT_ATTEMPTS; i++) failOnce();
+    MockWebSocket.instances.at(-1)!.onmessage?.({ data: snapshot });
+    expect(statuses.at(-1)).toBe('live');
+
+    // The budget is back to full: the whole span passes without going offline.
+    for (let i = 0; i < MAX_RECONNECT_ATTEMPTS; i++) failOnce();
+    expect(statuses).not.toContain('offline');
+    failOnce();
+    expect(statuses.at(-1)).toBe('offline');
+  });
+
+  test('a retry handle from a closed connection is inert', () => {
+    let retry: (() => void) | undefined;
+    const close = connectRace(() => {}, (_s, r) => { if (r) retry = r; });
+    for (let i = 0; i <= MAX_RECONNECT_ATTEMPTS; i++) failOnce();
+
+    close();
+    const before = MockWebSocket.instances.length;
+    retry!();
+    expect(MockWebSocket.instances).toHaveLength(before);
   });
 });

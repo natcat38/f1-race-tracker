@@ -212,6 +212,8 @@ The app shell: entry point, root component, error boundary, static-demo bootstra
 | `App.tsx` | The React app shell: mounts the root component, wires the live WebSocket or static-replay data source into race state, and lays out the dashboard panels. |
 | `ErrorBoundary.tsx` | React error boundary that keeps one component's render-time exception from blanking the whole app. |
 | `main.tsx` | Browser entry point: mounts App under an error boundary and pulls in the global fonts and stylesheets. |
+| `routing.test.ts` | Unit tests for hash parsing and serialising: route names and the deep-linked car code. |
+| `routing.ts` | The app's hash routing: which view a URL names, and which car it pre-selects. |
 | `staticDemo.ts` | Build-time identity of the public GitHub Pages demo, and the repo it came from. |
 
 ### `web/src/components`
@@ -488,4 +490,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-45 directories, 169 files listed, 0 without a declared purpose.
+45 directories, 171 files listed, 0 without a declared purpose.

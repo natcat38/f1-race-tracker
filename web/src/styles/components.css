@@ -27,7 +27,7 @@
   background: var(--chalk);
   color: var(--asphalt);
   padding: var(--sp-2) var(--sp-3);
-  border-radius: 4px;
+  border-radius: var(--radius);
   font-family: var(--display);
   font-size: var(--fs-sm);
   font-weight: 600;
@@ -69,11 +69,19 @@
   padding: var(--sp-3) var(--sp-4);
   background: var(--carbon);
   border: 1px solid var(--edge);
-  border-radius: 4px;
+  border-radius: var(--radius);
   flex-wrap: wrap;
 }
 
+/* This is the page's <h1>, so the UA's 2em/1.34em margins have to go — a heading
+   inside a flex rail would otherwise be the one item pushing the strip taller
+   than its own padding. Everything else here is the brand lockup it has always
+   been. */
 .rail-brand {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
   font-family: var(--display);
   font-weight: 700;
   font-size: var(--fs-sm);
@@ -83,14 +91,29 @@
   white-space: nowrap;
 }
 
+/* The route name sits a tier below the brand in weight and colour, so the h1
+   reads as "product, then page" rather than as two competing titles. It is the
+   only visible page title on the route (accessibility L-2), so it keeps --chalk's
+   sibling --slate rather than the dimmer --dim. */
+.rail-route {
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  color: var(--slate);
+}
+
+.rail-brand-sep {
+  color: var(--edge);
+  font-weight: 400;
+}
+
 /* The rail's supporting values read as labels: uppercase and widely tracked, so
    they sit visibly BELOW the clock in the hierarchy instead of a pixel away from
-   it. The report asked for 10px here; --fs-2xs is the token it named, and it is
-   12px now because agent 2 retired the 9/10px rungs as below the legibility
-   floor. Tracking, case and colour carry the demotion instead of size. */
+   it. The report asked for 10px here; --fs-sm is the rung that job landed on
+   after the 9/10px rungs were retired as below the legibility floor, so it is
+   12px. Tracking, case and colour carry the demotion instead of size. */
 .rail-session,
 .rail-lap {
-  font-size: var(--fs-2xs);
+  font-size: var(--fs-sm);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--slate);
@@ -146,7 +169,7 @@
   gap: var(--sp-0);
   padding: var(--sp-1) var(--sp-3);
   border: 1px solid var(--edge);
-  border-radius: 4px;
+  border-radius: var(--radius);
   text-decoration: none;
   color: var(--chalk);
   font-family: var(--display);
@@ -173,7 +196,7 @@
 .rail-tab-sub {
   white-space: nowrap;
   font-family: var(--data);
-  font-size: var(--fs-2xs);
+  font-size: var(--fs-sm);
   font-weight: 400;
   letter-spacing: 0;
   text-transform: none;
@@ -215,7 +238,7 @@
      neighbours change its width by 4px — visible on a rail that already wraps
      at phone widths. Left as a measured value rather than snapped. */
   padding: var(--sp-0) 10px;
-  border-radius: 4px;
+  border-radius: var(--radius);
   font-family: var(--data);
   font-size: var(--fs-md);
   font-weight: 600;
@@ -246,6 +269,23 @@
   color: var(--amber);
 }
 
+/* The Reconnect button inside the terminal chip. A chip is a pill of text, so a
+   full .btn (32px min-height, its own border) would have burst it — this trims
+   the control back to the chip's own height and lets the chip's amber wash carry
+   the alarm, while the underline and the 24px touch floor keep it obviously
+   pressable. The (pointer: coarse) block at the end of this file still raises it
+   on touch, so the WCAG 2.5.8 target size is not lost. */
+.chip-action {
+  min-height: 24px;
+  margin-left: var(--sp-1);
+  padding: 0 var(--sp-2);
+  border-color: currentColor;
+  color: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
 /* The clip-wrap notice. Amber like the other "read this" chips — it is not a
    fault, but it is the explanation for a clock that has just run backwards, and
    it has about eight seconds to be noticed. */
@@ -259,7 +299,7 @@
 .panel {
   background: var(--carbon);
   border: 1px solid var(--edge);
-  border-radius: 4px;
+  border-radius: var(--radius);
   overflow: hidden;
 }
 
@@ -304,7 +344,7 @@
   color: var(--chalk);
   cursor: pointer;
   padding: var(--sp-1) var(--sp-3);
-  border-radius: 4px;
+  border-radius: var(--radius);
   font-family: var(--data);
   font-size: var(--fs-md);
   touch-action: manipulation;
@@ -395,7 +435,7 @@ select.btn {
   width: 100%;
   height: min(var(--track-h), 70vh);
   background: var(--carbon);
-  border-radius: 4px;
+  border-radius: var(--radius);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -550,7 +590,7 @@ select.btn {
 }
 
 .tt-mark {
-  font-size: var(--fs-3xs);
+  font-size: var(--fs-xs);
   margin-left: var(--sp-0);
 }
 
@@ -561,7 +601,7 @@ select.btn {
   display: inline-block;
   min-width: 3.4ch;
   margin-left: var(--sp-0);
-  font-size: var(--fs-3xs);
+  font-size: var(--fs-xs);
   color: var(--slate);
 }
 
@@ -570,7 +610,7 @@ select.btn {
 }
 
 .tt-note {
-  font-size: var(--fs-2xs);
+  font-size: var(--fs-sm);
   margin-top: var(--sp-1);
 }
 
@@ -684,6 +724,25 @@ select.btn {
   font-size: var(--fs-lg);
   font-weight: 400;
   letter-spacing: 0;
+}
+
+/* Comms history rows. Extracted from three inline copies of the same flex
+   triple when the off state started reusing them. */
+.comms-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--slate);
+}
+
+/* The resting variant: same rows, no controls, one tier quieter. --dim is the
+   codebase's one de-emphasis colour and still measures above the 4.5:1 floor, so
+   "off" reads as recessed rather than as disabled-and-unreadable. The driver
+   code keeps its team colour — it is the thing worth scanning for. */
+.comms-row-resting {
+  color: var(--dim);
+  min-height: 20px;
 }
 
 /* Shared text utilities */
@@ -804,7 +863,7 @@ select.btn {
   padding: var(--sp-3);
   background: var(--asphalt);
   border: 1px solid var(--edge);
-  border-radius: 4px;
+  border-radius: var(--radius);
   /* Wrap the one-liner rather than scroll it: it is meant to be read and
      copied whole, and on a phone a horizontal scroller hides half of it. */
   white-space: pre-wrap;
@@ -901,11 +960,41 @@ select.btn {
   max-width: 100%;
 }
 
+/* The telemetry row primitive. Throttle, Brake, Laps and Gap are the same
+   shape — a fixed label gutter, a flexible middle (a bar or a sparkline), a
+   right-aligned value — and TelemetryPanel repeated that flex/gap/font triple
+   and the `width: 64` label cell verbatim at four sites (design-system 2.7).
+   One class each, and the gutter width is a token, so the four rows cannot
+   drift apart the next time one of them is edited. */
+.tele-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+}
+
+/* The bar's numeric readout — the last unnamed magic width in this row
+   (`width: 36`, three digits of tabular data plus breathing room). */
+.tele-value {
+  width: 4ch;
+  text-align: right;
+  flex: 0 0 auto;
+}
+
+.tele-label {
+  width: var(--tele-label-w);
+  color: var(--slate);
+  /* The gutter is a fixed column, not a flex item that gives ground: without
+     this a long label ("Throttle" at a user-raised font size) shrank the cell
+     and un-aligned the four rows from each other. */
+  flex: 0 0 auto;
+}
+
 /* Which card is which. With two live traces side by side and no labels, the only
    thing telling them apart was the driver code — fine if you remember which one
    you picked, useless if you are being shown the board. */
 .telemetry-role {
-  font-size: var(--fs-2xs);
+  font-size: var(--fs-sm);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--slate);
@@ -1011,7 +1100,7 @@ select.btn {
 
   .tt-table td:nth-child(n)::before {
     content: attr(data-label);
-    font-size: var(--fs-3xs);
+    font-size: var(--fs-xs);
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--slate);
@@ -1121,7 +1210,7 @@ select.btn {
   position: relative;
   flex: 1;
   height: 1.2em;
-  font-size: var(--fs-3xs);
+  font-size: var(--fs-xs);
   color: var(--slate);
   font-variant-numeric: tabular-nums;
 }
@@ -1137,6 +1226,34 @@ select.btn {
 }
 
 /* Race Control — the selected driver's messages */
+
+/* Was four inline spans in a non-wrapping flex row. Adding the time-of-day
+   stamp (ui-ux m14) took the widest message 47px past the panel edge at 1280,
+   because a nowrap row of fixed-width cells has nowhere to give. The message is
+   the one cell that can shrink and wrap; everything else stays on its own line
+   and drops below when it must. */
+.rc-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--slate);
+}
+
+.rc-text {
+  flex: 1 1 12ch;
+  min-width: 0;
+}
+
+/* The time of day race control issued the message — a tier below both the race
+   clock at the head of the row and the message itself, so three numbers in one
+   row cannot be mistaken for each other. */
+.rc-wall {
+  color: var(--dim);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
 
 .rc-row-mine {
   border-left: 2px solid var(--chalk);
@@ -1176,7 +1293,7 @@ select.btn {
   gap: var(--sp-1) var(--sp-4);
   margin-bottom: var(--sp-2);
   font-family: var(--data);
-  font-size: var(--fs-2xs);
+  font-size: var(--fs-sm);
   color: var(--slate);
 }
 
@@ -1201,7 +1318,7 @@ select.btn {
 }
 
 .cmd-copy {
-  font-size: var(--fs-2xs);
+  font-size: var(--fs-sm);
   min-height: 24px;
   padding: var(--sp-0) var(--sp-2);
   flex-shrink: 0;

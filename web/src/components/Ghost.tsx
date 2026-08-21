@@ -170,7 +170,7 @@ function GhostLive({ initialSelected }: { initialSelected?: number | null }) {
             value={resolvedSelected ?? ''}
             onChange={(e) => setSelected(Number(e.target.value))}
             disabled={drivers.length === 0}
-            style={{ background: 'var(--asphalt)', color: 'var(--chalk)', border: '1px solid var(--edge)', padding: 'var(--sp-1) var(--sp-2)', borderRadius: 4 }}
+            style={{ background: 'var(--asphalt)', color: 'var(--chalk)', border: '1px solid var(--edge)', padding: 'var(--sp-1) var(--sp-2)', borderRadius: 'var(--radius)' }}
           >
             {/* An empty dropdown reads as "no drivers exist"; say we are waiting instead. */}
             {drivers.length === 0 && <option value="">Waiting for driver data…</option>}
