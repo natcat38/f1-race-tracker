@@ -82,7 +82,7 @@ takes three separate opt-ins to reach. See
 
 ### What's not done
 
-The "Live (demo)" toggle is honestly labelled: it streams a second committed replay clip (Silverstone 2024) through Python to exercise the polyglot seam, not a real live-timing connection. True live ingestion (`ingest/live_signalr.py`) parses `TimingData`/`TimingAppData` for lap, gap/interval, and tyre fields alongside position, but every message shape is still `UNVERIFIED:` against a real session — see [docs/runbooks/live-verification.md](docs/runbooks/live-verification.md) for the checklist to run through and close out field-by-field the next time a live session is available.
+The "Live (demo)" toggle is honestly labelled: it streams a second committed replay clip (Silverstone 2024) through Python to exercise the polyglot seam, not a real live-timing connection. True live ingestion (`ingest/live_signalr.py`) parses `TimingData`/`TimingAppData` for lap, gap/interval, and tyre fields alongside position. The connect-time snapshot shape was verified for real on 2026-08-20, but the *incremental* message shapes — the ones that only arrive during a running session — are all still marked `UNVERIFIED:` in the source. See [docs/runbooks/live-verification.md](docs/runbooks/live-verification.md) for the checklist to run through and close them out field-by-field the next time a live session is available.
 
 Gap/Int in the timing tower remain best-effort estimates derived from track position, not official per-tick timing data (the tower says so). There's no per-rival two-car map overlay, and the stint chart shows the full baked plan rather than only what's happened so far in the replay window (noted in its own footnote).
 
@@ -124,16 +124,22 @@ The React UI toggle at the top of the page POSTs this endpoint. The active butto
 
 ## Service layout (`docker-compose.yml`)
 
-| Service  | Language | Role                                    | Default session |
+| Service  | Language | Role                                    | Session key |
 |----------|----------|-----------------------------------------|-----------------|
 | `redis`  | —        | The polyglot seam                       | —               |
 | `replay` | Go       | Loops the Monza 2024 clip               | `replay`        |
 | `live`   | Python   | Streams the Silverstone 2024 clip       | `live`          |
+| `compare-2023` | Go | Loops the Monza 2023 clip, wall-clock phased | `compare-monza-2023` |
+| `compare-2024` | Go | Loops the Monza 2024 clip, wall-clock phased | `compare-monza-2024` |
 | `gateway`| Go       | Serves SPA + WebSocket, switchable lane | starts on `replay` |
+
+The two `compare-*` lanes exist only to feed the side-by-side view; the toggle at the
+top of the board switches the gateway between `replay` and `live` and never touches them.
 
 ## Further reading
 
-- `ingest/` — how to bake a new circuit clip or run the live SignalR ingester
+- `ingest/README.md` — how to bake a new circuit clip (including the exact commands the three committed clips were baked with) or run the live SignalR ingester
+- `CONTEXT.md` — the project glossary: lane, writer, seam, snapshot, frame, Rev
 - `docs/F1_Race_Tracker_Tech_Scope.md` — technical architecture decisions
 - `docs/F1_Race_Tracker_Product_Scope.md` — product scope (as shipped)
 - `docs/runbooks/live-verification.md` — checklist for verifying true-live ingestion against a real session, plus §5 for the beta F1TV link flow
