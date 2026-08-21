@@ -1,3 +1,6 @@
+// Vite build configuration, including the base path the GitHub Pages static demo is
+// served under.
+
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 

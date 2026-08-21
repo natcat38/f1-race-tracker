@@ -1,3 +1,5 @@
+<!-- ADR-0008: live team radio rides frames, while replay radio stays fixed in the snapshot. -->
+
 # 0008 — Live team radio rides frames; replay radio stays snapshot-fixed
 
 **Status:** accepted

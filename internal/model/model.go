@@ -1,3 +1,5 @@
+// The wire types — CarState, Snapshot, Frame — that every layer serialises and parses.
+
 // Package model is the normalised contract shared by every layer (and, later, Python).
 package model
 

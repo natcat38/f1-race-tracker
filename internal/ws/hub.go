@@ -1,3 +1,6 @@
+// The fan-out hub: holds the authoritative snapshot and broadcasts each frame to every
+// registered client.
+
 package ws
 
 import (

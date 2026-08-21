@@ -1,3 +1,5 @@
+<!-- ADR-0005: stints and weather extend the existing contract patterns rather than introducing new ones. -->
+
 # 0005 — Phase 5's `stints` and `weather` extend existing contract patterns, not new ones
 
 **Status:** accepted

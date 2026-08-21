@@ -1,3 +1,6 @@
+// Tests for the Redis seam against miniredis: snapshot round-trip, frame pub/sub, and
+// subscription lifecycle.
+
 package bus
 
 import (

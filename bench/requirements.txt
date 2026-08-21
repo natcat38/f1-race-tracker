@@ -1,2 +1,4 @@
+# Python dependencies for the benchmark harness (plotting + tests).
+
 matplotlib==3.11.0
 pytest==9.1.1

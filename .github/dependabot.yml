@@ -1,3 +1,5 @@
+# Dependabot update schedule for the Go, Python and npm dependency sets.
+
 version: 2
 updates:
   # Go modules (root)

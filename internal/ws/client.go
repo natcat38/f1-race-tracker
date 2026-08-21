@@ -1,3 +1,6 @@
+// One connected browser: its send queue, write pump, and the read loop that exists only
+// to notice a close.
+
 package ws
 
 import (

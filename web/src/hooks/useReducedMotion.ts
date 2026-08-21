@@ -1,3 +1,6 @@
+// Subscribes to prefers-reduced-motion for the two places motion is driven from
+// JavaScript.
+
 import { useSyncExternalStore } from 'react';
 
 const QUERY = '(prefers-reduced-motion: reduce)';

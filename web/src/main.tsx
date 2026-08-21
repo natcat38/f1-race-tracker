@@ -1,3 +1,6 @@
+// Browser entry point: mounts App under an error boundary and pulls in the global fonts
+// and stylesheets.
+
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import '@fontsource/chakra-petch/400.css'

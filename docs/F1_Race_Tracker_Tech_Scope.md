@@ -1,3 +1,5 @@
+<!-- Technical scope: the stack, the tiers, and the code-level breakdown of how the pieces fit. -->
+
 # F1 Race Tracker — Tech Scope
 
 > **Audience:** engineers (you, building it). Code-level breakdown.

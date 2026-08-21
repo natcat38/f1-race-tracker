@@ -1,3 +1,5 @@
+<!-- ADR-0002: timing and telemetry ride as flat omitempty fields on CarState, rebroadcast every frame. -->
+
 # 0002 — Timing fields rebroadcast every frame (flat contract)
 
 Phase 2 adds timing and telemetry as flat `omitempty` fields on `CarState`

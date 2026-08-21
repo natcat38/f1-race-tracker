@@ -1,3 +1,6 @@
+// Tests for Apply's fold: car replacement, Rev monotonicity, and the rolling
+// race-control buffer.
+
 package model
 
 import "testing"

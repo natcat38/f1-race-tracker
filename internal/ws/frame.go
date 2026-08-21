@@ -1,3 +1,5 @@
+// Wire envelopes: wraps a snapshot or frame in the type-tagged JSON the frontend switches on.
+
 // Package ws is the gateway-side WebSocket fan-out hub.
 package ws
 

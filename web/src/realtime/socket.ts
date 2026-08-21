@@ -1,3 +1,5 @@
+// The live data source: a reconnecting WebSocket that feeds parsed messages into the race reducer.
+
 /**
  * The frontend's data-source connections: a reconnecting live WebSocket and a paced static-replay reader, both feeding the same RaceState reducer.
  * @packageDocumentation

@@ -1,3 +1,5 @@
+# Builds the baked static demo and deploys it to GitHub Pages.
+
 name: Deploy static demo
 
 on:

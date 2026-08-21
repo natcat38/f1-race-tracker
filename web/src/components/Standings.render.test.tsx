@@ -1,3 +1,5 @@
+// Render tests for the compare-lane standings list.
+
 import { describe, test, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Standings } from './Standings';

@@ -1,3 +1,6 @@
+// Tests that the live regions announce changes politely and without re-reading the
+// backlog.
+
 import { describe, test, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { RaceControl } from './RaceControl';

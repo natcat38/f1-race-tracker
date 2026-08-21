@@ -1,3 +1,5 @@
+// Tests for the static-replay reader: clip pacing, looping and status reporting.
+
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { connectStaticReplay } from './staticReplay';
 import type { RaceState } from '../state/race';

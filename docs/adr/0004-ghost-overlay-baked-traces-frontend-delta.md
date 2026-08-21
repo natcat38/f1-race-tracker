@@ -1,3 +1,5 @@
+<!-- ADR-0004: ghost overlay uses per-clip baked lap traces, with the delta subtracted in the frontend. -->
+
 # Ghost overlay: per-clip baked lap traces, delta subtracted in the frontend
 
 **Status:** accepted

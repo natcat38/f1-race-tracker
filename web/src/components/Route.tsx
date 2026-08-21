@@ -1,3 +1,6 @@
+// The shared page frame every route renders inside: skip link, heading, and the main
+// landmark.
+
 import { useEffect, useState, type ReactNode } from 'react';
 
 // The panel entrance stagger is charming exactly once. It is keyed off .page, and

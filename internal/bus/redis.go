@@ -1,3 +1,5 @@
+// The Redis seam itself: stores the latest snapshot and publishes/subscribes frame streams.
+
 // Package bus is the Redis seam: snapshot store + frame pub/sub.
 package bus
 

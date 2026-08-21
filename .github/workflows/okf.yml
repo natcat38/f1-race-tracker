@@ -1,3 +1,5 @@
+# Supply-chain and dependency-hygiene checks run alongside CI.
+
 name: OKF
 on:
   push:

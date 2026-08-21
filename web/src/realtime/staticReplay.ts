@@ -1,3 +1,6 @@
+// The static-demo data source: paces a baked NDJSON clip through the same reducer the
+// live socket feeds.
+
 import { applyMessage, emptyState, parseMsg, type RaceState } from '../state/race';
 import type { ConnStatus } from './socket';
 

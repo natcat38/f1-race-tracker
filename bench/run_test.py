@@ -1,3 +1,5 @@
+"""Tests for the benchmark harness's docker-stats parsing and its resource sampler."""
+
 from run import parse_cpu_perc, parse_mem_mb, StatsSampler
 
 

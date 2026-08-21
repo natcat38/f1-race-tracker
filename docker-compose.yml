@@ -1,3 +1,6 @@
+# The local stack: Redis, a replay writer per compare lane, and the gateway serving the
+# embedded SPA.
+
 services:
   redis:
     image: redis:7-alpine

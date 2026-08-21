@@ -1,3 +1,5 @@
+<!-- What this project is, what it looks like, and how to run it. -->
+
 # F1 Race Tracker
 
 ![Live lane — Silverstone 2024 on the track map](docs/assets/live-lane.png)

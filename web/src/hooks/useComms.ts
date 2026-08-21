@@ -1,3 +1,6 @@
+// Drives the comms layer: queues fired radio clips into one audio element and keeps a
+// short history.
+
 import { useEffect, useRef, useState } from 'react';
 import type { RaceState, RadioMessage } from '../state/race';
 import { stepComms, liveArrivals, isStale, isAllowedClip, type CommsCursor } from '../state/comms';

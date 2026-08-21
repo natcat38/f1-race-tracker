@@ -1,3 +1,5 @@
+// Render tests for the top rail: tabs, clock and status.
+
 import { describe, test, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { StatusRail } from './StatusRail';

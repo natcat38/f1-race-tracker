@@ -1,3 +1,5 @@
+<!-- Runbook: how to verify the exploratory SignalR live path against a real session. -->
+
 # Runbook: verifying `live_signalr.py` against a real session
 
 `ingest/live_signalr.py` is exploratory — every message shape it parses is

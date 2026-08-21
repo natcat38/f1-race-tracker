@@ -1,3 +1,5 @@
+# The PR gate: Go vet/test/race, Python ingest and bench suites, frontend lint/test/build, and the generated-file checks.
+
 name: CI
 on:
   push:

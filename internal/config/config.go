@@ -1,3 +1,5 @@
+// Environment configuration: reads, defaults and validates every knob the process takes.
+
 // Package config loads and validates the gateway/replay process's environment configuration.
 package config
 

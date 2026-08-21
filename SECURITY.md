@@ -1,3 +1,5 @@
+<!-- Security posture and vulnerability-reporting policy for this self-hosted app. -->
+
 # Security Policy
 
 This is a self-hosted app you run locally, not a hosted service — there is no public

@@ -1,3 +1,5 @@
+// Unit tests for gap smoothing, hysteresis and the long-gap display rules.
+
 import { describe, it, expect } from 'vitest';
 import {
   fmtGapEstimate, fmtLongGap, median, updateGapSmoothing, displayGaps, holdOrder,

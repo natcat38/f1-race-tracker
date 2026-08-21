@@ -1,3 +1,5 @@
+// The top rail: brand, route tabs, session clock and connection status.
+
 import type { ReactNode } from 'react';
 import type { RaceState } from '../state/race';
 import type { ConnStatus } from '../realtime/socket';

@@ -1,3 +1,5 @@
+# Container image for the true-live SignalR ingest path (ingest/live.py).
+
 FROM python:3.11-slim
 WORKDIR /app
 COPY ingest/requirements-live.txt ./

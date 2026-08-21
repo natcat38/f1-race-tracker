@@ -1,3 +1,5 @@
+// The shared panel chrome every dashboard card renders inside: title, framing and spacing.
+
 /**
  * The dashboard's presentational components — map, timing tower, standings, telemetry, comms, race control, ghost/compare overlays, and their shared layout/formatting helpers.
  * @packageDocumentation

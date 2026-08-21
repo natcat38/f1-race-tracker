@@ -1,3 +1,6 @@
+// Tests for the ghost overlay maths: delta series, index lookup and common-driver
+// selection.
+
 import { describe, test, expect } from 'vitest';
 import { deltaSeries, indexAtTime, commonDrivers, ghostSkeletonCopy } from './ghost';
 

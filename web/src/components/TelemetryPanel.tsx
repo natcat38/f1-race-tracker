@@ -1,3 +1,5 @@
+// The selected car's telemetry readout: speed, gear, pedal bars and lap/gap sparklines.
+
 import type { Car, RaceState } from '../state/race';
 import { fmtLap, fmtGapEstimate, type LapHistory, type GapHistory } from './timingHelpers';
 

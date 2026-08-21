@@ -1,3 +1,5 @@
+<!-- Index of the background knowledge notes: what the system is, and where each component and domain note lives. -->
+
 # F1 Race Tracker — Knowledge
 
 A real-time F1 race visualiser: an animated track map + standings, fed by either a

@@ -1,3 +1,6 @@
+// React error boundary that keeps one component's render-time exception from blanking
+// the whole app.
+
 import { Component, type ReactNode } from 'react'
 
 // ErrorBoundary keeps a render-time exception in one component from unmounting

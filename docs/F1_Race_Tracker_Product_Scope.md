@@ -1,3 +1,5 @@
+<!-- Product scope: who this is for, what it shows them, and what it deliberately leaves out. -->
+
 # F1 Race Tracker — Product Scope
 
 > **Audience:** product readers; primary persona: the armchair race engineer (and the recruiter who lands on the repo, secondarily). Plain language, no code.

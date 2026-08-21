@@ -1,3 +1,6 @@
+// Ghost-overlay maths: signed cross-year delta series and the clock-to-index inversion
+// the animation needs.
+
 import type { ConnStatus } from '../realtime/socket';
 
 // Pure helpers for the cross-year ghost overlay. The route holds both years'

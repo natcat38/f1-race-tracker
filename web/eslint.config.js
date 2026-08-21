@@ -1,3 +1,5 @@
+// ESLint configuration for the frontend: TypeScript, React hooks and refresh rules.
+
 import js from '@eslint/js'
 import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'

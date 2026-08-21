@@ -1,3 +1,6 @@
+// Fixed-bucket latency histogram: constant memory regardless of sample count, so a
+// sweep of millions of frames still reports percentiles.
+
 package main
 
 import "math"

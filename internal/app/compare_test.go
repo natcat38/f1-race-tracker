@@ -1,3 +1,6 @@
+// Tests for the compare lanes: ?session= selects which lane a client is served from,
+// and unknown sessions are rejected.
+
 package app
 
 import (

@@ -1,3 +1,6 @@
+// The track map: cars drawn as smoothed dots on the baked track outline, with the
+// board's selection highlighted.
+
 import type { RaceState } from '../state/race';
 import { TrackPath } from './TrackPath';
 import { useSmoothedCars } from '../hooks/useSmoothedCars';

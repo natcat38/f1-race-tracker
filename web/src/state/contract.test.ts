@@ -1,3 +1,6 @@
+// Contract test: the golden snapshot fixture must apply cleanly through the frontend
+// reducer.
+
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { emptyState, applyMessage } from './race';

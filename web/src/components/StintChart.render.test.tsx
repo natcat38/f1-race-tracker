@@ -1,3 +1,5 @@
+// Render tests for the strategy timeline's stint segments and leader marker.
+
 import { describe, test, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { StintChart } from './StintChart';

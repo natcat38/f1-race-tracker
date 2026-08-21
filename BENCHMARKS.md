@@ -1,3 +1,5 @@
+<!-- Measured gateway fan-out capacity: how many concurrent viewers one gateway sustains, at what latency, and how the numbers were produced. -->
+
 # F1 Race Tracker — Benchmark
 
 **Headline:** A single gateway sustained **1,000** concurrent WebSocket viewers at 10 Hz with **p99 fan-out latency of 48 ms** and **zero dropped clients**, and kept climbing to ~2,000 viewers (≈19,900 frames/s) before latency knee'd — on one developer laptop.

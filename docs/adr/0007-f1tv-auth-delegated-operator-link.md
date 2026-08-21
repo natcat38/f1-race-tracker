@@ -1,3 +1,5 @@
+<!-- ADR-0007: beta live timing authenticates via an operator-linked F1 TV session, delegated to FastF1. -->
+
 # 0007 — Beta live timing: operator-linked F1TV auth, delegated to FastF1
 
 **Status:** accepted

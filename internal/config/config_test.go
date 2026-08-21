@@ -1,3 +1,6 @@
+// Tests for environment loading: defaults, overrides, and validation of every
+// configurable knob.
+
 package config
 
 import "testing"

@@ -1,3 +1,5 @@
+// The compare route: two lanes side by side, each its own socket and standings readout.
+
 import { useEffect, useState } from 'react';
 import { connectRace, type ConnStatus } from '../realtime/socket';
 import { emptyState, type RaceState } from '../state/race';

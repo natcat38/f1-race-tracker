@@ -1,3 +1,6 @@
+// The gateway role: subscribes to the bus, keeps a hub per compare lane, and serves
+// /ws, /healthz and the embedded SPA.
+
 package app
 
 import (

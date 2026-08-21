@@ -1,3 +1,5 @@
+// Tests that track outlines are letterboxed into the square viewBox without distortion.
+
 import { describe, it, expect } from 'vitest';
 import { SIZE, fitViewBox, trackPathD } from './geometry';
 

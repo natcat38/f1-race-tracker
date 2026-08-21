@@ -1,3 +1,6 @@
+// Tests for the gateway role: snapshot-on-connect, frame fan-out, origin and session
+// allowlists, health reporting.
+
 package app
 
 import (

@@ -1,3 +1,6 @@
+// Tests for the replay writer role: frames are published to the bus in order and the
+// snapshot is kept current.
+
 package app
 
 import (

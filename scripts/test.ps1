@@ -1,4 +1,4 @@
-# scripts/test.ps1 — run every test suite in the repo. Exits non-zero on first failure.
+# Run every test suite in the repo, in the order CI does. Exits non-zero on first failure.
 # Requires: Go toolchain; web deps (`npm ci` in web/); and the shared .venv with
 # ingest/requirements-dev.txt (pytest + redis) and bench/requirements.txt installed.
 $ErrorActionPreference = "Stop"
