@@ -36,14 +36,14 @@ type CarState struct {
 	// feed) and derived on replay: arc-length progress along the circuit centreline,
 	// priced through the leader's own distance-time curve, good to ~0.1s. See
 	// ingest/geometry.py and ingest/README.md's "How gaps are estimated".
-	GapMs     int       `json:"gapMs,omitempty"`   // to leader
-	GapLaps   int       `json:"gapLaps,omitempty"` // whole laps behind leader; FE shows "+1 LAP" when >= 1
-	IntMs     int       `json:"intMs,omitempty"`   // interval to car ahead
-	Speed     int       `json:"speed,omitempty"`
-	Gear      int       `json:"gear,omitempty"`
-	Throttle  int       `json:"throttle,omitempty"` // 0-100
-	Brake     int       `json:"brake,omitempty"`    // 0-100
-	DRS       bool      `json:"drs,omitempty"`
+	GapMs    int  `json:"gapMs,omitempty"`   // to leader
+	GapLaps  int  `json:"gapLaps,omitempty"` // whole laps behind leader; FE shows "+1 LAP" when >= 1
+	IntMs    int  `json:"intMs,omitempty"`   // interval to car ahead
+	Speed    int  `json:"speed,omitempty"`
+	Gear     int  `json:"gear,omitempty"`
+	Throttle int  `json:"throttle,omitempty"` // 0-100
+	Brake    int  `json:"brake,omitempty"`    // 0-100
+	DRS      bool `json:"drs,omitempty"`
 }
 
 type RaceControlMessage struct {
