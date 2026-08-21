@@ -167,8 +167,16 @@ function GhostLive({ initialSelected }: { initialSelected?: number | null }) {
         ) : (
           <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="track-svg" role="img" aria-label="Ghost overlay track map">
             <TrackPath d={trackPath} />
-            {/* ghost (last year) — translucent */}
-            <circle cx={ghost!.x * SIZE} cy={ghost!.y * SIZE} r={7} fill={colour} opacity={0.4} stroke="#000" strokeWidth={1} />
+            {/* Ghost (last year). A flat 0.4 opacity over a dark map measured
+                1.59:1 — well under the 3:1 a graphic that carries meaning needs,
+                and for dark team colours no opacity gets there. The ring does the
+                work instead: dashed and full-strength, so the ghost is told apart
+                from the solid car by outline style rather than by how faint it is. */}
+            <circle
+              cx={ghost!.x * SIZE} cy={ghost!.y * SIZE} r={7}
+              fill={colour} fillOpacity={0.45}
+              stroke="var(--track-label)" strokeWidth={1.5} strokeDasharray="3 2"
+            />
             {/* solid (this year) */}
             <circle cx={solid!.x * SIZE} cy={solid!.y * SIZE} r={7} fill={colour} stroke="#fff" strokeWidth={1.5} />
             <text x={solid!.x * SIZE + 10} y={solid!.y * SIZE + 4} fill="var(--track-label)" fontSize="var(--fs-xs)">{code}</text>
@@ -229,6 +237,9 @@ function GhostLive({ initialSelected }: { initialSelected?: number | null }) {
             disabled={!ready}
             onChange={(e) => scrub(Number(e.target.value))}
             aria-label="Lap position"
+            // Without this the slider announces its raw value — "43700" — while
+            // the human-readable elapsed time sits rendered right beside it.
+            aria-valuetext={fmtElapsed(tMs)}
             style={{ flex: 1, minWidth: 160 }}
           />
           <span className="rail-clock">{fmtElapsed(tMs)}</span>

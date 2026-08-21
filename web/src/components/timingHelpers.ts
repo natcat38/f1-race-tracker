@@ -74,9 +74,18 @@ export function intLabel(
   return fmtGap(intMs);
 }
 
+// These are text colours in the tower (the "S5"/"W2" readout) as well as fills in
+// the strategy bars, so they are held to the 4.5:1 text floor on --carbon, not the
+// 3:1 non-text one. SOFT was #e1342e (4.05:1) and WET #3671C6 (3.71:1) — both read
+// as compound-correct but both failed as text, so each is lifted to the nearest
+// shade that clears the line while staying recognisably the F1 compound colour.
+// Ratios measured with WCAG relative-luminance math against #14171C.
 export const TYRE_COLOUR: Record<string, string> = {
-  SOFT: '#e1342e', MEDIUM: '#e8c84a', HARD: '#e8e8e8',
-  INTERMEDIATE: '#3bb273', WET: '#3671C6',
+  SOFT: '#F25A54',          /* 5.5:1 */
+  MEDIUM: '#e8c84a',        /* 10.9:1 */
+  HARD: '#e8e8e8',          /* 14.7:1 */
+  INTERMEDIATE: '#3bb273',  /* 6.7:1 */
+  WET: '#4A8AD8',           /* 5.1:1 */
 };
 
 // tyreLabel is the single compact tyre readout shared by TimingTower and

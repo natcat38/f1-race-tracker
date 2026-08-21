@@ -2,7 +2,7 @@
  * The React app shell: mounts the root component, wires the live WebSocket or static-replay data source into race state, and lays out the dashboard panels.
  * @packageDocumentation
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { connectRace, type ConnStatus } from './realtime/socket';
 import { connectStaticReplay } from './realtime/staticReplay';
 import { emptyState, type RaceState } from './state/race';
@@ -42,16 +42,40 @@ export default function App() {
   const [hash, setHash] = useState<string>(typeof location !== 'undefined' ? location.hash : '');
   const [selected, setSelected] = useState<number | null>(null);
   const [rival, setRival] = useState<number | null>(null);
+  // WCAG 2.2.2: the board starts moving on load and never stops — car markers
+  // animate via rAF indefinitely and the tower repaints at 10 Hz — with no pause,
+  // stop or hide control anywhere. prefers-reduced-motion removes the glide but
+  // not the 10 Hz positional jumps, and it is an OS-level setting besides. Freeze
+  // holds the rendered frame while the feed keeps arriving in the background;
+  // resuming snaps to whatever is current, so nothing is replayed or queued.
+  // (The #ghost route already had its own Play/Pause; this is the board's.)
+  const [frozen, setFrozen] = useState(false);
+  const frozenRef = useRef(false);
+  const latestRef = useRef<RaceState>(state);
   const staleSec = useStale(state);
   const lapHistory = useLapHistory(state);
   const gapHistory = useGapHistory(state);
 
-  useEffect(() => (STATIC_DEMO ? connectStaticReplay : connectRace)(setState, setStatus), []);
+  useEffect(() => {
+    const onState = (s: RaceState) => {
+      latestRef.current = s;
+      if (!frozenRef.current) setState(s);
+    };
+    return (STATIC_DEMO ? connectStaticReplay : connectRace)(onState, setStatus);
+  }, []);
+
   useEffect(() => {
     const onHash = () => setHash(location.hash);
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
+
+  function toggleFrozen() {
+    const next = !frozenRef.current;
+    frozenRef.current = next;
+    setFrozen(next);
+    if (!next) setState(latestRef.current);
+  }
 
   // A rival only makes sense alongside a primary selection, and never as the
   // same car as the primary — derived rather than synced via effect.
@@ -71,8 +95,26 @@ export default function App() {
     <Route
       title={`Race board${state.label ? ` — ${state.label}` : ''}`}
       rail={
-        <StatusRail active="board" state={state} status={status} staleSec={staleSec}>
+        <StatusRail
+          active="board"
+          state={state}
+          status={status}
+          // Frozen means "we are choosing not to apply frames", not "the feed has
+          // stopped" — so the staleness chip must not start claiming an outage the
+          // moment a user pauses to read a row.
+          staleSec={frozen ? 0 : staleSec}
+        >
           {!STATIC_DEMO && <SourceToggle state={state} />}
+          {/* Label swap rather than aria-pressed, matching the overlay's existing
+              Play/Pause: a transport control names the action it will take. The
+              resulting state is carried by the chip, in a region that is present
+              before it fills so the transition is actually announced. */}
+          <button type="button" className="btn" onClick={toggleFrozen}>
+            {frozen ? '▶ Resume' : '⏸ Freeze'}
+          </button>
+          <span role="status" aria-live="polite">
+            {frozen && <span className="chip chip-replay">⏸ FROZEN</span>}
+          </span>
         </StatusRail>
       }
     >
@@ -80,7 +122,7 @@ export default function App() {
         <Panel label="Track">
           {status === 'reconnecting' && !showSkeleton && (
             <div style={{ position: 'relative', display: 'inline-block' }}>
-              <Map state={state} />
+              <Map state={state} paused={frozen} />
               <div className="chip chip-reconnect" style={{
                 position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
               }}>
@@ -88,7 +130,7 @@ export default function App() {
               </div>
             </div>
           )}
-          {!showSkeleton && status !== 'reconnecting' && <Map state={state} />}
+          {!showSkeleton && status !== 'reconnecting' && <Map state={state} paused={frozen} />}
           {showSkeleton && <SkeletonMap failed={status === 'failed'} trackless={trackless} />}
         </Panel>
         <Panel label="Timing">

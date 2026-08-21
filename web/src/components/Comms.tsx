@@ -16,12 +16,18 @@ export function Comms({ state }: { state: RaceState }) {
 
   return (
     <div style={{ display: 'grid', gap: 8 }}>
+      {/* "Comms ON"/"Comms OFF" was ambiguous about whether it described the
+          current state or the action the press would take. A stable noun plus
+          aria-pressed puts the state where assistive tech reads it, and leaves
+          .btn-active to carry it visually. */}
       <button
+        type="button"
         onClick={toggle}
+        aria-pressed={enabled}
         className={enabled ? 'btn btn-active' : 'btn'}
         style={{ justifySelf: 'start' }}
       >
-        {enabled ? 'Comms ON' : 'Comms OFF'}
+        Comms
       </button>
 
       {enabled && nowPlaying && (

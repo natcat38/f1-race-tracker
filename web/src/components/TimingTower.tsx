@@ -18,6 +18,38 @@ export function TimingTower({
   const [pb, setPb] = useState<Bests>({});
   const pbRef = useRef<Bests>({});
   const sessionRef = useRef(state.session);
+  // Roving tabindex (below) tracked by driver number, not row index: the running
+  // order re-sorts on every 10 Hz frame, so an index-based tab stop would wander
+  // between drivers while the user is reading. Keyed by driver, the stop follows
+  // the car — and because each row's React key is the driver number, the focused
+  // DOM node survives the reorder too.
+  const [focusedDriver, setFocusedDriver] = useState<number | null>(null);
+  const btnRefs = useRef(new Map<number, HTMLButtonElement | null>());
+  // A scrolling region has to be keyboard-operable or its off-screen columns are
+  // mouse-only (WCAG 2.1.1) — but a focusable div with nothing to scroll is just a
+  // dead tab stop, so it becomes focusable only when the table actually overruns.
+  // The column drops in components.css keep that rare; a user who has raised their
+  // browser's default font size is the case that still hits it, which is exactly
+  // the user who can least afford a silently clipped column.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [scrollable, setScrollable] = useState(false);
+  // Deliberately unkeyed: this runs after every render, which for the tower means
+  // ~10 times a second. A ResizeObserver looks tidier but misses the case that
+  // matters most — raising the browser's default font size widens the table's
+  // CONTENT while its border box, pinned at width:100%, never changes — and the
+  // tower renders empty copy before the first frame, so a mount-time observer
+  // finds no element at all. The functional updater returns the same value when
+  // nothing changed, so React bails out and this costs one layout read per frame.
+  // The lint rule's worry (an unkeyed effect that sets state loops forever) does not
+  // apply: the updater bails out on no change, and flipping tabIndex/role does not
+  // affect layout, so the measurement cannot oscillate.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const over = el.scrollWidth > el.clientWidth + 1;
+    setScrollable((s) => (s === over ? s : over));
+  });
 
   useEffect(() => {
     // New session (e.g. replay <-> live switch): drop the previous clip's
@@ -52,16 +84,58 @@ export function TimingTower({
       ? sectorDeltaVs(v, refSectors[i])
       : sectorDelta(v, pb[dn]?.[i] ?? Infinity);
 
+  // The tower is one tab stop, not twenty: exactly one row button is reachable by
+  // Tab and Arrow/Home/End move between them. Prefer wherever focus last was, then
+  // the reference car, then the leader — so tabbing in lands somewhere meaningful.
+  const inOrder = (dn: number | null) => dn != null && order.some((c) => c.driverNum === dn);
+  const rovingDriver = inOrder(focusedDriver)
+    ? focusedDriver
+    : inOrder(selected) ? selected : order[0].driverNum;
+
+  function moveFocus(from: number, to: number | 'first' | 'last') {
+    const i = order.findIndex((c) => c.driverNum === from);
+    if (i < 0) return;
+    const nextIdx =
+      to === 'first' ? 0
+        : to === 'last' ? order.length - 1
+          : Math.min(order.length - 1, Math.max(0, i + to));
+    const dn = order[nextIdx].driverNum;
+    setFocusedDriver(dn);
+    btnRefs.current.get(dn)?.focus();
+  }
+
+  function onRowKeyDown(e: React.KeyboardEvent, dn: number) {
+    // Enter and Space are left to the native <button>, which already activates on
+    // both and swallows Space's page scroll.
+    const step = { ArrowDown: 1, ArrowUp: -1, Home: 'first', End: 'last' } as const;
+    const to = step[e.key as keyof typeof step];
+    if (to === undefined) return;
+    e.preventDefault();
+    moveFocus(dn, to);
+  }
+
   return (
     <div>
     <button
+      type="button"
       onClick={() => setSecondsMode((m) => !m)}
-      className="btn"
-      style={{ marginBottom: 6, fontSize: 'var(--fs-xs)', padding: '2px 8px' }}
+      // A stable label plus aria-pressed, rather than a label that swaps between
+      // "Show seconds" and "Show laps": with a swapping label there is no state to
+      // report non-visually, and the button reads as an action whose current
+      // setting is invisible.
+      aria-pressed={secondsMode}
+      className={secondsMode ? 'btn btn-active' : 'btn'}
+      style={{ marginBottom: 6 }}
     >
-      {secondsMode ? 'Show laps' : 'Show seconds'}
+      Gaps in seconds
     </button>
-    <div className="tt-scroll">
+    <div
+      className="tt-scroll"
+      ref={scrollRef}
+      tabIndex={scrollable ? 0 : -1}
+      role={scrollable ? 'group' : undefined}
+      aria-label={scrollable ? 'Timing tower — scroll sideways for the remaining columns' : undefined}
+    >
     <table className="tt-table">
       <thead>
         <tr>
@@ -89,24 +163,45 @@ export function TimingTower({
           return (
             <tr
               key={c.driverNum}
-              // No aria-selected: a plain <tr> is not in a grid/listbox, so the
-              // attribute is invalid ARIA there. Selection shows as a class, and
-              // the row keeps its own accessible pressed-state via the button role.
-              className={isSel ? 'tt-row tt-row-selected' : 'tt-row'}
-              role="button"
-              tabIndex={0}
-              aria-pressed={isSel}
-              onClick={() => onSelect(c.driverNum)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onSelect(c.driverNum);
-                }
+              // No role and no tabIndex on the <tr>. role="button" used to sit here
+              // and it flattened the whole table body: a button has a presentational
+              // children content model, so every <td> lost its cell role, the ten
+              // <th scope="col"> headers associated with nothing, and each row was
+              // announced as one 66-character run-on ("1PIALEADER—1:24.748…").
+              // The control now lives in the Driver cell, which keeps the table a
+              // table and gives every row a short, correct accessible name.
+              // No aria-selected either: a plain <tr> is not in a grid or listbox,
+              // so the attribute would be invalid ARIA here — the button's
+              // aria-pressed carries the state instead.
+              className={
+                `tt-row${isSel ? ' tt-row-selected' : ''}${c.status === 'Out' ? ' tt-row-out' : ''}`
+              }
+              // Row-wide click is a mouse convenience layered over the real control.
+              // Clicks that came from the button are its own to handle, so the
+              // selection is not applied twice for one activation.
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest('.tt-select')) return;
+                onSelect(c.driverNum);
               }}
-              style={c.status === 'Out' ? { opacity: 0.5 } : undefined}
             >
               <td>{idx + 1}</td>
-              <td><b>{c.code}</b></td>
+              <td>
+                <button
+                  type="button"
+                  className="tt-select"
+                  ref={(el) => { btnRefs.current.set(c.driverNum, el); }}
+                  aria-pressed={isSel}
+                  tabIndex={c.driverNum === rovingDriver ? 0 : -1}
+                  onFocus={() => setFocusedDriver(c.driverNum)}
+                  onKeyDown={(e) => onRowKeyDown(e, c.driverNum)}
+                  onClick={() => onSelect(c.driverNum)}
+                >
+                  <b>{c.code}</b>
+                  <span className="visually-hidden">
+                    {isSel ? ' — reference car' : ' — set as reference car'}
+                  </span>
+                </button>
+              </td>
               {status ? (
                 <>
                   <td style={{ color: c.status === 'Pit' ? TYRE_COLOUR.MEDIUM : 'var(--slate)' }}>{status}</td>
@@ -131,21 +226,22 @@ export function TimingTower({
                   <td key={i} style={cellColour(v, best, c.driverNum, i)}>
                     {fmtSec(v)}
                     {mark && (
-                      <sup
-                        style={{ fontSize: 'var(--fs-3xs)', marginLeft: 2 }}
-                        title={mark === 'S' ? 'Session best' : 'Personal best'}
-                      >
+                      <sup className="tt-mark" title={mark === 'S' ? 'Session best' : 'Personal best'}>
                         {mark}
                       </sup>
                     )}
-                    {d !== undefined && (
-                      <sup style={{
-                        fontSize: 'var(--fs-3xs)', marginLeft: 3,
-                        color: rivalMode && d < 0 ? 'var(--good)' : 'var(--slate)',
-                      }}>
-                        {rivalMode ? fmtSigned(d) : fmtGap(d)}
-                      </sup>
-                    )}
+                    {/* Always rendered, even when empty: the delta used to appear
+                        only once a reference car was picked, which grew the table
+                        by ~40px and pushed S3 off the edge at the exact moment the
+                        user asked for more sector detail. Reserving the width keeps
+                        the table the same size selected or not. */}
+                    <sup
+                      className={
+                        `tt-delta${d !== undefined && rivalMode && d < 0 ? ' tt-delta-good' : ''}`
+                      }
+                    >
+                      {d === undefined ? '' : rivalMode ? fmtSigned(d) : fmtGap(d)}
+                    </sup>
                   </td>
                 );
               })}
@@ -155,15 +251,19 @@ export function TimingTower({
       </tbody>
     </table>
     </div>
-    <div className="empty" style={{ fontSize: 'var(--fs-2xs)', marginTop: 4 }}>
+    <div className="empty tt-note">
       Gap / Int are estimates derived from track position, not official timing.
-      {refCar && ` Click a row to set the reference car — sector deltas compare against ${refCar.code}.`}
+      {refCar && ` Choose a driver to set the reference car — sector deltas compare against ${refCar.code}.`}
     </div>
-    <div className="empty" style={{ fontSize: 'var(--fs-2xs)', marginTop: 2, display: 'flex', gap: 10 }}>
+    <div className="empty tt-note tt-legend">
       {([['SOFT', 'S Soft'], ['MEDIUM', 'M Medium'], ['HARD', 'H Hard'],
          ['INTERMEDIATE', 'I Inter'], ['WET', 'W Wet']] as const).map(([t, label]) => (
         <span key={t} style={{ color: TYRE_COLOUR[t] }}>{label}</span>
       ))}
+      {/* The S/P glyph is the colour-blind-safe half of the sector-best signal,
+          but its meaning used to live only in a title attribute on a superscript
+          — unreachable on touch. It gets a visible legend like the compounds do. */}
+      <span>S = session best · P = personal best</span>
     </div>
     </div>
   );

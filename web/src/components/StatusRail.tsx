@@ -51,9 +51,10 @@ export function StatusRail({
               {state.weather.rainfall && <span style={{ color: 'var(--rain)' }}> · RAIN</span>}
             </span>
           )}
-          <span role="status" aria-live="polite">
-            <StatusBadge status={status ?? 'connecting'} state={state} staleSec={staleSec} />
-          </span>
+          {/* No live-region wrapper here any more: StatusBadge carries its own, so
+              Compare's two lanes announce their transitions too and there is no
+              chance of nesting two polite regions and double-announcing. */}
+          <StatusBadge status={status ?? 'connecting'} state={state} staleSec={staleSec} />
         </>
       )}
       {note && <span className="rail-note">{note}</span>}

@@ -23,9 +23,15 @@
 
 /* Page shell */
 
+/* max(…, env()) rather than plain padding: in landscape on a notched phone — a
+   plausible orientation for a wide timing board — the left inset otherwise cuts
+   into the tower. env() resolves to 0 everywhere else, so this is inert on
+   desktop. */
 .page {
   position: relative;
   padding: var(--sp-4) var(--sp-6);
+  padding-left: max(var(--sp-6), env(safe-area-inset-left));
+  padding-right: max(var(--sp-6), env(safe-area-inset-right));
   display: grid;
   gap: var(--sp-6);
 }
@@ -124,7 +130,11 @@
   border-color: var(--chalk);
 }
 
+/* nowrap: at phone widths these compressed and broke inside the phrase —
+   "COMPARE / side by / side" — which is both ugly and taller. Keeping each on one
+   line measured a 383px rail down to 254px. */
 .rail-tab-sub {
+  white-space: nowrap;
   font-family: var(--data);
   font-size: var(--fs-2xs);
   font-weight: 400;
@@ -233,7 +243,14 @@
 
 /* Buttons */
 
+/* min-height, not just padding: the text buttons measured 19–27px tall, under
+   WCAG 2.2's 24px floor (§2.5.8). 32px on a mouse, 44px wherever the pointer is
+   coarse — see the (pointer: coarse) block at the end of this file. */
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
   border: 1px solid var(--edge);
   background: transparent;
   color: var(--chalk);
@@ -249,6 +266,12 @@
 .btn:hover:not(:disabled):not(.btn-active) {
   background: rgba(233, 237, 241, 0.06);
   border-color: var(--slate);
+}
+
+/* The rival picker borrows .btn for its chrome; a <select> does not want a flex
+   inner display. */
+select.btn {
+  display: inline-block;
 }
 
 /* Icon-only controls (comms ▶/↻): square up toward a 44px target without
@@ -298,14 +321,22 @@
   font-family: var(--data);
   font-size: var(--fs-lg);
   text-align: center;
+  /* The longest wrapped sentence in the app, and the first thing a visitor sees
+     while the feed warms up — worth not leaving a one-word last line. */
+  text-wrap: balance;
   padding: var(--sp-3);
 }
 
 /* Timing tower */
 
+/* A container, so the columns below drop on the tower's OWN width rather than the
+   viewport's. The tower shares a grid row with the track map, so the viewport says
+   very little about how much room the table actually has — at a 1280px desktop the
+   panel is barely half the page. */
 .tt-scroll {
   overflow-x: auto;
   max-width: 100%;
+  container: tt / inline-size;
 }
 
 .tt-table {
@@ -314,15 +345,46 @@
   font-size: var(--fs-sm);
 }
 
+/* nowrap because these are timing values: a sector cell that wrapped its delta
+   superscript onto a second line doubled every row's height (measured 25px → 47px
+   across all twenty) while still not fitting. Wrapping never helps here — the
+   column drops below are the mechanism for not fitting. */
+.tt-table th,
+.tt-table td {
+  padding: 2px var(--sp-1);
+  white-space: nowrap;
+}
+
 .tt-table th {
   color: var(--slate);
   text-align: left;
-  padding: 2px var(--sp-2);
   font-weight: 400;
 }
 
-.tt-table td {
-  padding: 2px var(--sp-2);
+/* Columns drop rather than scroll off. Thresholds are the table's own measured
+   widths (all ten columns 753px, 678 without Best, 611 without Int too, 269 with
+   the sectors gone) plus a little slack, so each step fires just before the table
+   would start clipping. Sector times stay to the last step: they are what the
+   reference-car feature exists to show, and they are duplicated nowhere else on
+   the board. Best and Int are derived readouts and the ones to lose first.
+
+   Below ~600px only five columns survive. That beats a silent 2.5× horizontal
+   clip inside a vertically-scrolling page, but a per-driver card is the better
+   answer at phone widths — the UX review's own recommendation, and a layout
+   change rather than an accessibility one. */
+@container tt (max-width: 745px) {
+  .tt-table th:nth-child(6),
+  .tt-table td:nth-child(6) { display: none; }  /* Best */
+}
+
+@container tt (max-width: 675px) {
+  .tt-table th:nth-child(4),
+  .tt-table td:nth-child(4) { display: none; }  /* Int */
+}
+
+@container tt (max-width: 600px) {
+  .tt-table th:nth-child(n + 8),
+  .tt-table td:nth-child(n + 8) { display: none; }  /* S1–S3 */
 }
 
 .tt-row {
@@ -333,15 +395,99 @@
   background: rgba(233, 237, 241, 0.04);
 }
 
+/* Selection recesses the row instead of lifting it. The old --edge fill raised the
+   background luminance enough to push the purple session-best mark (3.7:1), the
+   soft/wet compound colours and any dimmed text under 4.5:1 on exactly one row;
+   --asphalt moves the other way, so every foreground on the selected row gains
+   contrast rather than losing it. The chalk edge keeps the row unmistakable. */
 .tt-row-selected {
-  background: var(--edge);
+  background: var(--asphalt);
+}
+
+.tt-table td:first-child {
+  border-left: 2px solid transparent;
+}
+
+.tt-row-selected td:first-child {
+  border-left-color: var(--chalk);
+}
+
+/* Retired cars: a colour, not `opacity: 0.5` over the normal palette. The opacity
+   route measured 2.40:1 on the Gap/Int cells and 2.59:1 on personal-best sector
+   marks — the row was de-emphasised straight past readable. --dim holds 4.8:1 and
+   still reads as clearly recessed beside the full-strength rows around it. The
+   Gap cell also carries the word OUT, so the dimming was never the only signal. */
+.tt-row-out td,
+.tt-row-out .tt-select,
+.tt-row-out .tt-mark,
+.tt-row-out .tt-delta {
+  color: var(--dim);
+}
+
+/* The real control: an unstyled button that looks exactly like the driver code it
+   replaced, but is a focusable, named, pressable thing to a screen reader. */
+.tt-select {
+  appearance: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+/* Drawn inside the row's own bounds: .panel is overflow:hidden and .tt-scroll is
+   overflow:auto, so an outward ring on the first or last column is clipped. */
+.tt-select:focus-visible {
+  outline: 2px solid var(--chalk);
+  outline-offset: -2px;
+  border-radius: 2px;
+}
+
+.tt-mark {
+  font-size: var(--fs-3xs);
+  margin-left: 2px;
+}
+
+/* Reserved width, always rendered even when empty: picking a reference car used to
+   add ~40px of superscript per sector column and take S3 over the edge with it, so
+   the interaction that adds sector insight was the one that hid a sector. */
+.tt-delta {
+  display: inline-block;
+  min-width: 3.4ch;
+  margin-left: 3px;
+  font-size: var(--fs-3xs);
+  color: var(--slate);
+}
+
+.tt-delta-good {
+  color: var(--good);
+}
+
+.tt-note {
+  font-size: var(--fs-2xs);
+  margin-top: var(--sp-1);
+}
+
+.tt-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 2px;
 }
 
 /* Layout grids */
 
+/* The map's 600px cap left the tower 567px for a 753px table on a 1280px laptop —
+   S1–S3 permanently behind a horizontal scrollbar on the most common desktop
+   size there is. 460px still draws a perfectly legible circuit and hands the
+   tower ~707px, which is every column except Best. Above ~1400px the tower gets
+   the rest of the row and Best returns on its own. */
 .board-top {
   display: grid;
-  grid-template-columns: minmax(0, 600px) 1fr;
+  grid-template-columns: minmax(0, 460px) minmax(0, 1fr);
   gap: var(--sp-6);
 }
 
@@ -496,4 +642,46 @@
 
 .demo-notice-link:hover {
   color: var(--slate);
+}
+
+/* Touch targets — WCAG 2.2 §2.5.8 sets a 24px floor and the interface guidelines
+   ask for 44px. Scoped to coarse pointers so the desktop board keeps its density:
+   growing every row by 12px on a mouse would push half the field below the fold. */
+
+@media (pointer: coarse) {
+  .btn,
+  .btn-icon {
+    min-height: 44px;
+  }
+
+  /* Rows measured 23px — one pixel under the floor, and the app's primary
+     interaction, in a twenty-deep stack, on a phone. */
+  .tt-table td {
+    padding-block: 8px;
+  }
+
+  /* The Driver cell IS the control, so the button takes the row's height rather
+     than sitting as a 17px sliver inside a padded cell — padding on the cell grows
+     the row without growing the target. */
+  .tt-table td:nth-child(2) {
+    padding-block: 0;
+  }
+
+  .tt-select {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 44px;
+  }
+
+  /* The overlay's primary control was a 20px-tall target for a precision drag.
+     The visual track stays 4px — only the hit box grows. */
+  .ghost-controls input[type="range"] {
+    height: 44px;
+  }
+
+  .rail-tab {
+    min-height: 44px;
+    justify-content: center;
+  }
 }

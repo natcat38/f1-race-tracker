@@ -7,8 +7,16 @@
   --carbon:  #14171C;  /* panel background */
   --edge:    #232A33;  /* 1px borders, dividers */
   --chalk:   #E9EDF1;  /* primary text */
-  --slate:   #8A94A0;  /* secondary text */
-  --dim:     #646D79;  /* deliberately-off states (DRS inactive) — 3.4:1 on carbon */
+  --slate:   #8A94A0;  /* secondary text — 5.8:1 on carbon */
+  /* The one de-emphasis colour. Everything that used to say "quieter" with
+     `opacity` on top of --slate/--chalk (retired rows, DRS off) now says it with
+     this token instead: opacity multiplied against a palette already tuned near
+     the 4.5:1 floor and dropped straight through it (retired Gap cells measured
+     2.40:1, DRS-off 3.43:1). Raised from #646D79 to 4.8:1 on carbon / 5.2:1 on
+     asphalt, which still reads as clearly recessed next to full-strength --chalk
+     — relative contrast against neighbouring rows is what carries "de-emphasised",
+     and that survives fine above the threshold. */
+  --dim:     #7C8590;
   --amber:   #FFB000;  /* ATTENTION ONLY: stall, reconnect, flags, safety car */
   --onair:   #E10600;  /* F1 brand red — FILLS ONLY (the LIVE chip wash). Too dark
                           for text on carbon at 3.6:1; use --bad for red text. */
@@ -38,14 +46,25 @@
   --sp-4: 16px;
   --sp-6: 24px;
 
-  --fs-3xs: 9px;
-  --fs-2xs: 10px;
-  --fs-xs: 11px;
-  --fs-sm: 12px;
-  --fs-md: 13px;
-  --fs-lg: 14px;
-  --fs-xl: 18px;
-  --fs-hero: 28px;
+  /* rem, not px, so raising the browser's default font size actually scales the
+     board — the accommodation a low-vision user reaches for before page zoom.
+     :root deliberately sets no font-size, so 1rem stays the user's own default
+     (16px unless they changed it) and the px values in the comments are just
+     what each token resolves to at that default.
+
+     The bottom two rungs are retired: --fs-3xs was 9px and --fs-2xs 10px, and
+     they carried real meaning (sector-best S/P marks, sector delta superscripts,
+     the tyre legend, Race Control timestamps) at a size a lot of sighted readers
+     can't parse either. They now alias --fs-xs/--fs-sm; the names stay so the
+     intent at each call site is still legible. */
+  --fs-3xs: 0.6875rem;  /* 11px */
+  --fs-2xs: 0.75rem;    /* 12px */
+  --fs-xs: 0.6875rem;   /* 11px */
+  --fs-sm: 0.75rem;     /* 12px */
+  --fs-md: 0.8125rem;   /* 13px */
+  --fs-lg: 0.875rem;    /* 14px */
+  --fs-xl: 1.125rem;    /* 18px */
+  --fs-hero: 1.75rem;   /* 28px */
 }
 
 * {

@@ -48,7 +48,7 @@ function NextStep({ auth }: { auth: AuthStatus }) {
   if (auth.state === 'unavailable') {
     return (
       <p>
-        <strong>Next:</strong> can&apos;t reach the link status — the gateway or the
+        <strong>Next:</strong> can’t reach the link status — the gateway or the
         ingest service is probably down. Check <code>docker compose ps</code>.
       </p>
     );
@@ -57,7 +57,7 @@ function NextStep({ auth }: { auth: AuthStatus }) {
     const left = relativeExpiry(auth.expiresUtc);
     return (
       <p>
-        <strong>Next:</strong> nothing — you&apos;re linked. This sign-in lapses{' '}
+        <strong>Next:</strong> nothing — you’re linked. This sign-in lapses{' '}
         {left ?? 'in a few days'}; when it does, run <code>{LINK_CMD}</code> again.
       </p>
     );
@@ -131,7 +131,16 @@ export function Settings() {
     >
       <Panel
         label="F1TV Link — beta"
-        actions={<span className={CHIP[auth.state]}>{CHIP_LABEL[auth.state]}</span>}
+        // The chip and the Next line are both driven by a 5s poll of /api/f1auth,
+        // and both change only on an actual state transition — so a polite region
+        // here announces "linked" once, rather than ticking. Without it, the user
+        // who has just run the link command in a terminal and switched back to this
+        // tab is told nothing at all: the page silently rewrites itself.
+        actions={
+          <span role="status" aria-live="polite">
+            <span className={CHIP[auth.state]}>{CHIP_LABEL[auth.state]}</span>
+          </span>
+        }
       >
         <>
             <p>
@@ -142,7 +151,9 @@ export function Settings() {
               on free data and never touches any of this.
             </p>
 
-            <NextStep auth={auth} />
+            <div role="status" aria-live="polite">
+              <NextStep auth={auth} />
+            </div>
 
             {auth.state === 'linked' && (
               <p>
@@ -168,7 +179,7 @@ export function Settings() {
               </li>
               <li>
                 Install the f1login browser extension —{' '}
-                <code>https://f1login.fastf1.dev</code> (this is FastF1&apos;s own
+                <code>https://f1login.fastf1.dev</code> (this is FastF1’s own
                 extension; it is what hands the sign-in to this machine)
               </li>
               <li>
@@ -180,8 +191,8 @@ export function Settings() {
               </li>
               <li>
                 Run <code>{LINK_CMD}</code>, then open the URL it prints and sign in.
-                It will say <em>&quot;requires an active F1TV Access/Pro/Premium
-                subscription&quot;</em> before the URL — that line is expected, not a
+                It will say <em>“requires an active F1TV Access/Pro/Premium
+                subscription”</em> before the URL — that line is expected, not a
                 rejection; a free account signs in fine.
               </li>
             </ol>
@@ -202,7 +213,7 @@ export function Settings() {
             <p>
               <strong>Beta.</strong> Verified on 2026-08-20: the account links, the feed
               accepts the sign-in, and the team-radio wire format is confirmed. Whether a
-              live session&apos;s stream is tier-gated is still untested — that needs a
+              live session’s stream is tier-gated is still untested — that needs a
               race weekend. See <code>docs/runbooks/live-verification.md</code> §5 and
               ADR-0007.
             </p>

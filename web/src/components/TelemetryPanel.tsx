@@ -19,6 +19,11 @@ function Bar({ label, value, tone }: { label: string; value: number; tone: 'good
   );
 }
 
+// Matches MAX_LAP_HISTORY / MAX_GAP_HISTORY in timingHelpers — the cap both
+// series are sliced to, and so the widest a sparkline ever gets.
+const MAX_SPARK_BARS = 8;
+const BAR_W = 15;
+
 // Sparkline: one bar per completed lap, red = slower than previous lap,
 // green = faster — the stint-degradation squint test. Reused for the gap
 // trend too, where the same colouring reads as "closing" (green) vs
@@ -29,7 +34,13 @@ function Sparkline({ values, label }: { values: (number | undefined)[]; label: s
   const min = Math.min(...known), max = Math.max(...known);
   const span = max - min || 1;
   return (
-    <svg width={values.length * 15} height={24} role="img" aria-label={label}>
+    // minWidth reserves the full 8-lap span so the row does not reflow one bar at
+    // a time as history accumulates. Not flex-pinned: the panel is already tight
+    // when a rival card is open, and a hard floor there would push it wider still.
+    <svg
+      width={values.length * 15} height={24} role="img" aria-label={label}
+      style={{ minWidth: MAX_SPARK_BARS * BAR_W }}
+    >
       {values.map((v, i) => {
         if (v == null) return null;
         const h = 4 + ((v - min) / span) * 18;
@@ -80,9 +91,12 @@ function CarTelemetry({ car, history, gapHistory }: {
         {car.speed ?? 0} <span style={{ fontSize: 'var(--fs-lg)', color: 'var(--slate)' }}>km/h</span>
         <span style={{ marginLeft: 16 }}>G{car.gear ?? 0}</span>
         {/* The off state used --edge (a border colour, 1.2:1) and was effectively
-            invisible; --dim reads as deliberately-off at 3.4:1. */}
+            invisible; --dim was raised from there to 3.4:1 and then, in this pass,
+            to 4.8:1 — the threshold, not just an improvement on invisible.
+            On/off was also signalled by colour alone, which the sector marks and
+            the sparkline hatch elsewhere in this codebase already know not to do. */}
         <span style={{ marginLeft: 16, color: car.drs ? 'var(--good)' : 'var(--dim)' }}>
-          DRS
+          DRS<span className="visually-hidden">{car.drs ? ' active' : ' inactive'}</span>
         </span>
       </div>
       <Bar label="Throttle" value={car.throttle ?? 0} tone="good" />
