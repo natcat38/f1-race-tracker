@@ -10,3 +10,6 @@ cache/
 *.out
 .playwright-mcp/
 *.png
+# Never bake credentials into image layers (Dockerfile does COPY . .)
+secrets/
+.env
