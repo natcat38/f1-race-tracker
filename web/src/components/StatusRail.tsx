@@ -3,6 +3,7 @@ import type { RaceState } from '../state/race';
 import type { ConnStatus } from '../realtime/socket';
 import { StatusBadge } from './StatusBadge';
 import { fmtClock, leaderLapOf } from './timingHelpers';
+import { REPO_URL } from '../staticDemo';
 
 const TABS = [
   { key: 'board', href: '#', label: 'BOARD', sub: 'live board' },
@@ -70,6 +71,19 @@ export function StatusRail({
           </a>
         ))}
       </nav>
+      {/* Deliberately outside <nav>: this is a way out of the app, not a fifth
+          view. It is the only path from any route back to the project, which
+          for a portfolio piece is the whole point of the artefact. */}
+      <a
+        className="rail-repo"
+        href={REPO_URL}
+        target="_blank"
+        rel="noreferrer"
+        title="Project source on GitHub"
+      >
+        GitHub<span aria-hidden="true"> ↗</span>
+        <span className="visually-hidden"> (opens in a new tab)</span>
+      </a>
     </div>
   );
 }

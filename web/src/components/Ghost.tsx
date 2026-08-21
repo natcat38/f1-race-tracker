@@ -10,12 +10,37 @@ import { TrackPath } from './TrackPath';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { StatusRail } from './StatusRail';
 import { Route } from './Route';
+import { StaticDemoNotice } from './StaticDemoNotice';
+import { STATIC_DEMO } from '../staticDemo';
 
 const BAR_H = 90;
 const THIS = { session: 'compare-monza-2024', year: '2024' };
 const LAST = { session: 'compare-monza-2023', year: '2023' };
 
+// Split from GhostLive so the static build never mounts the two connectRace
+// effects below: a Pages deployment has no gateway to dial, and the old
+// unconditional mount left the route stuck on "Connection lost — retrying
+// automatically…" forever while the console filled with socket errors.
 export function Ghost({ initialSelected }: { initialSelected?: number | null } = {}) {
+  if (STATIC_DEMO) {
+    return (
+      <Route
+        title={`Lap delta overlay — ${THIS.year} vs ${LAST.year} (not in this demo)`}
+        rail={<StatusRail active="ghost" note="Not available in the static demo" />}
+      >
+        <StaticDemoNotice
+          label={`Lap delta overlay — ${THIS.year} vs ${LAST.year}`}
+          what={`The overlay replays one driver's fastest lap from two different years at once —
+                 this year solid, last year as a ghost — and draws the time delta corner by
+                 corner around the circuit, so you can see exactly where the lap was won.`}
+        />
+      </Route>
+    );
+  }
+  return <GhostLive initialSelected={initialSelected} />;
+}
+
+function GhostLive({ initialSelected }: { initialSelected?: number | null }) {
   const [thisYear, setThisYear] = useState<RaceState>(emptyState());
   const [lastYear, setLastYear] = useState<RaceState>(emptyState());
   const [statusThis, setStatusThis] = useState<ConnStatus>('connecting');

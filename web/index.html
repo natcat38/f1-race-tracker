@@ -5,7 +5,44 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0B0D10" />
-    <title>F1 Race Tracker</title>
+    <title>F1 Race Tracker — live timing tower &amp; telemetry</title>
+    <meta
+      name="description"
+      content="A broadcast-style Formula 1 timing board: timing tower, live track map, tyre strategy and a lap-delta ghost overlay, streamed over WebSocket. Python ingest, Go gateway, React front end. The public demo replays Monza 2024."
+    />
+
+    <!--
+      Social preview. The URLs are absolute and hard-coded to the GitHub Pages
+      deployment on purpose: og:image and og:url must be absolute, and Pages is
+      the only place this page is ever crawled or unfurled from. Local dev and
+      docker-compose (base '/', see vite.config.ts) serve the same tags — they
+      point at the public copy of an identical asset, which no scraper visits.
+      og.png lives in web/public/, so Vite emits it at the base-rewritten
+      /f1-race-tracker/og.png on the Pages build.
+    -->
+    <link rel="canonical" href="https://natcat38.github.io/f1-race-tracker/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="F1 Race Tracker" />
+    <meta property="og:url" content="https://natcat38.github.io/f1-race-tracker/" />
+    <meta property="og:title" content="F1 Race Tracker — live timing tower &amp; telemetry" />
+    <meta
+      property="og:description"
+      content="A broadcast-style Formula 1 timing board: timing tower, live track map, tyre strategy and a lap-delta ghost overlay. Python ingest → Redis → Go gateway → WebSocket → React."
+    />
+    <meta property="og:image" content="https://natcat38.github.io/f1-race-tracker/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="The F1 Race Tracker board: a Monza track map beside a twenty-row timing tower showing gaps, lap times and tyre compounds."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="F1 Race Tracker — live timing tower &amp; telemetry" />
+    <meta
+      name="twitter:description"
+      content="A broadcast-style Formula 1 timing board: timing tower, live track map, tyre strategy and a lap-delta ghost overlay. Python ingest → Redis → Go gateway → WebSocket → React."
+    />
+    <meta name="twitter:image" content="https://natcat38.github.io/f1-race-tracker/og.png" />
   </head>
   <body>
     <div id="root"></div>

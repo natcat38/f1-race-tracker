@@ -137,6 +137,27 @@
   color: var(--asphalt);
 }
 
+/* Repo link-back — quieter than a tab on purpose: it is an exit from the app,
+   not a view. Padded to a usable target without growing the rail's height. */
+.rail-repo {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--sp-2) var(--sp-2);
+  font-family: var(--display);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--slate);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.rail-repo:hover {
+  color: var(--chalk);
+  text-decoration: underline;
+}
+
 /* Status chips */
 
 .chip {
@@ -434,4 +455,45 @@
   border: 1px solid var(--asphalt);
   border-radius: 50%;
   background: var(--chalk);
+}
+
+/* Prose blocks — the static-demo signposts and the About panel. Every other
+   view is instrument-dense and earns edge-to-edge width; these are documents,
+   so they get a reading measure instead. */
+
+.demo-notice {
+  display: grid;
+  gap: var(--sp-3);
+  max-width: 68ch;
+  font-size: var(--fs-lg);
+  color: var(--chalk);
+}
+
+.demo-notice p {
+  margin: 0;
+}
+
+.demo-notice-cmd {
+  margin: 0;
+  padding: var(--sp-3);
+  background: var(--asphalt);
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  /* Wrap the one-liner rather than scroll it: it is meant to be read and
+     copied whole, and on a phone a horizontal scroller hides half of it. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--data);
+  font-size: var(--fs-md);
+  color: var(--chalk);
+}
+
+.demo-notice-link {
+  color: var(--chalk);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.demo-notice-link:hover {
+  color: var(--slate);
 }

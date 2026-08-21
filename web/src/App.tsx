@@ -22,6 +22,7 @@ import { Compare } from './components/Compare';
 import { Ghost } from './components/Ghost';
 import { Settings } from './components/Settings';
 import { StintChart } from './components/StintChart';
+import { STATIC_DEMO } from './staticDemo';
 
 // Three distinct reasons the map is missing, so the copy never contradicts what
 // the rest of the board is showing: an unrecoverable static-demo load failure,
@@ -34,11 +35,6 @@ function SkeletonMap({ failed, trackless }: { failed?: boolean; trackless?: bool
       : 'Warming up the timing feed…';
   return <div className="track-skeleton">{copy}</div>;
 }
-
-// Build-time flag: VITE_STATIC_DEMO=true selects the file-backed static player
-// instead of the real WebSocket connection. Set only by the GitHub Pages build
-// (see .github/workflows/pages.yml) — docker-compose and local dev never set it.
-const STATIC_DEMO = import.meta.env.VITE_STATIC_DEMO === 'true';
 
 export default function App() {
   const [state, setState] = useState<RaceState>(emptyState());

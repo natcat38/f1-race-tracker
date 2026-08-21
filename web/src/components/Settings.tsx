@@ -3,9 +3,10 @@ import { Panel } from './Panel';
 import { StatusRail } from './StatusRail';
 import { Route } from './Route';
 import { parseAuthStatus, relativeExpiry, type AuthStatus } from '../state/f1auth';
+import { StaticDemoNotice } from './StaticDemoNotice';
+import { REPO_URL, STACK_LINE, STATIC_DEMO } from '../staticDemo';
 
 const POLL_MS = 5000;
-const STATIC_DEMO = import.meta.env.VITE_STATIC_DEMO === 'true';
 
 const LINK_CMD = 'python ingest/f1tv_link.py';
 
@@ -69,6 +70,28 @@ function NextStep({ auth }: { auth: AuthStatus }) {
   );
 }
 
+// The one place in the app that says what was built and links back to it — the
+// board, compare and overlay routes are all instruments with no room for prose
+// (ui-ux review M15). The rail carries a compact repo link on every route; this
+// is the sentence behind it.
+function About() {
+  return (
+    <Panel label="About this project">
+      <div className="demo-notice">
+        <p>
+          F1 Race Tracker is a broadcast-style timing board fed by a real telemetry
+          pipeline: {STACK_LINE}
+        </p>
+        <p>
+          <a className="demo-notice-link" href={REPO_URL} target="_blank" rel="noreferrer">
+            Source, architecture and ADRs on GitHub ↗
+          </a>
+        </p>
+      </div>
+    </Panel>
+  );
+}
+
 // Settings is the #settings route: the operator's view of the beta F1TV link.
 // It only ever reads status — linking itself is a host command, because fastf1's
 // browser login POSTs to host loopback and a container cannot receive that
@@ -77,6 +100,29 @@ export function Settings() {
   const auth = useAuthStatus();
   const expiresIn = relativeExpiry(auth.expiresUtc);
   const noSubscription = auth.state === 'linked' && auth.tier !== 'active';
+
+  // The static build has no ingest process to link an account with, and no
+  // /api/f1auth to ask — so it says so plainly instead of reporting the
+  // "UNAVAILABLE" chip that an unreachable gateway would otherwise produce.
+  if (STATIC_DEMO) {
+    return (
+      <Route
+        title="F1TV account link (not in this demo)"
+        rail={<StatusRail active="settings" note="Not available in the static demo" />}
+      >
+        <StaticDemoNotice
+          label="F1TV Link — beta"
+          what="This page links a Formula 1 account to the ingest service, so the
+                tracker can pull a live session's timing feed instead of a recorded
+                one. Signing in runs as a host command on your own machine — nothing
+                about it can work from a static page."
+        />
+        {/* No <About /> here: StaticDemoNotice already carries the stack line
+            and the repo link, and saying both twice on one screen reads as a
+            template rather than as writing. */}
+      </Route>
+    );
+  }
 
   return (
     <Route
@@ -87,13 +133,7 @@ export function Settings() {
         label="F1TV Link — beta"
         actions={<span className={CHIP[auth.state]}>{CHIP_LABEL[auth.state]}</span>}
       >
-        {STATIC_DEMO ? (
-          <p>
-            Not available in the static demo — run the full system
-            (<code>docker compose up</code>) to link an account.
-          </p>
-        ) : (
-          <>
+        <>
             <p>
               <strong>You need a paid F1 TV Access subscription for this to show live
               data.</strong> Signing in with a free F1 account works and is worth doing —
@@ -167,8 +207,8 @@ export function Settings() {
               ADR-0007.
             </p>
           </>
-        )}
       </Panel>
+      <About />
     </Route>
   );
 }

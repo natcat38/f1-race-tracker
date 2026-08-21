@@ -72,8 +72,11 @@ export function connectRace(
       setTimeout(open, backoff);
       backoff = Math.min(backoff * 2, 8000); // exponential backoff, capped at 8s (Task 7 acceptance)
     };
-    ws.onerror = (ev) => {
-      console.error('connectRace: socket error', ev.type);
+    ws.onerror = () => {
+      // ev.type is the literal string 'error', which made the line read
+      // "socket error error" and said nothing about which socket. Log the URL
+      // instead — on a multi-lane route that is the only distinguishing detail.
+      console.error('connectRace: socket error on', url);
       ws?.close();
     };
   }

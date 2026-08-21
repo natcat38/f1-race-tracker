@@ -8,6 +8,8 @@ import { StatusRail } from './StatusRail';
 import { Route } from './Route';
 import { StatusBadge } from './StatusBadge';
 import { useStale } from '../hooks/useStale';
+import { StaticDemoNotice } from './StaticDemoNotice';
+import { STATIC_DEMO } from '../staticDemo';
 
 const PAIR = [
   { session: 'compare-monza-2023', year: '2023' },
@@ -38,6 +40,24 @@ function Lane({ session, year }: { session: string; year: string }) {
 }
 
 export function Compare() {
+  // Guarded before any Lane mounts, so the static build never opens the two
+  // sockets that gave this route its permanent "reconnecting…" state.
+  if (STATIC_DEMO) {
+    return (
+      <Route
+        title="Compare — Monza 2023 vs 2024 (not in this demo)"
+        rail={<StatusRail active="compare" note="Not available in the static demo" />}
+      >
+        <StaticDemoNotice
+          label="Compare — Monza 2023 vs 2024"
+          what="Compare puts two recorded races side by side — the same corner of the
+                same circuit, a year apart, each lane a separate replay session
+                streamed independently by the gateway."
+        />
+      </Route>
+    );
+  }
+
   return (
     <Route
       title="Compare — Monza 2023 vs 2024"
