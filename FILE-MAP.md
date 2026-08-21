@@ -20,7 +20,7 @@ docstring — an orientation gap, not an omission by the generator.
 | `internal/feed/replay` | 2 | replay reads a .jsonl clip and replays it as a frame stream. |
 | `internal/model` | 5 | model is the normalised contract shared by every layer (and, later, Python). |
 | `internal/ws` | 7 | ws is the gateway-side WebSocket fan-out hub. |
-| `ingest` | 20 | Records FastF1 sessions to JSONL replay clips and runs the true-live SignalR ingest path. |
+| `ingest` | 21 | Records FastF1 sessions to JSONL replay clips and runs the true-live SignalR ingest path. |
 | `bench` | 2 | Drive the loadtest sweeps behind BENCHMARKS.md by running cmd/loadtest at increasing concurrency and recording gateway resource usage. |
 | `web/src` | 3 | The React app shell: mounts the root component, wires the live WebSocket or static-replay data source into race state, and lays out the dashboard panels. |
 | `web/src/components` | 25 | The dashboard's presentational components — map, timing tower, standings, telemetry, comms, race control, ghost/compare overlays, and their shared layout/formatting helpers. |
@@ -28,4 +28,4 @@ docstring — an orientation gap, not an omission by the generator.
 | `web/src/realtime` | 4 | The frontend's data-source connections: a reconnecting live WebSocket and a paced static-replay reader, both feeding the same RaceState reducer. |
 | `web/src/state` | 10 | The frontend's race state: wire message types, the applyMessage reducer, and the comms/ghost sub-state it composes. |
 
-17 source directories, 103 files, 0 without a declared purpose.
+17 source directories, 104 files, 0 without a declared purpose.
