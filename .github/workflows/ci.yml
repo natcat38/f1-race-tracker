@@ -124,3 +124,9 @@ jobs:
       - uses: actions/checkout@v7
       - name: docker compose build
         run: docker compose build
+      # A build only proves the COPY lines succeed, not that the image can run:
+      # #72 added an import to live.py that Dockerfile.live did not ship, and the
+      # image built green then died at start-up. live.py is main-guarded, so an
+      # import is a safe smoke test.
+      - name: live image imports its modules
+        run: docker compose run --rm --no-deps --entrypoint python live -c "import live"
