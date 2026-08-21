@@ -17,7 +17,11 @@ export function Map({ state, paused }: { state: RaceState; paused?: boolean }) {
         // at 2.95:1 against the panel. 0.6 measures 6.2:1 and still reads as
         // plainly recessed; the retired 0.5 (4.7:1) already cleared the line.
         <g key={c.driverNum} opacity={c.status === 'Pit' ? 0.6 : c.status === 'Out' ? 0.5 : 1}>
-          <circle cx={c.p.x * SIZE} cy={c.p.y * SIZE} r={7} fill={teamColour[c.team] ?? '#bbb'} stroke="#000" strokeWidth={1} />
+          <circle
+            cx={c.p.x * SIZE} cy={c.p.y * SIZE} r={7}
+            fill={teamColour[c.team] ?? 'var(--team-unknown)'}
+            stroke="var(--marker-stroke)" strokeWidth={1}
+          />
           <text x={c.p.x * SIZE + 10} y={c.p.y * SIZE + 4} fill="var(--track-label)" fontSize="var(--fs-xs)">{c.code}</text>
         </g>
       ))}

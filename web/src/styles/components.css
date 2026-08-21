@@ -1,3 +1,20 @@
+/* Component styles. There is a deliberate split between this file and the
+   inline `style={{…}}` objects in the components, and it is not the usual
+   "we ran out of time" kind:
+
+   - COLOUR is tokenized everywhere, inline styles included. Nothing in this app
+     writes a raw hex outside styles/tokens.css — the inline styles say
+     `var(--slate)`, the SVG markers say `var(--marker-stroke)`, and the tyre
+     compounds resolve through `var(--tyre-*)`. A palette change is a one-file
+     edit (plus index.html's theme-color, which HTML cannot read a CSS var from).
+   - LAYOUT for a component that owns exactly one arrangement stays inline, next
+     to the JSX that arranges it. Anything shared, stateful (:hover, :focus-visible),
+     responsive, or motion-related lives here, where a selector can reach it.
+
+   So an inline `style` in this codebase should be a flex/grid arrangement and a
+   token — never a colour literal, and (since --sp-0) never a bare spacing
+   integer either. Both of those are review findings, not house style. */
+
 /* Skip link — first focusable element on every route. Off-screen until
    focused, then pinned top-left over the rail. */
 
@@ -106,7 +123,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: var(--sp-0);
   padding: var(--sp-1) var(--sp-3);
   border: 1px solid var(--edge);
   border-radius: 4px;
@@ -120,7 +137,7 @@
 }
 
 .rail-tab:hover:not(.rail-tab-active) {
-  background: rgba(233, 237, 241, 0.06);
+  background: var(--hover-wash);
   border-color: var(--slate);
 }
 
@@ -174,7 +191,10 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
-  padding: 2px 10px;
+  /* 10px, off the scale on purpose: a chip is a pill, and both scale
+     neighbours change its width by 4px — visible on a rail that already wraps
+     at phone widths. Left as a measured value rather than snapped. */
+  padding: var(--sp-0) 10px;
   border-radius: 4px;
   font-family: var(--data);
   font-size: var(--fs-md);
@@ -186,7 +206,7 @@
    stays (it carries the brand); the label uses --bad, which measures 4.9:1
    over this exact composite. */
 .chip-live {
-  background: rgba(225, 6, 0, 0.15);
+  background: rgb(var(--onair-rgb) / 0.15);
   color: var(--bad);
 }
 
@@ -202,7 +222,7 @@
 
 .chip-stall,
 .chip-reconnect {
-  background: rgba(255, 176, 0, 0.15);
+  background: rgb(var(--amber-rgb) / 0.15);
   color: var(--amber);
 }
 
@@ -264,7 +284,7 @@
 }
 
 .btn:hover:not(:disabled):not(.btn-active) {
-  background: rgba(233, 237, 241, 0.06);
+  background: var(--hover-wash);
   border-color: var(--slate);
 }
 
@@ -351,7 +371,7 @@ select.btn {
    column drops below are the mechanism for not fitting. */
 .tt-table th,
 .tt-table td {
-  padding: 2px var(--sp-1);
+  padding: var(--sp-0) var(--sp-1);
   white-space: nowrap;
 }
 
@@ -392,7 +412,7 @@ select.btn {
 }
 
 .tt-row:hover {
-  background: rgba(233, 237, 241, 0.04);
+  background: var(--hover-wash-faint);
 }
 
 /* Selection recesses the row instead of lifting it. The old --edge fill raised the
@@ -448,7 +468,7 @@ select.btn {
 
 .tt-mark {
   font-size: var(--fs-3xs);
-  margin-left: 2px;
+  margin-left: var(--sp-0);
 }
 
 /* Reserved width, always rendered even when empty: picking a reference car used to
@@ -457,7 +477,7 @@ select.btn {
 .tt-delta {
   display: inline-block;
   min-width: 3.4ch;
-  margin-left: 3px;
+  margin-left: var(--sp-0);
   font-size: var(--fs-3xs);
   color: var(--slate);
 }
@@ -474,8 +494,10 @@ select.btn {
 .tt-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 10px;
-  margin-top: 2px;
+  /* Column gap 10px for the same reason as .chip above — snapping to 12px
+     costs the legend an extra wrapped line at the tower widths that matter. */
+  gap: var(--sp-1) 10px;
+  margin-top: var(--sp-0);
 }
 
 /* Layout grids */
@@ -657,7 +679,7 @@ select.btn {
   /* Rows measured 23px — one pixel under the floor, and the app's primary
      interaction, in a twenty-deep stack, on a phone. */
   .tt-table td {
-    padding-block: 8px;
+    padding-block: var(--sp-2);
   }
 
   /* The Driver cell IS the control, so the button takes the row's height rather

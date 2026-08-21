@@ -55,8 +55,8 @@ export function SourceToggle({ state }: { state: RaceState }) {
   }
 
   return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-      <div role="radiogroup" aria-label="Data source" style={{ display: 'inline-flex', gap: 4 }}>
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
+      <div role="radiogroup" aria-label="Data source" style={{ display: 'inline-flex', gap: 'var(--sp-1)' }}>
         {SOURCES.map((s, i) => (
           <button
             key={s.key}

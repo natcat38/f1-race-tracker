@@ -15,7 +15,7 @@ export function Comms({ state }: { state: RaceState }) {
   }
 
   return (
-    <div style={{ display: 'grid', gap: 8 }}>
+    <div style={{ display: 'grid', gap: 'var(--sp-2)' }}>
       {/* "Comms ON"/"Comms OFF" was ambiguous about whether it described the
           current state or the action the press would take. A stable noun plus
           aria-pressed puts the state where assistive tech reads it, and leaves
@@ -32,7 +32,7 @@ export function Comms({ state }: { state: RaceState }) {
 
       {enabled && nowPlaying && (
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
+          display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', padding: 'var(--sp-2) var(--sp-3)',
           background: 'var(--asphalt)', borderRadius: 4, fontSize: 'var(--fs-md)',
         }}>
           <span style={{ color: colourFor(nowPlaying.driverNum), fontWeight: 700 }}>
@@ -49,10 +49,10 @@ export function Comms({ state }: { state: RaceState }) {
       )}
 
       {enabled && history.length > 0 && (
-        <div style={{ display: 'grid', gap: 4 }}>
+        <div style={{ display: 'grid', gap: 'var(--sp-1)' }}>
           {history.map((m, i) => (
             <div key={`${m.timeMs}-${i}`} style={{
-              display: 'flex', alignItems: 'center', gap: 8,
+              display: 'flex', alignItems: 'center', gap: 'var(--sp-2)',
               fontSize: 'var(--fs-sm)', color: 'var(--slate)',
             }}>
               <span style={{ color: colourFor(m.driverNum), fontWeight: 700 }}>{codeFor(m.driverNum)}</span>

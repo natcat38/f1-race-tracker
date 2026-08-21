@@ -125,7 +125,7 @@ export function TimingTower({
       // setting is invisible.
       aria-pressed={secondsMode}
       className={secondsMode ? 'btn btn-active' : 'btn'}
-      style={{ marginBottom: 6 }}
+      style={{ marginBottom: 'var(--sp-2)' }}
     >
       Gaps in seconds
     </button>
@@ -204,7 +204,10 @@ export function TimingTower({
               </td>
               {status ? (
                 <>
-                  <td style={{ color: c.status === 'Pit' ? TYRE_COLOUR.MEDIUM : 'var(--slate)' }}>{status}</td>
+                  {/* --pit, not the medium-compound yellow: "in the pit lane" is a
+                      race state, and borrowing a tyre colour for it meant the
+                      swatch and the indicator could never be tuned apart. */}
+                  <td style={{ color: c.status === 'Pit' ? 'var(--pit)' : 'var(--slate)' }}>{status}</td>
                   <td>—</td>
                 </>
               ) : (

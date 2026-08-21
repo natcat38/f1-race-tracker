@@ -6,7 +6,7 @@ import { fmtLap, fmtGap, type LapHistory, type GapHistory } from './timingHelper
 // at a glance.
 function Bar({ label, value, tone }: { label: string; value: number; tone: 'good' | 'bad' }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--fs-sm)' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', fontSize: 'var(--fs-sm)' }}>
       <span style={{ width: 64, color: 'var(--slate)' }}>{label}</span>
       <div style={{ flex: 1, height: 8, background: 'var(--edge)', borderRadius: 4 }}>
         <div style={{
@@ -83,33 +83,33 @@ function CarTelemetry({ car, history, gapHistory }: {
   car: Car; history?: number[]; gapHistory?: (number | undefined)[];
 }) {
   return (
-    <div style={{ display: 'grid', gap: 8, minWidth: 200 }}>
+    <div style={{ display: 'grid', gap: 'var(--sp-2)', minWidth: 200 }}>
       <div style={{ fontSize: 'var(--fs-lg)' }}>
         <b>{car.code}</b> <span style={{ color: 'var(--slate)' }}>{car.team}</span>
       </div>
       <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-hero)' }}>
         {car.speed ?? 0} <span style={{ fontSize: 'var(--fs-lg)', color: 'var(--slate)' }}>km/h</span>
-        <span style={{ marginLeft: 16 }}>G{car.gear ?? 0}</span>
+        <span style={{ marginLeft: 'var(--sp-4)' }}>G{car.gear ?? 0}</span>
         {/* The off state used --edge (a border colour, 1.2:1) and was effectively
             invisible; --dim was raised from there to 3.4:1 and then, in this pass,
             to 4.8:1 — the threshold, not just an improvement on invisible.
             On/off was also signalled by colour alone, which the sector marks and
             the sparkline hatch elsewhere in this codebase already know not to do. */}
-        <span style={{ marginLeft: 16, color: car.drs ? 'var(--good)' : 'var(--dim)' }}>
+        <span style={{ marginLeft: 'var(--sp-4)', color: car.drs ? 'var(--good)' : 'var(--dim)' }}>
           DRS<span className="visually-hidden">{car.drs ? ' active' : ' inactive'}</span>
         </span>
       </div>
       <Bar label="Throttle" value={car.throttle ?? 0} tone="good" />
       <Bar label="Brake" value={car.brake ?? 0} tone="bad" />
       {history && history.length >= 2 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--fs-sm)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', fontSize: 'var(--fs-sm)' }}>
           <span style={{ width: 64, color: 'var(--slate)' }}>Laps</span>
           <Sparkline values={history} label={`${car.code} lap time trend`} />
           <span>{fmtLap(history[history.length - 1])}</span>
         </div>
       )}
       {gapHistory && gapHistory.length >= 2 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--fs-sm)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', fontSize: 'var(--fs-sm)' }}>
           <span style={{ width: 64, color: 'var(--slate)' }}>Gap</span>
           <Sparkline values={gapHistory} label={`${car.code} gap trend`} />
           <span>{fmtGap(gapHistory[gapHistory.length - 1])}</span>
@@ -140,10 +140,10 @@ export function TelemetryPanel({
   const rivalCar = rival != null ? state.cars[rival] : undefined;
   const others = Object.values(state.cars).filter((c) => c.driverNum !== car.driverNum);
   return (
-    <div style={{ display: 'grid', gap: 8 }}>
+    <div style={{ display: 'grid', gap: 'var(--sp-2)' }}>
       <SparkHatch />
       {others.length > 0 && onRivalChange && (
-        <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--slate)', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--slate)', display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
           vs
           <select
             value={rival ?? ''}
@@ -158,7 +158,7 @@ export function TelemetryPanel({
           </select>
         </label>
       )}
-      <div style={{ display: 'flex', gap: 16 }}>
+      <div style={{ display: 'flex', gap: 'var(--sp-4)' }}>
         <CarTelemetry car={car} history={lapHistory[car.driverNum]} gapHistory={gapHistory[car.driverNum]?.gaps} />
         {rivalCar && (
           <CarTelemetry car={rivalCar} history={lapHistory[rivalCar.driverNum]} gapHistory={gapHistory[rivalCar.driverNum]?.gaps} />

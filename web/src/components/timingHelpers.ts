@@ -74,18 +74,22 @@ export function intLabel(
   return fmtGap(intMs);
 }
 
-// These are text colours in the tower (the "S5"/"W2" readout) as well as fills in
-// the strategy bars, so they are held to the 4.5:1 text floor on --carbon, not the
-// 3:1 non-text one. SOFT was #e1342e (4.05:1) and WET #3671C6 (3.71:1) — both read
-// as compound-correct but both failed as text, so each is lifted to the nearest
-// shade that clears the line while staying recognisably the F1 compound colour.
-// Ratios measured with WCAG relative-luminance math against #14171C.
+// The compound swatches. The values, the contrast ratios and the reasoning now
+// live beside the rest of the palette in styles/tokens.css — this is the lookup
+// that turns a compound name from the wire into the token that draws it, and
+// nothing more. Re-typing the hexes here was how INTERMEDIATE ended up as a
+// lowercase copy of --good and WET as an exact copy of Red Bull's team colour.
+//
+// These are also STATUS-neutral: a compound colour describes rubber, not a race
+// state. The yellow-flag label and the in-pit indicator used to borrow
+// TYRE_COLOUR.MEDIUM; they use --amber and --pit now, so retuning the medium
+// swatch for legibility no longer restyles race control and the timing tower.
 export const TYRE_COLOUR: Record<string, string> = {
-  SOFT: '#F25A54',          /* 5.5:1 */
-  MEDIUM: '#e8c84a',        /* 10.9:1 */
-  HARD: '#e8e8e8',          /* 14.7:1 */
-  INTERMEDIATE: '#3bb273',  /* 6.7:1 */
-  WET: '#4A8AD8',           /* 5.1:1 */
+  SOFT: 'var(--tyre-soft)',
+  MEDIUM: 'var(--tyre-medium)',
+  HARD: 'var(--tyre-hard)',
+  INTERMEDIATE: 'var(--tyre-inter)',
+  WET: 'var(--tyre-wet)',
 };
 
 // tyreLabel is the single compact tyre readout shared by TimingTower and

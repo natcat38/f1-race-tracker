@@ -22,9 +22,14 @@ function StintChartInner({ state }: { state: RaceState }) {
   const total = state.totalLaps || 1;
 
   return (
+    // Deliberately off the 2/4/8/12/16/24 scale, and the only value in the app
+    // that is. This gap repeats between twenty rows, so the nearest step either
+    // way moves the panel's height by ~19px — enough to re-flow the four-up
+    // bottom strip, which every other panel in it shares a grid row with. A
+    // named half-step for one call site would be worse than an annotated 3.
     <div style={{ display: 'grid', gap: 3 }}>
       {order.map((c) => (
-        <div key={c.driverNum} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--fs-xs)' }}>
+        <div key={c.driverNum} style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', fontSize: 'var(--fs-xs)' }}>
           <span style={{ width: 28, flexShrink: 0 }}>{c.code}</span>
           <div style={{ position: 'relative', flex: 1, height: 10, background: 'var(--edge)', borderRadius: 2 }}>
             {state.stints[c.driverNum].map((s, i) => (
@@ -61,7 +66,7 @@ function StintChartInner({ state }: { state: RaceState }) {
           </div>
         </div>
       ))}
-      <div className="empty" style={{ fontSize: 'var(--fs-2xs)', marginTop: 2 }}>
+      <div className="empty" style={{ fontSize: 'var(--fs-2xs)', marginTop: 'var(--sp-0)' }}>
         Full-race stint plan baked from session data — the replay window sits inside it.
       </div>
     </div>

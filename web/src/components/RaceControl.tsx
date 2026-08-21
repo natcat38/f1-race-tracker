@@ -1,5 +1,5 @@
 import type { RaceControlMessage, RaceState } from '../state/race';
-import { fmtClock, TYRE_COLOUR } from './timingHelpers';
+import { fmtClock } from './timingHelpers';
 
 const MAX_SHOWN = 8;
 
@@ -24,7 +24,10 @@ function idOf(m: RaceControlMessage): number {
 // Category labels/colours for FastF1's race-control feed. Falls back to an
 // uppercased raw category for anything not in this table rather than hiding it.
 const CATEGORY: Record<string, { label: string; colour: string }> = {
-  Flag: { label: 'FLAG', colour: TYRE_COLOUR.MEDIUM },
+  // --amber, not the medium-compound yellow this used to borrow: "flags" is
+  // literally named in --amber's own docstring, and SafetyCar one line below was
+  // already using it — the file disagreed with itself within two lines.
+  Flag: { label: 'FLAG', colour: 'var(--amber)' },
   SafetyCar: { label: 'SAFETY CAR', colour: 'var(--amber)' },
   Drs: { label: 'DRS', colour: 'var(--good)' },
   CarEvent: { label: 'CAR', colour: 'var(--chalk)' },
@@ -43,12 +46,12 @@ export function RaceControl({ state }: { state: RaceState }) {
     // role="log" is the right role for a chronological message feed; it is safe to
     // make polite here because this stream is genuinely low-frequency, unlike the
     // 10 Hz timing tower, which is deliberately kept out of every live region.
-    <div style={{ display: 'grid', gap: 4 }} role="log" aria-live="polite" aria-relevant="additions">
+    <div style={{ display: 'grid', gap: 'var(--sp-1)' }} role="log" aria-live="polite" aria-relevant="additions">
       {recent.map((m) => {
         const cat = CATEGORY[m.category] ?? { label: m.category.toUpperCase(), colour: 'var(--chalk)' };
         return (
         <div key={idOf(m)} style={{
-          display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 'var(--fs-sm)', color: 'var(--slate)',
+          display: 'flex', alignItems: 'baseline', gap: 'var(--sp-2)', fontSize: 'var(--fs-sm)', color: 'var(--slate)',
         }}>
           <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: 'var(--fs-2xs)' }}>{fmtClock(m.t)}</span>
           <span style={{ color: cat.colour, fontWeight: 700, fontSize: 'var(--fs-2xs)', letterSpacing: '0.08em' }}>

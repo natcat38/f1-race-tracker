@@ -14,6 +14,8 @@ import { StaticDemoNotice } from './StaticDemoNotice';
 import { STATIC_DEMO } from '../staticDemo';
 
 const BAR_H = 90;
+// Named once: '#bbb' appeared three times in this file as the same concept.
+const UNKNOWN_TEAM = 'var(--team-unknown)';
 const THIS = { session: 'compare-monza-2024', year: '2024' };
 const LAST = { session: 'compare-monza-2023', year: '2023' };
 
@@ -141,7 +143,7 @@ function GhostLive({ initialSelected }: { initialSelected?: number | null }) {
 
   const car =
     resolvedSelected != null ? thisYear.cars[resolvedSelected] ?? lastYear.cars[resolvedSelected] : undefined;
-  const colour = car ? teamColour[car.team] ?? '#bbb' : '#bbb';
+  const colour = car ? teamColour[car.team] ?? UNKNOWN_TEAM : UNKNOWN_TEAM;
   const code = car?.code ?? (resolvedSelected != null ? String(resolvedSelected) : '');
 
   // idxLast comes from last-year's trace; clamp to this-year's outline before the
@@ -178,7 +180,7 @@ function GhostLive({ initialSelected }: { initialSelected?: number | null }) {
               stroke="var(--track-label)" strokeWidth={1.5} strokeDasharray="3 2"
             />
             {/* solid (this year) */}
-            <circle cx={solid!.x * SIZE} cy={solid!.y * SIZE} r={7} fill={colour} stroke="#fff" strokeWidth={1.5} />
+            <circle cx={solid!.x * SIZE} cy={solid!.y * SIZE} r={7} fill={colour} stroke="var(--marker-halo)" strokeWidth={1.5} />
             <text x={solid!.x * SIZE + 10} y={solid!.y * SIZE + 4} fill="var(--track-label)" fontSize="var(--fs-xs)">{code}</text>
           </svg>
         )}
@@ -188,7 +190,7 @@ function GhostLive({ initialSelected }: { initialSelected?: number | null }) {
         <Panel label="Delta bar">
           {/* red above the midline = this year slower, green below = faster */}
           <svg viewBox={`0 0 ${SIZE} ${BAR_H}`} className="track-svg" role="img" aria-label="Lap time delta around the circuit">
-            <line x1={0} y1={BAR_H / 2} x2={SIZE} y2={BAR_H / 2} stroke="#444" strokeWidth={1} />
+            <line x1={0} y1={BAR_H / 2} x2={SIZE} y2={BAR_H / 2} stroke="var(--ghost-rule)" strokeWidth={1} />
             {delta.map((d, i) => {
               const h = (Math.abs(d) / maxAbs) * (BAR_H / 2);
               const x = (i / delta.length) * SIZE;
@@ -209,7 +211,7 @@ function GhostLive({ initialSelected }: { initialSelected?: number | null }) {
             value={resolvedSelected ?? ''}
             onChange={(e) => setSelected(Number(e.target.value))}
             disabled={drivers.length === 0}
-            style={{ background: 'var(--asphalt)', color: 'var(--chalk)', border: '1px solid var(--edge)', padding: '4px 8px', borderRadius: 4 }}
+            style={{ background: 'var(--asphalt)', color: 'var(--chalk)', border: '1px solid var(--edge)', padding: 'var(--sp-1) var(--sp-2)', borderRadius: 4 }}
           >
             {/* An empty dropdown reads as "no drivers exist"; say we are waiting instead. */}
             {drivers.length === 0 && <option value="">Waiting for driver data…</option>}
