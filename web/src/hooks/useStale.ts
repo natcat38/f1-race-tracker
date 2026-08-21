@@ -1,3 +1,5 @@
+// Tracks how long it has been since the last frame, so the UI can say when data has gone stale.
+
 /**
  * React hooks that derive UI-facing state (staleness, gap/lap history, smoothed car positions, comms playback) from the raw RaceState stream.
  * @packageDocumentation

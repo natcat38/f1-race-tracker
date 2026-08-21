@@ -1,3 +1,6 @@
+// Tests for the live socket: reconnect backoff, status transitions and message
+// dispatch.
+
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { connectRace } from './socket';
 import type { RaceState } from '../state/race';

@@ -1,3 +1,6 @@
+// Interpolates car positions at display refresh rate so 10 Hz frames render as
+// continuous motion.
+
 import { useEffect, useRef, useState } from 'react';
 import type { Car, RaceState, Point } from '../state/race';
 import { useReducedMotion } from './useReducedMotion';

@@ -1,3 +1,6 @@
+// Tests for envelope encoding: snapshots and frames are wrapped with the type tag the
+// frontend switches on.
+
 package ws
 
 import (

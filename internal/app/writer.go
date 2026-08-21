@@ -1,3 +1,5 @@
+// The replay writer role: pulls frames from a clip source and publishes them to the bus.
+
 // Package app wires the replay source, the bus, and the hub into runnable roles.
 package app
 

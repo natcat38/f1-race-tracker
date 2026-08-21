@@ -1,3 +1,6 @@
+// The settings page: F1 TV link status and the operator instructions for establishing
+// it.
+
 import { useEffect, useState } from 'react';
 import { Panel } from './Panel';
 import { StatusRail } from './StatusRail';

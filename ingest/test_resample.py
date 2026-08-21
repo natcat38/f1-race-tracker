@@ -1,3 +1,5 @@
+"""Tests for the resampler's nearest-neighbour grid lookup and windowing helpers."""
+
 from resample import in_window_ms, nearest_index, step_value
 
 

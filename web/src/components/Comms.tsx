@@ -1,3 +1,5 @@
+// The team-radio layer: a now-playing banner over a short replayable history.
+
 import type { RaceState } from '../state/race';
 import { useComms } from '../hooks/useComms';
 import { teamColour } from './teamColours';

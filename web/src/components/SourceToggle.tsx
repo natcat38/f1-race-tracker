@@ -1,3 +1,6 @@
+// The replay/live lane switch, including the caveat text that keeps the live lane
+// honest.
+
 import { useRef, useState } from 'react';
 import type { RaceState } from '../state/race';
 

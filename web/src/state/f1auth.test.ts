@@ -1,3 +1,5 @@
+// Tests for parsing and rendering the F1 TV link status.
+
 import { describe, expect, test } from 'vitest';
 import { parseAuthStatus, relativeExpiry } from './f1auth';
 

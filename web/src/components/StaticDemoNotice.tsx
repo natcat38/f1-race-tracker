@@ -1,3 +1,6 @@
+// The placeholder gateway-backed views render on the static GitHub Pages build, where
+// no gateway exists.
+
 import { Panel } from './Panel';
 import { REPO_URL, RUN_CMD, STACK_LINE } from '../staticDemo';
 

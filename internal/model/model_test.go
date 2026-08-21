@@ -1,3 +1,5 @@
+// Tests that the wire types round-trip through JSON with every timing field intact.
+
 package model
 
 import (

@@ -1,3 +1,6 @@
+// The ghost route: a cross-year lap overlay animating this year's car against last
+// year's trace.
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { connectRace, type ConnStatus } from '../realtime/socket';
 import { emptyState, type RaceState } from '../state/race';

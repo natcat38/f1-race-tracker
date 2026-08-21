@@ -1,3 +1,5 @@
+<!-- ADR-0001: one gateway for now; multi-gateway fan-out deferred until there is load to justify it. -->
+
 # 1. Single gateway for now; multi-gateway deferred
 
 Date: 2026-06-21

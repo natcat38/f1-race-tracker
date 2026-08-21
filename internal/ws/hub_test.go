@@ -1,3 +1,6 @@
+// Tests for hub fan-out: broadcast reaches all clients, slow clients are dropped, and
+// the snapshot stays authoritative.
+
 package ws
 
 import (

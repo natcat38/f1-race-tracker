@@ -1,3 +1,6 @@
+// The HTTP entry point: upgrades a request to WebSocket, sends the snapshot, then
+// streams frames.
+
 package ws
 
 import (

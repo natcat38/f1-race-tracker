@@ -1,3 +1,6 @@
+// The shared fold behind the lap and gap histories, including reset on session switch
+// or replay-loop restart.
+
 import { useEffect, useRef, useState } from 'react';
 import type { Car, RaceState } from '../state/race';
 

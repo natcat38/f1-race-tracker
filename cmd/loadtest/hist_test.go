@@ -1,3 +1,6 @@
+// Tests for the latency histogram and the loadtest client's end-to-end measurement
+// against a stub gateway.
+
 package main
 
 import (

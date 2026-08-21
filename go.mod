@@ -1,3 +1,6 @@
+// Go module definition and dependency set for the gateway, replay writer and
+// command-line tools.
+
 module github.com/natcat38/f1-race-tracker
 
 go 1.26.6

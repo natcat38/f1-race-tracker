@@ -1,3 +1,5 @@
+<!-- ADR-0003: team-radio audio is streamed from F1's public URL at play time, never committed to the repo. -->
+
 # 0003 — Team-radio audio streamed from F1's public URL, not committed
 
 Phase 3 adds **team radio** (driver↔engineer audio) as a toggleable **comms

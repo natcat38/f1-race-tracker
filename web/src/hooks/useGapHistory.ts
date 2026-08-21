@@ -1,3 +1,5 @@
+// Rolling per-driver gap-trend history, one entry per completed lap.
+
 import type { RaceState } from '../state/race';
 import { updateGapHistory, type GapHistory } from '../components/timingHelpers';
 import { useRollingHistory } from './useRollingHistory';

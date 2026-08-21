@@ -1,3 +1,6 @@
+// Tests for the static-demo bake: clip reading, envelope shape, and the NDJSON output
+// contract the GitHub Pages player depends on.
+
 package main
 
 import (

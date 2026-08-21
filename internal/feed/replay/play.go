@@ -1,3 +1,5 @@
+// Clip playback: reads a .jsonl clip and emits frames paced against the session wallclock.
+
 // Package replay reads a .jsonl clip and replays it as a frame stream.
 package replay
 

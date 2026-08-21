@@ -1,3 +1,6 @@
+// Tests that a client switching between the replay and live lanes keeps receiving a
+// coherent snapshot-then-frames stream.
+
 package app
 
 import (

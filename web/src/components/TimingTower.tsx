@@ -1,3 +1,6 @@
+// The timing tower: the running order with gaps, interval, lap times, sectors and
+// tyres.
+
 import { useEffect, useRef, useState } from 'react';
 import type { RaceState } from '../state/race';
 import {

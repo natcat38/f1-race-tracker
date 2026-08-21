@@ -1,3 +1,5 @@
+<!-- ADR-0006: the static GitHub Pages demo is a third front door, not a reversal of the self-hosted stance. -->
+
 # Static GitHub Pages demo: a third front door, not a hosting reversal
 
 **Status:** accepted

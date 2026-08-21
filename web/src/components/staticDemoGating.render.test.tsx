@@ -1,3 +1,6 @@
+// Tests that gateway-backed views render the static-demo notice instead of dialling a
+// socket that cannot connect.
+
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';

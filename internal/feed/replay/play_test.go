@@ -1,3 +1,6 @@
+// Tests for clip playback: wallclock-aligned frame selection, deterministic looping,
+// and speed scaling.
+
 package replay
 
 import (

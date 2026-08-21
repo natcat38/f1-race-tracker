@@ -1,3 +1,6 @@
+// Shared formatting and ordering helpers for the timing views: lap/gap/sector
+// rendering, running order, personal bests.
+
 import type { RaceState, Car } from '../state/race';
 
 // fmtLap renders a lap/sector time (ms) as m:ss.SSS, or em-dash when absent.

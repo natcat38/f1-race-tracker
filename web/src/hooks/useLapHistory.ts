@@ -1,3 +1,5 @@
+// Rolling per-driver lap-time history.
+
 import type { RaceState } from '../state/race';
 import { updateLapHistory, type LapHistory } from '../components/timingHelpers';
 import { useRollingHistory } from './useRollingHistory';

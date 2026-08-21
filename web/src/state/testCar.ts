@@ -1,3 +1,6 @@
+// Shared test fixture: a minimal valid Car matching the wire contract, with per-test
+// overrides.
+
 import type { Car } from './race';
 
 // car() is the shared test fixture factory: a minimal valid Car (every required

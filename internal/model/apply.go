@@ -1,3 +1,6 @@
+// Apply: folds a frame into a snapshot in place, idempotent on Rev and loop-aware for
+// replaying clips.
+
 package model
 
 // maxMessages caps the rolling race-control buffer in a Snapshot.

@@ -1,3 +1,6 @@
+// Unit tests for the timing helpers: lap/gap/sector formatting, ordering and personal
+// bests.
+
 import { describe, it, expect } from 'vitest';
 import {
   fmtLap, fmtGap, fmtClock, fmtElapsed, gapLabel, intLabel, lapsDown, bestSectors, orderCars,

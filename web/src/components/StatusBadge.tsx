@@ -1,3 +1,5 @@
+// The connection/staleness badge: what the socket is doing and how old the data is.
+
 import type { ConnStatus } from '../realtime/socket';
 import type { RaceState } from '../state/race';
 

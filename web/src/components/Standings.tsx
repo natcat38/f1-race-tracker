@@ -1,3 +1,6 @@
+// The compare route's per-lane readout: raw tyre, last-lap and gap fields, deliberately
+// uncomputed.
+
 import type { RaceState } from '../state/race';
 import { fmtLap, gapLabel, lapsDown, orderCars, TYRE_COLOUR, tyreLabel } from './timingHelpers';
 

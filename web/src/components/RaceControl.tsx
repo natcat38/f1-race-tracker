@@ -1,3 +1,6 @@
+// The race-control log: the most recent marshalling messages, announced politely as
+// they arrive.
+
 import type { RaceControlMessage, RaceState } from '../state/race';
 import { fmtClock, needsDriverTag } from './timingHelpers';
 

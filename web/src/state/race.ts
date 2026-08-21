@@ -1,3 +1,5 @@
+// The race state core: wire message types, parseMsg, and the applyMessage reducer everything reads from.
+
 /**
  * The frontend's race state: wire message types, the applyMessage reducer, and the comms/ghost sub-state it composes.
  * @packageDocumentation

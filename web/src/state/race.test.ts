@@ -1,3 +1,6 @@
+// Tests for the race reducer: snapshot init, frame application, and rejection of
+// malformed messages.
+
 import { describe, it, expect, test } from 'vitest';
 import { emptyState, applyMessage, parseMsg, type RaceState } from './race';
 

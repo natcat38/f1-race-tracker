@@ -1,3 +1,6 @@
+// Tests for the upgrade path: origin checks, snapshot-first ordering, and client
+// registration/removal.
+
 package ws
 
 import (

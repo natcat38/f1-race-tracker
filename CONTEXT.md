@@ -1,3 +1,5 @@
+<!-- The project glossary: the shared vocabulary every layer, issue and ADR is expected to use. -->
+
 # Context — F1 Race Tracker glossary
 
 The shared vocabulary of this project. Use these terms exactly; avoid the listed

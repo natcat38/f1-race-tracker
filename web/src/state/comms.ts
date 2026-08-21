@@ -1,3 +1,6 @@
+// Comms sub-state: steps a cursor through the radio timeline and decides which clips
+// fire, replay or go stale.
+
 import type { RadioMessage } from './race';
 
 export interface CommsCursor { lastClock: number }

@@ -1,3 +1,5 @@
+// The constructor colour palette used everywhere a car is drawn or listed.
+
 export const teamColour: Record<string, string> = {
   'Red Bull': '#3671C6', Ferrari: '#E8002D', Mercedes: '#27F4D2', McLaren: '#FF8000',
   'Aston Martin': '#229971', Alpine: '#0093CC', Williams: '#64C4FF',

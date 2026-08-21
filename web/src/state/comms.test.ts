@@ -1,3 +1,6 @@
+// Tests for the comms cursor: which clips fire, which are skipped as stale, and which
+// are allowed.
+
 import { describe, test, expect } from 'vitest';
 import { stepComms, isAllowedClip, liveArrivals } from './comms';
 import type { RadioMessage } from './race';

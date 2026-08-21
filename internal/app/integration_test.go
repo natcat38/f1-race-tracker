@@ -1,3 +1,6 @@
+// End-to-end test: a frame published to the bus reaches a real WebSocket client with
+// the wire shape the frontend expects.
+
 package app
 
 import (

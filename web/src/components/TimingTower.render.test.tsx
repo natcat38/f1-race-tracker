@@ -1,3 +1,5 @@
+// Render tests for the timing tower's rows, columns and empty states.
+
 import { describe, test, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { TimingTower } from './TimingTower';

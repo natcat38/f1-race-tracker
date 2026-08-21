@@ -1,3 +1,6 @@
+// The full-race strategy timeline: one row per car, each stint a coloured segment on a
+// lap axis.
+
 import { memo } from 'react';
 import type { RaceState } from '../state/race';
 import { axisTicks, leaderLapOf, orderCars, sameRunningOrder, TYRE_COLOUR } from './timingHelpers';

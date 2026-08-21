@@ -1,3 +1,5 @@
+// Embeds web/dist into the Go binary so the gateway serves the SPA same-origin.
+
 // Package web embeds the built React SPA for same-origin serving.
 package web
 

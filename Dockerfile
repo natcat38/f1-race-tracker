@@ -1,3 +1,6 @@
+# Multi-stage image for the single Go binary: builds the React SPA, embeds it,
+# and ships the gateway/replay server.
+
 # Build the React SPA
 FROM node:24 AS web
 WORKDIR /web

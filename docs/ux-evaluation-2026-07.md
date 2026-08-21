@@ -1,3 +1,5 @@
+<!-- Hands-on UX evaluation of all three routes (July 2026), with observed findings and root causes. -->
+
 # UX Evaluation — pit-wall lens (July 2026)
 
 > **Method:** hands-on, driven via `docker compose up --build -d` against `http://localhost:8080`, all three routes (main board, `#compare`, `#ghost`), plus source reads to confirm root cause. Screenshots weren't available in this environment (the headless renderer timed out on screenshot capture); findings below are verified via DOM/text extraction, JS state inspection, and network/console instrumentation instead — every finding marked "observed" was driven live, not inferred from code alone.

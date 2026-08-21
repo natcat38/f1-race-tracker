@@ -1,3 +1,6 @@
+// Contract test: the checked-in golden snapshot must parse into this package's types,
+// pinning the wire shape shared with the frontend.
+
 package model
 
 import (
