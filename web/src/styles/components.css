@@ -83,25 +83,37 @@
   white-space: nowrap;
 }
 
-.rail-session {
+/* The rail's supporting values read as labels: uppercase and widely tracked, so
+   they sit visibly BELOW the clock in the hierarchy instead of a pixel away from
+   it. The report asked for 10px here; --fs-2xs is the token it named, and it is
+   12px now because agent 2 retired the 9/10px rungs as below the legibility
+   floor. Tracking, case and colour carry the demotion instead of size. */
+.rail-session,
+.rail-lap {
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   color: var(--slate);
-  font-size: var(--fs-sm);
-  white-space: nowrap;
-}
-
-.rail-clock {
-  font-family: var(--data);
-  font-variant-numeric: tabular-nums;
-  font-size: var(--fs-lg);
-  color: var(--chalk);
   white-space: nowrap;
 }
 
 .rail-lap {
   font-family: var(--data);
   font-variant-numeric: tabular-nums;
-  font-size: var(--fs-sm);
-  color: var(--slate);
+}
+
+/* The session clock is the one number in the chrome that should dominate, and it
+   was rendering at 14px — one pixel larger than body text, in a design whose
+   whole reference is broadcast graphics. --fs-hero is the display rung the token
+   file has always carried and the board never used. */
+.rail-clock {
+  font-family: var(--data);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-hero);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--chalk);
   white-space: nowrap;
 }
 
@@ -114,9 +126,17 @@
   flex: 1;
 }
 
+/* margin-left: auto as well as the spacer, because .rail-spacer collapses when
+   the rail wraps: the nav then dropped to a LEFT-aligned second row and the
+   chrome visibly changed shape. The auto margin re-anchors it on either line. */
 .rail-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--sp-2);
+  margin-left: auto;
+  /* justify-content matters only once it wraps: a wrapped nav that centred its
+     orphan row would read as a different component on the second line. */
+  justify-content: flex-end;
 }
 
 .rail-tab {
@@ -322,16 +342,46 @@ select.btn {
 
 /* SVG chrome */
 
+/* Sized from its HEIGHT, with the width left to follow the fitted viewBox's
+   aspect ratio. This is the half of the fitted-viewBox change that actually
+   removes the dead space: once the box is cropped to the circuit's own bounds,
+   a portrait outline like Monza (372 × 599 in unit space) has a ratio well under
+   1, so pinning the width the old way — `width: min(600px, 100%)` — would have
+   made the map 1.6× TALLER than it was wide. Driving from height instead keeps
+   the map's vertical footprint exactly where the layout expects it and lets the
+   panel give the horizontal space back.
+   max-width is the escape hatch for a landscape circuit or a phone: the SVG
+   letterboxes inside it rather than distorting (preserveAspectRatio defaults to
+   xMidYMid meet). */
 .track-svg {
-  width: min(600px, 100%);
-  height: auto;
+  --track-h: 420px;
   display: block;
+  height: min(var(--track-h), 70vh);
+  width: auto;
+  max-width: 100%;
+  margin-inline: auto;
   background: var(--carbon);
 }
 
+/* #ghost is a single full-bleed panel with one map in it — the route with the
+   most room and, before this, the emptiest first frame in the app. */
+.ghost-track {
+  --track-h: 640px;
+}
+
+/* Fixed 600 × 90 strip, so it is width-driven like any ordinary chart. */
+.delta-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Matches the map's footprint so the panel does not resize under the reader when
+   the first frame lands. Width stays full-bleed: this one is a sentence. */
 .track-skeleton {
-  width: min(600px, 100%);
-  aspect-ratio: 1 / 1;
+  --track-h: 420px;
+  width: 100%;
+  height: min(var(--track-h), 70vh);
   background: var(--carbon);
   border-radius: 4px;
   display: flex;
@@ -382,9 +432,11 @@ select.btn {
 }
 
 /* Columns drop rather than scroll off. Thresholds are the table's own measured
-   widths (all ten columns 753px, 678 without Best, 611 without Int too, 269 with
-   the sectors gone) plus a little slack, so each step fires just before the table
-   would start clipping. Sector times stay to the last step: they are what the
+   widths — all ten columns 771px, 694 without Best, 629 without Int too, 278 with
+   the sectors gone — each rounded UP so the step fires just before the table
+   would start clipping rather than just after. (Re-measured on this tree: the
+   position column's 14px/700 numerals, its 3px constructor rule and the extra
+   4px of padding added ~18px per state.) Sector times stay to the last step: they are what the
    reference-car feature exists to show, and they are duplicated nowhere else on
    the board. Best and Int are derived readouts and the ones to lose first.
 
@@ -392,17 +444,17 @@ select.btn {
    clip inside a vertically-scrolling page, but a per-driver card is the better
    answer at phone widths — the UX review's own recommendation, and a layout
    change rather than an accessibility one. */
-@container tt (max-width: 745px) {
+@container tt (max-width: 775px) {
   .tt-table th:nth-child(6),
   .tt-table td:nth-child(6) { display: none; }  /* Best */
 }
 
-@container tt (max-width: 675px) {
+@container tt (max-width: 700px) {
   .tt-table th:nth-child(4),
   .tt-table td:nth-child(4) { display: none; }  /* Int */
 }
 
-@container tt (max-width: 600px) {
+@container tt (max-width: 635px) {
   .tt-table th:nth-child(n + 8),
   .tt-table td:nth-child(n + 8) { display: none; }  /* S1–S3 */
 }
@@ -424,12 +476,31 @@ select.btn {
   background: var(--asphalt);
 }
 
+/* Position is the primary key of the table and used to render identically to a
+   millisecond fragment; the constructor rule beside it is the identity key the
+   map has always had. --team is set per row in TimingTower.tsx, so a row without
+   a known constructor falls back to a transparent rule of the same width and
+   nothing shifts. */
 .tt-table td:first-child {
-  border-left: 2px solid transparent;
+  border-left: 3px solid var(--team, transparent);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  padding-left: var(--sp-2);
 }
 
+/* Selection draws INSIDE the padding box rather than replacing the border, so a
+   selected row keeps its constructor key: chalk hairline, then team colour, then
+   the numeral. (Overwriting border-left-color the old way meant the one row you
+   had just chosen was the one row with no team on it.) */
 .tt-row-selected td:first-child {
-  border-left-color: var(--chalk);
+  box-shadow: inset 2px 0 0 var(--chalk);
+}
+
+/* The variable weight axis, used. Martian Mono ships 100–800 and the design only
+   ever spent 400 and 600. */
+.tt-quiet {
+  font-weight: 300;
+  color: var(--slate);
 }
 
 /* Retired cars: a colour, not `opacity: 0.5` over the normal palette. The opacity
@@ -507,9 +578,15 @@ select.btn {
    size there is. 460px still draws a perfectly legible circuit and hands the
    tower ~707px, which is every column except Best. Above ~1400px the tower gets
    the rest of the row and Best returns on its own. */
+/* The map column sizes to the map now, instead of to a 460px guess. With the
+   viewBox fitted to the circuit, a portrait outline like Monza is ~257px wide at
+   the map's 420px height — the old fixed column left 200px of empty panel beside
+   it AND took that width off the tower, which is what pushed Best behind a
+   scrollbar at 1280px. `auto` hands the difference straight to the timing table,
+   so the tower gets wider on exactly the circuits where the map needs less. */
 .board-top {
   display: grid;
-  grid-template-columns: minmax(0, 460px) minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   gap: var(--sp-6);
 }
 
@@ -532,11 +609,28 @@ select.btn {
   flex-wrap: wrap;
 }
 
+/* The lanes had no flex at all, so at 1600px they sized to content and left a
+   ~400px dead margin on the right of the view. A basis rather than `flex: 1`
+   alone, so they still wrap to one column on a narrow screen. */
+.compare-lanes > .panel {
+  flex: 1 1 460px;
+  min-width: 0;
+}
+
 .ghost-controls {
   display: flex;
   align-items: center;
   gap: var(--sp-3);
   flex-wrap: wrap;
+}
+
+/* Ghost reuses the clock face for its playback position, but inside a control
+   bar rather than the rail: the display rung belongs to the session clock, not
+   to a scrubber readout sitting next to a <select>. */
+.ghost-controls .rail-clock {
+  font-size: var(--fs-lg);
+  font-weight: 400;
+  letter-spacing: 0;
 }
 
 /* Shared text utilities */
@@ -628,6 +722,14 @@ select.btn {
 /* Prose blocks — the static-demo signposts and the About panel. Every other
    view is instrument-dense and earns edge-to-edge width; these are documents,
    so they get a reading measure instead. */
+
+/* The Settings page's own copy. 13px mono running the full width of a 1440px
+   panel is ~200 characters a line, which no one reads — and the content there is
+   the most useful writing in the app. Same measure as .demo-notice below, so the
+   app has one reading width rather than two. */
+.panel-body .prose {
+  max-width: 68ch;
+}
 
 .demo-notice {
   display: grid;

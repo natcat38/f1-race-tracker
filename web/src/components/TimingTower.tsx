@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import type { RaceState } from '../state/race';
 import {
   fmtLap, fmtSec, fmtGap, gapLabel, intLabel,
-  orderCars, bestSectors, updatePersonalBests, sectorColour, sectorDelta,
+  orderCars, bestSectors, updatePersonalBests, personalBestOf, sectorColour, sectorDelta,
   TYRE_COLOUR, tyreLabel, statusLabel, sectorDeltaVs, fmtSigned, sectorMark,
 } from './timingHelpers';
 import type { Bests } from './timingHelpers';
+import { teamColour } from './teamColours';
 
 export function TimingTower({
   state, selected, onSelect,
@@ -68,12 +69,15 @@ export function TimingTower({
     return <div className="empty">No cars yet — the timing tower fills in when data arrives.</div>;
   }
   const [b1, b2, b3] = bestSectors(order);
+  // personalBestOf, not a raw lookup: it withholds the personal best until the
+  // driver has actually set two times in that sector, so the first observation of
+  // a sector no longer paints itself green for tying a record it just invented.
   const cellColour = (v: number | undefined, best: number, dn: number, i: number) => {
-    const c = sectorColour(v, best, pb[dn]?.[i] ?? Infinity);
+    const c = sectorColour(v, best, personalBestOf(pb, dn, i));
     return c ? { color: c } : undefined;
   };
   const cellMark = (v: number | undefined, best: number, dn: number, i: number) =>
-    sectorMark(v, best, pb[dn]?.[i] ?? Infinity);
+    sectorMark(v, best, personalBestOf(pb, dn, i));
   // With a reference car selected, every OTHER row's delta compares against
   // that car's same sector (the rival-relative question a race engineer asks)
   // instead of this driver's own personal best.
@@ -82,7 +86,7 @@ export function TimingTower({
   const cellDelta = (v: number | undefined, dn: number, i: number) =>
     refCar && dn !== selected
       ? sectorDeltaVs(v, refSectors[i])
-      : sectorDelta(v, pb[dn]?.[i] ?? Infinity);
+      : sectorDelta(v, personalBestOf(pb, dn, i));
 
   // The tower is one tab stop, not twenty: exactly one row button is reachable by
   // Tab and Arrow/Home/End move between them. Prefer wherever focus last was, then
@@ -176,6 +180,15 @@ export function TimingTower({
               className={
                 `tt-row${isSel ? ' tt-row-selected' : ''}${c.status === 'Out' ? ' tt-row-out' : ''}`
               }
+              // The constructor key the map has always had and the tower never
+              // did, so the board's two hero surfaces finally share one identity
+              // system: a dot on the map and a row in the tower are tied by
+              // colour. It lands as a 3px rule on the position cell rather than
+              // on the driver code itself — Haas (#B6BABD) and AlphaTauri
+              // (#2B4562) are among the constructor hexes that miss the text
+              // contrast floor on carbon, and a rule carries the key without
+              // spending any of it.
+              style={{ '--team': teamColour[c.team] ?? 'transparent' } as React.CSSProperties}
               // Row-wide click is a mouse convenience layered over the real control.
               // Clicks that came from the button are its own to handle, so the
               // selection is not applied twice for one activation.
@@ -217,7 +230,11 @@ export function TimingTower({
                 </>
               )}
               <td>{fmtLap(c.lastLapMs)}</td>
-              <td>{fmtLap(c.bestLapMs)}</td>
+              {/* Best is the one derived, rarely-watched readout on the row, so
+                  it is where the variable weight axis earns its keep: 300 and
+                  --slate recede it without hiding it. A class rather than a
+                  :nth-child rule so .tt-row-out's dimming still outranks it. */}
+              <td className="tt-quiet">{fmtLap(c.bestLapMs)}</td>
               <td style={{ color: TYRE_COLOUR[c.tyre ?? ''] ?? 'var(--chalk)' }}>
                 {tyreLabel(c.tyre, c.tyreAge)}
               </td>

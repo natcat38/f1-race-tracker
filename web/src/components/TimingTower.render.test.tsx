@@ -101,3 +101,33 @@ describe('TimingTower de-emphasis', () => {
     expect(html).toContain('S = session best · P = personal best');
   });
 });
+
+describe('TimingTower constructor key', () => {
+  test('every row carries its team colour as --team, for the position rule', () => {
+    const state = field();
+    // The map has always painted markers by constructor; the tower did not, so
+    // a dot and a row could not be tied together.
+    const html = renderToStaticMarkup(
+      <TimingTower state={state} selected={null} onSelect={() => {}} />,
+    );
+    expect(html).toContain('--team:#3671C6'); // testCar's default team is Red Bull
+  });
+
+  test('an unknown constructor falls back to transparent, so nothing shifts', () => {
+    const state = field([{ driverNum: 77, code: 'BOT', pos: 4, team: 'Nowhere F1' }]);
+    const html = renderToStaticMarkup(
+      <TimingTower state={state} selected={null} onSelect={() => {}} />,
+    );
+    expect(html).toContain('--team:transparent');
+  });
+
+  test('the driver code itself is NOT painted — several team hexes fail on carbon', () => {
+    // Haas #B6BABD and AlphaTauri #2B4562 are the cases; a 3px rule carries the
+    // key without spending any contrast.
+    const state = field([{ driverNum: 20, code: 'MAG', pos: 4, team: 'Haas' }]);
+    const html = renderToStaticMarkup(
+      <TimingTower state={state} selected={null} onSelect={() => {}} />,
+    );
+    expect(html).not.toContain('color:#B6BABD');
+  });
+});

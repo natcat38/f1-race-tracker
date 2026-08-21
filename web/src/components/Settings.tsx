@@ -142,7 +142,12 @@ export function Settings() {
           </span>
         }
       >
-        <>
+        {/* A reading measure, not the panel's full width: this is the one page in
+            the app that is prose rather than instruments, and at 1440px it was
+            setting ~200 characters per line in 13px mono. The other prose block
+            (.demo-notice) already uses 68ch, so there is one measure in the app
+            rather than two. */}
+        <div className="prose">
             <p>
               <strong>You need a paid F1 TV Access subscription for this to show live
               data.</strong> Signing in with a free F1 account works and is worth doing —
@@ -217,7 +222,7 @@ export function Settings() {
               race weekend. See <code>docs/runbooks/live-verification.md</code> §5 and
               ADR-0007.
             </p>
-          </>
+          </div>
       </Panel>
       <About />
     </Route>

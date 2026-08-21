@@ -15,6 +15,7 @@ import { RaceControl } from './components/RaceControl';
 import { Panel } from './components/Panel';
 import { Route } from './components/Route';
 import { StatusRail } from './components/StatusRail';
+import { leaderOf } from './components/timingHelpers';
 import { useStale } from './hooks/useStale';
 import { useLapHistory } from './hooks/useLapHistory';
 import { useGapHistory } from './hooks/useGapHistory';
@@ -80,6 +81,31 @@ export default function App() {
   // A rival only makes sense alongside a primary selection, and never as the
   // same car as the primary — derived rather than synced via effect.
   const effectiveRival = selected != null && rival !== selected ? rival : null;
+
+  // Cold open used to be one-third placeholder: Telemetry read "Select a car to
+  // see telemetry" and Comms explained a toggle, so two of the six board panels
+  // opened as empty boxes describing a setting instead of showing anything.
+  // Seeding the selection with the race leader on the first frame that has cars
+  // fills Telemetry immediately — and Telemetry is the one place --fs-hero was
+  // already wired up, so this also puts display type on the board for free.
+  //
+  // An "adjusting state during render" seed: an effect would be a cascading
+  // render, and useState's initialiser cannot see the first frame because it
+  // runs before any frame arrives. State rather than a ref because the flag is
+  // read during render, and the lint rule that governs this codebase is right
+  // that a ref read in render can leave the component not re-rendering.
+  //
+  // The flag, not `selected == null`, is what makes this fire exactly once: a
+  // user who clears the selection later (ui-ux M4, agent 5's) must not have the
+  // leader pushed back at them on the very next frame.
+  const [leaderSeeded, setLeaderSeeded] = useState(false);
+  if (!leaderSeeded) {
+    const leader = leaderOf(state.cars);
+    if (leader) {
+      setLeaderSeeded(true);
+      if (selected == null) setSelected(leader.driverNum);
+    }
+  }
 
   if (hash === '#compare') return <Compare />;
   if (hash === '#ghost') return <Ghost initialSelected={selected} />;

@@ -77,9 +77,17 @@
                                   Water on the circuit already has a token; the wet
                                   compound is the same idea, so it uses it. 7.6:1 */
 
-  /* Track map chrome, shared by the board map and the ghost overlay. */
-  --track-edge:  #333333;  /* outer casing stroke */
-  --track-fill:  #1A1A1A;  /* inner surface stroke */
+  /* Track map chrome, shared by the board map and the ghost overlay. A wide
+     casing stroke under a narrower surface stroke is the standard cartographic
+     way to draw a road — but the two values were the wrong way round for a dark
+     theme: the surface (#1A1A1A) was within a hair of the panel it sat on
+     (--carbon #14171C), so the "road" had no body and the circuit read as two
+     grey hairlines with nothing between them. The surface now sits a step ABOVE
+     --edge so it reads as tarmac, and the casing goes darker than the panel so
+     it reads as a seam cut into it. Both are decorative graphics, not readouts,
+     so no contrast floor applies; the driver-code label is the only text here. */
+  --track-fill:  #2B313A;  /* inner surface stroke — the road itself */
+  --track-edge:  var(--asphalt);  /* outer casing stroke — the gutter/shadow */
   --track-label: #EEEEEE;  /* driver code beside a car marker */
 
   /* Car-marker chrome on those maps. Previously six hardcoded greys sitting
@@ -122,6 +130,11 @@
   --fs-md: 0.8125rem;   /* 13px */
   --fs-lg: 0.875rem;    /* 14px */
   --fs-xl: 1.125rem;    /* 18px */
+  /* The missing rung between 18px and the 28px hero. Broadcast graphics are
+     defined by scale contrast and this scale had a hole exactly where the
+     secondary headline numbers live — the Ghost delta readout, which was
+     rendering at control size beside a <select>. */
+  --fs-2xl: 1.375rem;   /* 22px */
   --fs-hero: 1.75rem;   /* 28px */
 }
 

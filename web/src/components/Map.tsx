@@ -2,15 +2,16 @@ import type { RaceState } from '../state/race';
 import { TrackPath } from './TrackPath';
 import { useSmoothedCars } from '../hooks/useSmoothedCars';
 import { teamColour } from './teamColours';
-import { SIZE } from './geometry';
+import { SIZE, fitViewBox, trackPathD } from './geometry';
 
 export function Map({ state, paused }: { state: RaceState; paused?: boolean }) {
   const cars = useSmoothedCars(state, paused);
-  const trackPath = state.track.length
-    ? 'M ' + state.track.map((p) => `${p.x * SIZE},${p.y * SIZE}`).join(' L ') + ' Z'
-    : '';
+  const trackPath = trackPathD(state.track);
   return (
-    <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="track-svg" role="img" aria-label="Track map with live car positions">
+    // Fitted to the outline's own bounds rather than the full unit square: the
+    // baked outline is letterboxed inside it, and the empty margin was ~38% of
+    // the panel. Markers keep their SIZE-space coordinates — see fitViewBox.
+    <svg viewBox={fitViewBox(state.track)} className="track-svg" role="img" aria-label="Track map with live car positions">
       <TrackPath d={trackPath} />
       {cars.map((c) => (
         // A pit-lane car was drawn at 0.35, which put its driver code — real text —

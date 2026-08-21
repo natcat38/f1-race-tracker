@@ -133,11 +133,18 @@ export function orderCars(cars: RaceState['cars']): Car[] {
 // undefined means "no cars, or the leader has no lap yet" — 0 is a real lap number
 // (internal/model/model.go), so callers must guard with != null, not truthiness.
 export function leaderLapOf(cars: RaceState['cars']): number | undefined {
+  return leaderOf(cars)?.lap;
+}
+
+// leaderOf is the car at the front of the running order, found with one O(n)
+// field walk rather than a sort. Split out of leaderLapOf because the board's
+// first-paint auto-selection wants the driver, not the lap.
+export function leaderOf(cars: RaceState['cars']): Car | undefined {
   let leader: Car | undefined;
   for (const c of Object.values(cars)) {
     if (leader === undefined || byRunningOrder(c, leader) < 0) leader = c;
   }
-  return leader?.lap;
+  return leader;
 }
 
 // sameRunningOrder: do these two car maps produce the same rendered running order?
@@ -164,20 +171,57 @@ export function bestSectors(cars: Car[]): [number, number, number] {
   return [min((c) => c.s1Ms), min((c) => c.s2Ms), min((c) => c.s3Ms)];
 }
 
-// Bests maps driverNum -> their best-seen [s1, s2, s3] (ms) across all frames.
-export type Bests = Record<number, [number, number, number]>;
+// SectorPb is one driver's running state for ONE sector: the best time seen, the
+// last time seen, and how many distinct times they have actually set there.
+// `last` exists only to make `samples` honest — see foldSector.
+export type SectorPb = { best: number; last: number; samples: number };
 
-const faster = (prev: number, v: number | undefined) => (v && v > 0 && v < prev ? v : prev);
+// Bests maps driverNum -> their [s1, s2, s3] sector state across all frames.
+export type Bests = Record<number, [SectorPb, SectorPb, SectorPb]>;
 
-// updatePersonalBests folds this frame's sectors into the running per-driver mins.
-// Pure: returns a new map; Infinity means "no value yet".
+const NO_PB: SectorPb = { best: Infinity, last: 0, samples: 0 };
+const NO_PBS: [SectorPb, SectorPb, SectorPb] = [NO_PB, NO_PB, NO_PB];
+
+// A driver's FIRST time in a sector is trivially their own personal best, so in
+// any short replay window almost every cell tied its own record and rendered
+// green — measured on the running board at 54 of 60 sector cells, 90%. An accent
+// applied to nine cells in ten is not an accent, it is the table's default
+// colour, and it drowned the purple session-best that is supposed to be the
+// rarest, loudest mark on the tower. Requiring a second time means green says
+// "improved on a time you had already set here", which is what a pit wall reads
+// it as, and gives the table a resting state to stand out from.
+export const PB_MIN_SAMPLES = 2;
+
+// foldSector folds one frame's sector value into a driver's running state.
+// The wire re-broadcasts the same sector time at 10 Hz between completions
+// (ADR-0002), so a *frame* is not a sample — a value that CHANGED is. Without
+// that guard the threshold below would clear itself in 100 ms and mean nothing.
+function foldSector(prev: SectorPb, v: number | undefined): SectorPb {
+  if (!v || v <= 0 || v === prev.last) return prev;
+  return { best: Math.min(prev.best, v), last: v, samples: prev.samples + 1 };
+}
+
+// updatePersonalBests folds this frame's sectors into the running per-driver
+// state. Pure: returns a new map.
 export function updatePersonalBests(prev: Bests, cars: Car[]): Bests {
   const next: Bests = { ...prev };
   for (const c of cars) {
-    const cur = next[c.driverNum] ?? [Infinity, Infinity, Infinity];
-    next[c.driverNum] = [faster(cur[0], c.s1Ms), faster(cur[1], c.s2Ms), faster(cur[2], c.s3Ms)];
+    const cur = next[c.driverNum] ?? NO_PBS;
+    next[c.driverNum] = [
+      foldSector(cur[0], c.s1Ms), foldSector(cur[1], c.s2Ms), foldSector(cur[2], c.s3Ms),
+    ];
   }
   return next;
+}
+
+// personalBestOf is the single gate every sector readout goes through: the
+// stored best, or Infinity while this driver has fewer than PB_MIN_SAMPLES times
+// in that sector. Infinity is already exactly what "no personal best yet" means
+// to sectorColour, sectorMark and sectorDelta, so the threshold lands without
+// changing any of those three — they stay pure functions of the numbers given.
+export function personalBestOf(pb: Bests, driverNum: number, sector: number): number {
+  const s = pb[driverNum]?.[sector];
+  return s && s.samples >= PB_MIN_SAMPLES ? s.best : Infinity;
 }
 
 // Tokens, not hexes, so a palette change reaches the sector cells too.

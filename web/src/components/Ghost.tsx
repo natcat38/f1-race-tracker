@@ -4,7 +4,7 @@ import { emptyState, type RaceState } from '../state/race';
 import { teamColour } from './teamColours';
 import { commonDrivers, deltaSeries, indexAtTime, ghostSkeletonCopy } from '../state/ghost';
 import { fmtElapsed } from './timingHelpers';
-import { SIZE } from './geometry';
+import { SIZE, fitViewBox, trackPathD } from './geometry';
 import { Panel } from './Panel';
 import { TrackPath } from './TrackPath';
 import { useReducedMotion } from '../hooks/useReducedMotion';
@@ -124,10 +124,8 @@ function GhostLive({ initialSelected }: { initialSelected?: number | null }) {
   // from "still waiting on a snapshot" — both would otherwise show the same
   // "Loading reference laps…" copy forever in the no-overlap case.
   const lanesLoaded = thisYear.rev > 0 && lastYear.rev > 0;
-  const trackPath = useMemo(
-    () => (track.length ? 'M ' + track.map((p) => `${p.x * SIZE},${p.y * SIZE}`).join(' L ') + ' Z' : ''),
-    [track],
-  );
+  const trackPath = useMemo(() => trackPathD(track), [track]);
+  const viewBox = useMemo(() => fitViewBox(track), [track]);
 
   const idxThis = ready ? indexAtTime(traceThis!, tMs) : 0;
   const idxLast = ready ? indexAtTime(traceLast!, tMs) : 0;
@@ -167,7 +165,7 @@ function GhostLive({ initialSelected }: { initialSelected?: number | null }) {
             {ghostSkeletonCopy(lanesLoaded, drivers.length, statusThis, statusLast)}
           </div>
         ) : (
-          <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="track-svg" role="img" aria-label="Ghost overlay track map">
+          <svg viewBox={viewBox} className="track-svg ghost-track" role="img" aria-label="Ghost overlay track map">
             <TrackPath d={trackPath} />
             {/* Ghost (last year). A flat 0.4 opacity over a dark map measured
                 1.59:1 — well under the 3:1 a graphic that carries meaning needs,
@@ -189,7 +187,10 @@ function GhostLive({ initialSelected }: { initialSelected?: number | null }) {
       {ready && (
         <Panel label="Delta bar">
           {/* red above the midline = this year slower, green below = faster */}
-          <svg viewBox={`0 0 ${SIZE} ${BAR_H}`} className="track-svg" role="img" aria-label="Lap time delta around the circuit">
+          {/* Its own class, not .track-svg: the delta bar is a wide short strip
+              with a fixed 600×90 box, and .track-svg is now sized from its
+              height so a portrait circuit can't grow taller than the panel. */}
+          <svg viewBox={`0 0 ${SIZE} ${BAR_H}`} className="delta-svg" role="img" aria-label="Lap time delta around the circuit">
             <line x1={0} y1={BAR_H / 2} x2={SIZE} y2={BAR_H / 2} stroke="var(--ghost-rule)" strokeWidth={1} />
             {delta.map((d, i) => {
               const h = (Math.abs(d) / maxAbs) * (BAR_H / 2);
@@ -220,8 +221,10 @@ function GhostLive({ initialSelected }: { initialSelected?: number | null }) {
               return <option key={n} value={n}>{c?.code ?? n}</option>;
             })}
           </select>
+          {/* The headline number of the whole route, so it gets the display rung
+              rather than sitting at control size beside the scrubber. */}
           {ready && (
-            <span style={{ fontSize: 'var(--fs-xl)', color: dNow > 0 ? 'var(--bad)' : 'var(--good)' }}>
+            <span style={{ fontSize: 'var(--fs-2xl)', fontWeight: 700, color: dNow > 0 ? 'var(--bad)' : 'var(--good)' }}>
               {dNow > 0 ? '+' : ''}{dNow.toFixed(2)}s
             </span>
           )}

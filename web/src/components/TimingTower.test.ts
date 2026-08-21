@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   fmtLap, fmtGap, fmtClock, fmtElapsed, gapLabel, intLabel, bestSectors, orderCars,
   updatePersonalBests, sectorColour, sectorDelta, updateLapHistory, tyreLabel, statusLabel,
-  sectorDeltaVs, fmtSigned, updateGapHistory, leaderLapOf, sameRunningOrder,
+  sectorDeltaVs, fmtSigned, updateGapHistory, leaderLapOf, leaderOf, sameRunningOrder,
+  personalBestOf, sectorMark,
 } from './timingHelpers';
 import { car } from '../state/testCar';
 
@@ -128,6 +129,19 @@ describe('leaderLapOf', () => {
   });
 });
 
+describe('leaderOf', () => {
+  it('agrees with orderCars[0] — the car the board auto-selects on first paint', () => {
+    const cars = {
+      22: car({ driverNum: 22, code: 'TSU', pos: 19, lap: 7 }),
+      27: car({ driverNum: 27, code: 'HUL', pos: 19, lap: 12 }),
+      1: car({ driverNum: 1, code: 'VER', pos: 3, lap: 11 }),
+    };
+    expect(leaderOf(cars)?.driverNum).toBe(orderCars(cars)[0].driverNum);
+    expect(leaderOf(cars)?.code).toBe('VER');
+    expect(leaderOf({})).toBeUndefined();
+  });
+});
+
 describe('sameRunningOrder', () => {
   const a = { 1: car({ driverNum: 1, pos: 1, lap: 10 }), 16: car({ driverNum: 16, pos: 2, lap: 10 }) };
 
@@ -160,7 +174,44 @@ describe('updatePersonalBests', () => {
   it('accumulates the per-driver min across frames, ignoring zeros', () => {
     let b = updatePersonalBests({}, [car({ driverNum: 1, s1Ms: 26100, s2Ms: 0, s3Ms: 27000 })]);
     b = updatePersonalBests(b, [car({ driverNum: 1, s1Ms: 25900, s2Ms: 28000, s3Ms: 27500 })]);
-    expect(b[1]).toEqual([25900, 28000, 27000]); // s1 improved, s2 first real value, s3 kept faster
+    // s1 improved, s2 first real value, s3 kept the faster of the two
+    expect(b[1].map((s) => s.best)).toEqual([25900, 28000, 27000]);
+  });
+
+  it('counts a changed sector time as a sample, not a frame', () => {
+    // The wire re-broadcasts the same sector at 10 Hz between completions; if
+    // frames counted, the PB threshold would clear itself in 100ms.
+    let b = updatePersonalBests({}, [car({ driverNum: 1, s1Ms: 26100 })]);
+    for (let i = 0; i < 20; i++) b = updatePersonalBests(b, [car({ driverNum: 1, s1Ms: 26100 })]);
+    expect(b[1][0].samples).toBe(1);
+    b = updatePersonalBests(b, [car({ driverNum: 1, s1Ms: 25900 })]);
+    expect(b[1][0].samples).toBe(2);
+  });
+});
+
+describe('personalBestOf', () => {
+  it('withholds the personal best until the driver has two times in that sector', () => {
+    // The whole point of the threshold: a first observation cannot tie a record
+    // it just invented, so it renders neutral rather than green.
+    const one = updatePersonalBests({}, [car({ driverNum: 1, s1Ms: 26100 })]);
+    expect(personalBestOf(one, 1, 0)).toBe(Infinity);
+    expect(sectorColour(26100, 25000, personalBestOf(one, 1, 0))).toBeUndefined();
+    expect(sectorMark(26100, 25000, personalBestOf(one, 1, 0))).toBeUndefined();
+
+    const two = updatePersonalBests(one, [car({ driverNum: 1, s1Ms: 25900 })]);
+    expect(personalBestOf(two, 1, 0)).toBe(25900);
+    expect(sectorColour(25900, 25000, personalBestOf(two, 1, 0))).toBe('var(--good)');
+    expect(sectorMark(25900, 25000, personalBestOf(two, 1, 0))).toBe('P');
+  });
+
+  it('never withholds the session best — purple outranks the threshold', () => {
+    const one = updatePersonalBests({}, [car({ driverNum: 1, s1Ms: 25000 })]);
+    expect(sectorColour(25000, 25000, personalBestOf(one, 1, 0))).toBe('var(--best-session)');
+    expect(sectorMark(25000, 25000, personalBestOf(one, 1, 0))).toBe('S');
+  });
+
+  it('Infinity for a driver or sector with nothing recorded', () => {
+    expect(personalBestOf({}, 99, 0)).toBe(Infinity);
   });
 });
 
