@@ -112,7 +112,10 @@ lanes** — no new data type.
 ## Gap
 
 A car's time behind the race **leader**. Best-effort — derived when a clip is recorded
-(the source has no per-tick gap), so the UI marks it approximate.
+(the source has no per-tick gap): arc-length progress along the circuit centreline,
+converted to time through the leader's own distance-time curve. Good to about a tenth
+of a second (measured — see ingest/README.md), so the UI marks it approximate and
+prints one decimal.
 
 - _Use_ "gap"; not "delta" or "distance".
 
@@ -125,7 +128,9 @@ derivation as **Gap**.
 
 ## Lap deficit
 
-How many whole laps a car trails the **leader**. A car a lap or more down ("lapped")
+How many whole laps a car trails the **leader** — floored from the metres between
+them, never from a lap-NUMBER difference (which reads 1 for the whole field between
+the leader's line crossing and each car's own). A car a lap or more down ("lapped")
 is shown as "+1 LAP", not a time. The time gap and the lap deficit are carried
 separately so the UI never has to guess which to show.
 

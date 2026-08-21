@@ -103,6 +103,56 @@ If this list ever drifts again, the windows are recoverable from the clips thems
 and `--end-lap` is the leader's lap in the final frame. Read only the first and last
 lines of a clip (each is ~24 MB) and look at the `pos: 1` car's `lap` field.
 
+## How gaps are estimated
+
+FastF1 carries no per-tick gap, so `gapMs` / `intMs` / `gapLaps` are derived at bake
+time (`ingest/geometry.py` holds the pure geometry, `record.py` wires it up):
+
+1. One clean leader lap is resampled into a **centreline of 2000 nodes evenly spaced
+   in arc length** (~2.9 m apart at Monza). Even spacing is the point — the 150-point
+   display outline is a `linspace` over sample *indices*, and samples are uniform in
+   time, so its segments span 9.9 m to 83.5 m depending on how fast the car was going
+   there.
+2. Every car's position is **projected onto the centreline segment** it is actually
+   on, giving a continuous race distance in metres rather than a node index.
+3. `gapMs` answers "how long ago was the leader here?", so the **leader's own
+   distance-time curve is inverted** at the following car's distance. No lap-time
+   constant is involved, and a slow corner is priced as a slow corner because the
+   leader took that long there too. `intMs` is the same inversion against the car
+   ahead's curve; `gapLaps` is metres-behind floored over the lap length.
+
+Cars in the pit lane are frozen (the pit lane is not on the centreline) and emit no
+gap or interval — the tower shows `IN PIT` from `status` instead. Nothing is emitted
+until both cars have a completed reference lap, or before the leader's curve reaches
+back far enough at the start of a window.
+
+**Resolution: about a tenth of a second.** `ingest/check_gap_estimator.py` measures
+this against official line-crossing times (`session.laps.LapStartTime` — real timing
+loops), at every in-window crossing of every driver on all three clips:
+
+| clip | `gapMs` median \|err\| | `gapMs` p95 | `intMs` median \|err\| | `intMs` p95 |
+|---|---|---|---|---|
+| monza-2024 (n=82 / 40) | **31 ms** | 91 ms | **46 ms** | 98 ms |
+| monza-2023 (n=81 / 34) | **38 ms** | 110 ms | **18 ms** | 97 ms |
+| silverstone-2024 (n=52 / 24) | **32 ms** | 94 ms | **28 ms** | 111 ms |
+
+Bias is within ±25 ms on every clip. For comparison, the previous outline-index
+estimator measured a `gapMs` median |error| of 620 / 330 / 11241 ms on the same
+three windows. Run the check with:
+
+```bash
+.venv/Scripts/python ingest/check_gap_estimator.py
+```
+
+It needs the local FastF1 `cache/` and the baked clips; under pytest it skips when
+either is missing (CI has neither — the pure geometry is covered by
+`ingest/test_geometry.py`, which CI does run).
+
+One thing the estimator cannot fix: `pos` comes from FastF1's lap-level `Position`,
+which only updates at the line, so through a pit phase the classified order lags the
+road order and a car that has really passed another is still listed behind it. The
+frontend's `displayGaps()` clamp exists for that and stays load-bearing.
+
 ## Clip contract
 
 The output is JSONL (one JSON object per line):

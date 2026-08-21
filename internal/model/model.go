@@ -32,9 +32,13 @@ type CarState struct {
 	S1Ms      int       `json:"s1Ms,omitempty"`
 	S2Ms      int       `json:"s2Ms,omitempty"`
 	S3Ms      int       `json:"s3Ms,omitempty"`
-	GapMs     int       `json:"gapMs,omitempty"`   // to leader; best-effort, derived at record time
+	// Gap/interval/lap-deficit are official on the live lane (straight off the timing
+	// feed) and derived on replay: arc-length progress along the circuit centreline,
+	// priced through the leader's own distance-time curve, good to ~0.1s. See
+	// ingest/geometry.py and ingest/README.md's "How gaps are estimated".
+	GapMs     int       `json:"gapMs,omitempty"`   // to leader
 	GapLaps   int       `json:"gapLaps,omitempty"` // whole laps behind leader; FE shows "+1 LAP" when >= 1
-	IntMs     int       `json:"intMs,omitempty"`   // interval to car ahead; best-effort
+	IntMs     int       `json:"intMs,omitempty"`   // interval to car ahead
 	Speed     int       `json:"speed,omitempty"`
 	Gear      int       `json:"gear,omitempty"`
 	Throttle  int       `json:"throttle,omitempty"` // 0-100
