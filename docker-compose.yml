@@ -52,5 +52,7 @@ services:
       ROLE: gateway
       REDIS_URL: redis://redis:6379
       SESSION_KEY: replay       # initial source the gateway fans out
-    ports: ["8080:8080"]
+    # Loopback only: every auth control (origin allowlist, Sec-Fetch-Site guard)
+    # assumes a single local operator, so don't publish LAN-wide.
+    ports: ["127.0.0.1:8080:8080"]
     depends_on: [redis, replay, live]
