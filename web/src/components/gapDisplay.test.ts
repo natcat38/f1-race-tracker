@@ -19,7 +19,7 @@ describe('gap formatting at the estimate’s real resolution', () => {
 
   it('renders absent and zero gaps as an em-dash, like the exact formatters do', () => {
     expect(fmtGapEstimate(undefined)).toBe('—');
-    expect(fmtGapEstimate(0)).toBe('—');
+    expect(fmtGapEstimate(0)).toBe('+0.0');
   });
 
   it('renders a lapped car’s deficit as minutes, not raw seconds', () => {

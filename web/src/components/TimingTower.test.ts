@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  fmtLap, fmtGap, fmtClock, fmtElapsed, gapLabel, intLabel, bestSectors, orderCars,
+  fmtLap, fmtGap, fmtClock, fmtElapsed, gapLabel, intLabel, lapsDown, bestSectors, orderCars,
   updatePersonalBests, sectorColour, sectorDelta, updateLapHistory, tyreLabel, statusLabel,
   sectorDeltaVs, fmtSigned, updateGapHistory, leaderLapOf, leaderOf, sameRunningOrder,
   personalBestOf, sectorMark,
@@ -74,6 +74,26 @@ describe('intLabel (pit-wall)', () => {
   });
   it('suppresses the interval until the car ahead has completed a lap', () => {
     expect(intLabel(1, 1, 800, false, false, 90000, undefined)).toBe('—');
+  });
+});
+
+describe('lapsDown', () => {
+  it('ignores the lap-number transient when the car is only seconds behind', () => {
+    // Leader just crossed the line (lap 17), P2 still on lap 16, 3.4s back.
+    expect(lapsDown(1, 3400, 85000)).toBe(0);
+  });
+  it('keeps a genuine lap down', () => {
+    expect(lapsDown(1, 86000, 85000)).toBe(1);
+    expect(lapsDown(1, 78000, 85000)).toBe(1); // within the 0.1-lap tolerance
+    expect(lapsDown(10, 850000, 85000)).toBe(10);
+  });
+  it('never exceeds the wire value', () => {
+    expect(lapsDown(1, 200000, 85000)).toBe(1);
+  });
+  it('trusts the wire without a reference lap or a gap', () => {
+    expect(lapsDown(2, 5000, undefined)).toBe(2);
+    expect(lapsDown(2, undefined, 85000)).toBe(2);
+    expect(lapsDown(0, 5000, 85000)).toBe(0);
   });
 });
 

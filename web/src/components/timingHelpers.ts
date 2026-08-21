@@ -47,7 +47,8 @@ export const GAP_RESOLUTION_MS = 566;
 // has: +7.4, not +7.364. Use fmtGap for exact deltas.
 export function fmtGapEstimate(ms: number | undefined): string {
   if (ms === undefined || ms < 0) return '—';
-  if (ms === 0) return '—';
+  // A zero interval is a real reading (two cars at the same estimated gap),
+  // not a missing one — show it as +0.0, keep the dash for "unknown".
   return `+${(ms / 1000).toFixed(1)}`;
 }
 
@@ -72,6 +73,21 @@ export function fmtClock(ms: number): string {
 }
 
 const laps = (n: number) => `+${n} LAP${n > 1 ? 'S' : ''}`;
+
+// lapsDown reconciles the wire's gapLaps against the distance-derived gapMs.
+// Clips baked before record.py's fix carry gapLaps as a lap-NUMBER difference,
+// which reads 1 for every car between the leader crossing the line and its own
+// crossing — so P2..P20 flashed "+1 LAP" for a few seconds every lap. A car is
+// only a lap down if it is also at least ~a lap of time behind; refLapMs is the
+// leader's last lap. Without a reference lap the wire value stands.
+export function lapsDown(
+  gapLaps: number | undefined, gapMs: number | undefined, refLapMs: number | undefined,
+): number {
+  const n = gapLaps ?? 0;
+  if (n < 1) return 0;
+  if (!refLapMs || gapMs === undefined) return n;
+  return Math.min(n, Math.floor(gapMs / refLapMs + 0.1));
+}
 
 // gapLabel renders the pit-wall gap to leader: LEADER for P1; "+N LAP(S)" when
 // lapped (unless secondsMode forces raw time); else the time gap. Suppressed

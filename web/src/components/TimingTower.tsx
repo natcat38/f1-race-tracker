@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RaceState } from '../state/race';
 import {
-  fmtLap, fmtSec, fmtGap, gapLabel, intLabel,
+  fmtLap, fmtSec, fmtGap, gapLabel, intLabel, lapsDown,
   orderCars, bestSectors, updatePersonalBests, personalBestOf, sectorColour, sectorDelta,
   TYRE_COLOUR, tyreLabel, statusLabel, sectorDeltaVs, fmtSigned, sectorMark,
   updateGapSmoothing, displayGaps, hasNoData, holdOrder,
@@ -288,8 +288,8 @@ export function TimingTower({
                   {/* g.gapMs / g.intMs, not the raw wire values: smoothed over a
                       half-second window and reconciled with the running order,
                       then printed at the estimator's real resolution. */}
-                  <td role="cell" data-label="Gap" title={GAP_TITLE}>{gapLabel(g.gapMs, c.gapLaps, isLeader, secondsMode, c.lastLapMs)}</td>
-                  <td role="cell" data-label="Int" title={GAP_TITLE}>{intLabel(c.gapLaps, ahead?.gapLaps, g.intMs, isLeader, secondsMode, c.lastLapMs, ahead?.lastLapMs)}</td>
+                  <td role="cell" data-label="Gap" title={GAP_TITLE}>{gapLabel(g.gapMs, lapsDown(c.gapLaps, c.gapMs, order[0]?.lastLapMs), isLeader, secondsMode, c.lastLapMs)}</td>
+                  <td role="cell" data-label="Int" title={GAP_TITLE}>{intLabel(lapsDown(c.gapLaps, c.gapMs, order[0]?.lastLapMs), ahead ? lapsDown(ahead.gapLaps, ahead.gapMs, order[0]?.lastLapMs) : undefined, g.intMs, isLeader, secondsMode, c.lastLapMs, ahead?.lastLapMs)}</td>
                 </>
               )}
               <td role="cell" data-label="Last">{fmtLap(c.lastLapMs)}</td>

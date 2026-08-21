@@ -1,5 +1,5 @@
 import type { RaceState } from '../state/race';
-import { fmtLap, gapLabel, orderCars, TYRE_COLOUR, tyreLabel } from './timingHelpers';
+import { fmtLap, gapLabel, lapsDown, orderCars, TYRE_COLOUR, tyreLabel } from './timingHelpers';
 
 // Standings is the #compare view's per-lane readout: an uncomputed, raw-field
 // list (tyre/last lap/gap) — CONTEXT.md draws a deliberate line between compare
@@ -24,7 +24,7 @@ export function Standings({ state }: { state: RaceState }) {
             {/* Leader is the front of orderCars' running order, not a literal
                 pos===1 match (#66) — same test TimingTower uses, so a frame with
                 no exact pos:1 still labels someone LEADER instead of nobody. */}
-            {gapLabel(c.gapMs, c.gapLaps, idx === 0, false, c.lastLapMs)}
+            {gapLabel(c.gapMs, lapsDown(c.gapLaps, c.gapMs, order[0]?.lastLapMs), idx === 0, false, c.lastLapMs)}
           </span>
         </li>
       ))}

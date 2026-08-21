@@ -976,7 +976,11 @@ select.btn {
 
   .tt-row {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    /* Six tracks, spanned below: four equal columns clipped "LAST 1:25.341"
+       and "BEST 1:24.077" mid-digit at 375px — a label plus a seven-digit
+       time needs ~95px and a quarter of the card is ~80px. Gap/Int/Tyre and
+       the sectors take two tracks each, Last/Best three. */
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: var(--sp-1) var(--sp-2);
     align-items: baseline;
     padding: var(--sp-2) var(--sp-2) var(--sp-3);
@@ -1027,9 +1031,36 @@ select.btn {
     font-size: var(--fs-lg);
   }
 
-  /* The sector cells are the widest of the eight and the least helped by a
-     shared row, so they get the full width between them. */
+  /* Row two: Gap | Int | Tyre. Row three: Last | Best. Row four: S1 | S2 | S3.
+     Tyre is DOM cell 7 (after Last/Best) — `order` moves it up visually without
+     touching the DOM, so reading order and the table semantics stay as they are. */
+  .tt-table td:nth-child(3),
+  .tt-table td:nth-child(4),
+  .tt-table td:nth-child(7),
   .tt-table td:nth-child(n + 8) {
+    grid-column: span 2;
+  }
+
+  .tt-table td:nth-child(5),
+  .tt-table td:nth-child(6) {
+    grid-column: span 3;
+    order: 3;
+  }
+
+  .tt-table td:nth-child(3),
+  .tt-table td:nth-child(4) {
+    order: 1;
+  }
+
+  .tt-table td:nth-child(7) {
+    order: 2;
+  }
+
+  /* A sector value plus its delta can outgrow a third of the card; wrap the
+     delta under it rather than clip it. */
+  .tt-table td:nth-child(n + 8) {
+    order: 4;
+    flex-wrap: wrap;
     font-variant-numeric: tabular-nums;
   }
 
