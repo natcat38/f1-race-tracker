@@ -8,15 +8,17 @@ import {
 } from './timingHelpers';
 import { car } from '../state/testCar';
 
-// The Gap column was the one thing a cold reader checks for correctness, and it
-// failed on both counts: it printed three decimals for a quantity the estimator
-// knows to about half a second, and it could show P4 closer to the leader than
-// P3. Both are display problems — the wire is unchanged by any of this.
+// The Gap column is the one thing a cold reader checks for correctness. It used to
+// fail on two counts: it printed three decimals for a quantity known to about half
+// a second, and it could show P4 closer to the leader than P3. The estimate is now
+// good to about a tenth and is mutually consistent by construction, but the
+// classified order still lags it through a pit phase — so the clamp stays. Both are
+// display concerns; the wire is unchanged by any of this.
 
 describe('gap formatting at the estimate’s real resolution', () => {
   it('renders a derived gap to one decimal, not three', () => {
     expect(fmtGapEstimate(7364)).toBe('+7.4');
-    expect(fmtGapEstimate(566)).toBe('+0.6');
+    expect(fmtGapEstimate(1250)).toBe('+1.3');
   });
 
   it('renders absent and zero gaps as an em-dash, like the exact formatters do', () => {
@@ -71,9 +73,9 @@ describe('settle', () => {
   });
 
   it('holds the printed value while the median only wobbles', () => {
-    // A stationary gap wanders across ~two resolution steps on the running
-    // board, which repainted the column several times a second.
-    expect(settle([3965, 3965, 3399], 3399)).toBe(3399);
+    // Position noise moves a stationary gap by a few tens of ms per frame, which
+    // repainted the column's last digit several times a second.
+    expect(settle([3450, 3450, 3399], 3399)).toBe(3399);
   });
 
   it('follows the median once it has really moved', () => {

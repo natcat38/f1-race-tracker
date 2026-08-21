@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RaceState } from '../state/race';
 import {
-  fmtLap, fmtSec, fmtGap, gapLabel, intLabel, lapsDown,
+  fmtLap, fmtSec, fmtGap, gapLabel, intLabel,
   orderCars, bestSectors, updatePersonalBests, personalBestOf, sectorColour, sectorDelta,
   TYRE_COLOUR, tyreLabel, statusLabel, sectorDeltaVs, fmtSigned, sectorMark,
   updateGapSmoothing, displayGaps, hasNoData, holdOrder,
@@ -17,8 +17,9 @@ import { teamColour } from './teamColours';
 const COLUMNS = ['#', 'Driver', 'Gap', 'Int', 'Last', 'Best', 'Tyre', 'S1', 'S2', 'S3'] as const;
 
 // One sentence, on both estimated columns, saying what they are and how good
-// they are. "best-effort, derived" said the first half only.
-const GAP_TITLE = 'Estimated from track position, to about ±0.5s — not official timing';
+// they are. "best-effort, derived" said the first half only. The tenth is measured,
+// not claimed: see ingest/README.md's validation against official crossing times.
+const GAP_TITLE = 'Estimated from track position and the leader’s own pace, to about a tenth of a second — not official timing';
 
 export function TimingTower({
   state, selected, onSelect,
@@ -291,8 +292,8 @@ export function TimingTower({
                   {/* g.gapMs / g.intMs, not the raw wire values: smoothed over a
                       half-second window and reconciled with the running order,
                       then printed at the estimator's real resolution. */}
-                  <td role="cell" data-label="Gap" title={GAP_TITLE}>{gapLabel(g.gapMs, lapsDown(c.gapLaps, c.gapMs, order[0]?.lastLapMs), isLeader, secondsMode, c.lastLapMs)}</td>
-                  <td role="cell" data-label="Int" title={GAP_TITLE}>{intLabel(lapsDown(c.gapLaps, c.gapMs, order[0]?.lastLapMs), ahead ? lapsDown(ahead.gapLaps, ahead.gapMs, order[0]?.lastLapMs) : undefined, g.intMs, isLeader, secondsMode, c.lastLapMs, ahead?.lastLapMs)}</td>
+                  <td role="cell" data-label="Gap" title={GAP_TITLE}>{gapLabel(g.gapMs, c.gapLaps, isLeader, secondsMode, c.lastLapMs)}</td>
+                  <td role="cell" data-label="Int" title={GAP_TITLE}>{intLabel(c.gapLaps, ahead?.gapLaps, g.intMs, isLeader, secondsMode, c.lastLapMs, ahead?.lastLapMs)}</td>
                 </>
               )}
               <td role="cell" data-label="Last">{fmtLap(c.lastLapMs)}</td>

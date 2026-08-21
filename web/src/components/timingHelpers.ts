@@ -37,17 +37,15 @@ export function fmtGap(ms: number | undefined): string {
   return `+${(ms / 1000).toFixed(3)}`;
 }
 
-// GAP_RESOLUTION_MS is the honest resolution of the gap/interval estimator. The
-// gateway derives both from track position rather than from timing loops, and the
-// observed values come out quantised to ~0.566 s (one resampled step at the
-// recorder's cadence) — every reading on a Monza frame is an integer multiple of
-// it. Printing +3.399 for a quantity known to about half a second advertises
-// precision that does not exist, so the estimates render to one decimal while the
-// exact numbers on the same row (Last, Best, the sector times) keep all three.
-export const GAP_RESOLUTION_MS = 566;
-
 // fmtGapEstimate renders a DERIVED gap/interval at the resolution it actually
 // has: +7.4, not +7.364. Use fmtGap for exact deltas.
+//
+// The recorder measures each car's progress in metres along the circuit and prices
+// those metres through the leader's own distance-time curve; measured against
+// official line-crossing times on the three committed clips, that lands within a
+// median 31-38 ms and a p95 of ~0.1 s (ingest/README.md). One decimal is therefore
+// the last digit the number can defend — the three the exact columns print would be
+// invented precision.
 export function fmtGapEstimate(ms: number | undefined): string {
   if (ms === undefined || ms < 0) return '—';
   // A zero interval is a real reading (two cars at the same estimated gap),
@@ -76,21 +74,6 @@ export function fmtClock(ms: number): string {
 }
 
 const laps = (n: number) => `+${n} LAP${n > 1 ? 'S' : ''}`;
-
-// lapsDown reconciles the wire's gapLaps against the distance-derived gapMs.
-// Clips baked before record.py's fix carry gapLaps as a lap-NUMBER difference,
-// which reads 1 for every car between the leader crossing the line and its own
-// crossing — so P2..P20 flashed "+1 LAP" for a few seconds every lap. A car is
-// only a lap down if it is also at least ~a lap of time behind; refLapMs is the
-// leader's last lap. Without a reference lap the wire value stands.
-export function lapsDown(
-  gapLaps: number | undefined, gapMs: number | undefined, refLapMs: number | undefined,
-): number {
-  const n = gapLaps ?? 0;
-  if (n < 1) return 0;
-  if (!refLapMs || gapMs === undefined) return n;
-  return Math.min(n, Math.floor(gapMs / refLapMs + 0.1));
-}
 
 // gapLabel renders the pit-wall gap to leader: LEADER for P1; "+N LAP(S)" when
 // lapped (unless secondsMode forces raw time); else the time gap. Suppressed
@@ -381,14 +364,16 @@ export function updateLapHistory(prev: LapHistory, cars: Car[]): LapHistory {
 //
 // Two separate problems, both in the display rather than in the estimate:
 //
-// 1. JITTER. The estimator re-derives the gap from track position every frame,
-//    so a value quantised to ~0.566 s hops between adjacent steps ten times a
-//    second. The number is never wrong by more than its own resolution, but a
-//    column that repaints every 100 ms cannot be read at all.
-// 2. CONTRADICTION. Because each car's gap is estimated independently, P4's can
-//    come out smaller than P3's — a fourth-placed car closer to the leader than
-//    the third. The disclaimer covers imprecision; it does not cover impossible.
-//    Anyone who follows the sport spots it in seconds.
+// 1. JITTER. The estimator re-derives the gap from track position every frame, so
+//    position noise wobbles it by a few tens of ms ten times a second. Small, but a
+//    column whose last digit repaints every 100 ms cannot be read at all.
+// 2. CONTRADICTION. P4's gap can come out smaller than P3's — a fourth-placed car
+//    closer to the leader than the third. This is NOT an estimator defect: every
+//    car's gap is read off one shared leader curve, so the numbers are mutually
+//    consistent by construction. It is the running ORDER that lags — `pos` comes
+//    from lap-level timing that only updates at the line, so through a pit phase a
+//    car that has really passed another is still classified behind it. The
+//    disclaimer covers imprecision; it does not cover impossible.
 //
 // The fix for (1) is a median over a short window: it rejects a single hopped
 // sample outright, where a mean would smear it across the whole window, and it
@@ -412,13 +397,12 @@ export type GapSmoothing = Record<number, GapSamples>;
 export const GAP_WINDOW = 9;
 
 // How far the settled median has to move before the printed number follows it.
-// Deliberately larger than ONE resolution step (~566ms) and smaller than two:
-// measured on the running board, a stationary gap hops a single step several
-// times a second, and holding through that is the whole point — while a car that
-// has genuinely moved a second is followed within a frame. The cost is lagging a
-// real change by up to ~0.7s, which on a figure the column already disclaims as
-// an estimate is the right way round.
-export const GAP_HYSTERESIS_MS = 750;
+// Sized from the re-baked clips: frame-to-frame gap wobble is a median 20 ms and a
+// p99 of ~100 ms, so 150 ms sits just above the noise and just above the 0.1 s the
+// column actually prints. It was 750 ms when the estimate was quantised to ~566 ms
+// steps and the threshold had to straddle one; at that value it would now hide up
+// to 0.7 s of real movement, which is most of what a viewer is watching for.
+export const GAP_HYSTERESIS_MS = 150;
 
 // median of a numeric sample window. Returns undefined for an empty window.
 export function median(xs: number[]): number | undefined {
@@ -471,7 +455,8 @@ export type DisplayGap = { gapMs?: number; intMs?: number };
 // consistent set of numbers for the whole table:
 //   - each car's gap is its settled reading;
 //   - a gap is clamped up to the car in front's, so the column never contradicts
-//     the running order it sits beside;
+//     the running order it sits beside — still load-bearing on replay, because the
+//     order is what lags (see CONTRADICTION above), not the estimate;
 //   - the interval is the difference between neighbouring clamped gaps, which is
 //     non-negative by construction, falling back to the settled raw interval only
 //     when a neighbour has no gap at all.
