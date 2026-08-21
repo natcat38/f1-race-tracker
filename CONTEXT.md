@@ -41,9 +41,15 @@ and serves — it is never a writer.
 ## Event model
 
 The normalised contract — **CarState**, **Snapshot**, **Frame** — shared identically
-by Python and Go. Positions come first; the running order falls out of the same data.
+by Python and Go. Positions come first; the running order is derived from the same
+data, but not for free: a car's `pos` on the wire is a **reconciled** rank, computed
+once per **frame** by the **writer** so that every frame carries a unique, contiguous
+`1..N` order over the cars in it — no duplicates, no missing rank, no unknown
+sentinel.
 
 - _Use_ "event model" or "the contract"; the canonical definition is the Go types.
+- _Use_ "running order" for the sequence and "reconciled" for the guarantee; a raw,
+  per-driver position lookup is not the running order until it has been reconciled.
 
 ## Snapshot
 

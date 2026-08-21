@@ -2,7 +2,10 @@
 
 **Date:** 2026-08-20 · **Host:** Windows 10, Python 3.11 · **Status:** complete — source inspected and the link flow run for real with a free F1 account.
 
-Authoritative over the assumptions in `docs/superpowers/plans/2026-08-20-f1tv-beta-link-and-live-radio.md`.
+These findings are what the F1TV beta path was actually built against; the decision
+they fed is recorded in [ADR-0007](../../adr/0007-f1tv-auth-delegated-operator-link.md),
+and the operator procedure in
+[docs/runbooks/live-verification.md](../../runbooks/live-verification.md) §5.
 
 ## Versions
 

@@ -14,7 +14,7 @@
 
 ## Radio verdict
 
-**Requirement already met.** Radio/Comms is absent from both `#compare` and `#ghost` — verified by driving both routes live and confirming no Comms UI, no toggle, no history, nothing in the DOM tree. This matches the existing Phase 3 design spec (`docs/superpowers/specs/2026-06-26-phase3-team-radio-design.md`, "Out of scope: Radio in the compare view"), which already scopes radio to the main board only — ADR-0003 covers a different decision (streamed-vs-committed audio delivery) and doesn't address view placement. No change needed here; the doc reframe (see below) makes the reasoning explicit in CONTEXT.md's glossary rather than leaving it only in the design spec.
+**Requirement already met.** Radio/Comms is absent from both `#compare` and `#ghost` — verified by driving both routes live and confirming no Comms UI, no toggle, no history, nothing in the DOM tree. This matches the Phase 3 design intent — radio was scoped to the main board only, with the compare view explicitly out of scope — while ADR-0003 covers a different decision (streamed-vs-committed audio delivery) and doesn't address view placement. No change needed here; the doc reframe (see below) put the reasoning in `CONTEXT.md`'s **Comms** entry ("Shown only on the main board — the comparison views stay radio-free analytics surfaces"), which is now the durable home for it.
 
 **Usefulness on the main board: works, with rough edges.** Hands-on:
 - Selecting a car in the timing tower correctly attributes telemetry ("PIA McLaren") — clear.

@@ -12,21 +12,28 @@
 
 | # | Task | Layer | File(s) | Effort |
 |---|------|-------|---------|--------|
-| 1 | Recorder: FastF1 → normalised replay clip | Python | `ingest/record.py`, `ingest/normalise.py` | 2.5 d |
-| 2 | Normalised event + snapshot model (the contract) | Shared | `internal/model/*.go`, `ingest/model.py` | 1 d |
+| 1 | Recorder: FastF1 → normalised replay clip | Python | `ingest/record.py` | 2.5 d |
+| 2 | Normalised event + snapshot model (the contract) | Shared | `internal/model/*.go`, `ingest/live.py` | 1 d |
 | 3 | Replay player (read clip → publish to Redis) | Go | `internal/feed/replay/*` | 1 d |
 | 4 | Redis fan-out + snapshot store | Go | `internal/bus/*` | 1.5 d |
 | 5 | WebSocket hub (snapshot-on-join, backpressure) | Go | `internal/ws/*` | 2 d |
-| 6 | Gateway: serve SPA + scaffold + config + Docker | Go | `cmd/gateway`, `Dockerfile`, `docker-compose.yml` | 1.5 d |
+| 6 | Gateway: serve SPA + scaffold + config + Docker | Go | `cmd/server`, `internal/app/*`, `Dockerfile`, `docker-compose.yml` | 1.5 d |
 | 7 | **1a:** React WS client + moving dots + standings | Frontend | `web/src/realtime/*`, `web/src/components/Map.tsx` | 2.5 d |
-| 8 | **1b:** Draw track from positions + smooth animation | Frontend | `web/src/track/*`, `web/src/components/Map.tsx` | 3 d |
-| 9 | Loading / skeleton screen + connection states | Frontend | `web/src/components/*` | 0.5 d |
-| 10 | **1c:** Live feed (FastF1 live → Redis) + manual toggle | Python/Go | `ingest/live.py`, `internal/api/control.go` | 2 d |
+| 8 | **1b:** Draw track from positions + smooth animation | Frontend | `web/src/components/Map.tsx`, `TrackPath.tsx`, `web/src/hooks/useSmoothedCars.ts` | 3 d |
+| 9 | Loading / skeleton screen + connection states | Frontend | `web/src/App.tsx`, `web/src/components/StatusBadge.tsx` | 0.5 d |
+| 10 | **1c:** Live feed (FastF1 live → Redis) + manual toggle | Python/Go | `ingest/live.py`, `internal/app/gateway.go` | 2 d |
 | 11 | **1d:** Cross-year comparison (two maps, lap-aligned) | Frontend | `web/src/components/Compare.tsx` | 2.5 d |
 | 12 | Curated downsampled clips (incl. two-year pair) | Ops | `data/replays/*.jsonl` | 0.5 d |
-| 13 | Hub convergence integration test | Go | `internal/ws/hub_integration_test.go` | 0.5 d |
+| 13 | Hub convergence integration test | Go | `internal/ws/hub_test.go`, `internal/app/integration_test.go` | 0.5 d |
 | 14 | Load test + benchmark + README + demo recording | Ops | `cmd/loadtest/*`, `BENCHMARKS.md`, `README.md` | 1.5 d |
 | | **Phase 1 total** | | | **~23–25 d** |
+
+> **The task breakdown and effort estimates are the pre-build plan; the file paths are
+> not.** Paths in the table above and in the task sections that follow have been
+> corrected to where the code actually shipped, so nothing here points at a file that
+> does not exist. Where the shipped shape differs from what was planned — and why —
+> is recorded in [Built differently than planned](#built-differently-than-planned-as-built-deltas)
+> at the end of this document.
 
 > **Phases 2–5 (shipped, reused the pipeline).** Phase 2: pit-wall timing dashboard — see ADR-0002. Phase 3: team-radio audio layer — see ADR-0003. Phase 4: computed cross-year "ghost" delta — see ADR-0004. Phase 5: pit-wall completion — re-baked replay clips around real pit-stop windows, full-race stint timeline, weather, pit-lane visibility, per-rival sector deltas, gap-trend + two-car telemetry compare, honest `Live (demo)` labelling, and extended `live_signalr.py` field coverage (see [docs/runbooks/live-verification.md](runbooks/live-verification.md)). Task-level detail lives in those ADRs and the "Built differently than planned" section below, not here.
 
@@ -66,7 +73,15 @@ Referenced by all tasks. Define it once here. This section *is* the system-desig
 
 ### 2.2 The normalised model — positions first
 
-The contract is defined identically in Go and Python. Positions drive the map; the same data gives the running order for free. Telemetry fields are present but lightly used until Phase 2.
+The contract is defined identically in Go and Python. Positions drive the map; the same data gives the running order. Telemetry fields are present but lightly used until Phase 2.
+
+> **As built:** "for free" turned out to be optimistic. Each driver's raw position is a
+> separate step lookup into that driver's own timeline, so at a given instant one
+> driver's value can be stale relative to another's — duplicates, gaps, and the
+> `99` unknown sentinel all reached the wire. `pos` is now reconciled once per frame
+> before publishing (`reconcile_positions` in `ingest/resample.py`) into a unique,
+> contiguous `1..N` rank over the cars present in that frame, tie-broken exactly as the
+> frontend's `orderCars` would break it. See issue #66.
 
 ```go
 // internal/model — the contract every layer shares (Python writes the same JSON shape)
@@ -79,7 +94,7 @@ type CarState struct {
     DriverNum int     `json:"driverNum"`
     Code      string  `json:"code"`            // "VER"
     Team      string  `json:"team"`
-    Pos       int     `json:"pos"`             // running order (derived from positions)
+    Pos       int     `json:"pos"`             // running order, reconciled dense rank 1..N
     P         Point   `json:"p"`               // track-space coordinate (drives the map)
     Status    string  `json:"status"`          // "OnTrack" | "Pit" | "Out"
     Tyre      string  `json:"tyre,omitempty"`
@@ -139,7 +154,7 @@ Two independent snapshots/streams (e.g. `monza-2025-race`, `monza-2026-race`), e
 # Phase 1 — Animated Track Map + Comparison
 
 ## Task 1 — Recorder (Python / FastF1)
-**File:** `ingest/record.py`, `ingest/normalise.py` · **Effort:** 2.5 d
+**File:** `ingest/record.py` (with `ingest/resample.py`) · **Effort:** 2.5 d
 
 ### Task 1.1 — Pull a session with FastF1  `# NEW`
 Load a finished session (`fastf1.get_session(year, gp, 'R')`), enable the cache, fetch position data + timing. ⚠️ FastF1's first load of a session is slow and network-heavy — cache locally; this is an offline batch step, run a handful of times ever.
@@ -151,7 +166,7 @@ Convert FastF1 position/timing into `Frame`s matching §2.2, resampled to ~5–1
 `python -m ingest.record --year 2025 --gp monza --out data/replays/monza-2025-race.jsonl`. Document it in the README so anyone can bake more clips.
 
 ## Task 2 — Normalised event + snapshot model
-**File:** `internal/model/model.go`, `ingest/model.py` · **Effort:** 1 d
+**File:** `internal/model/model.go`, `ingest/live.py` · **Effort:** 1 d
 
 ### Task 2.1 — Define the types in Go and Python  `# NEW`
 Per §2.2, identical JSON shapes both sides. ⚠️ Field names/tags must match exactly across languages — this contract is the seam; a mismatch breaks fan-out silently.
@@ -184,7 +199,7 @@ Upgrade; **send snapshot first**, then stream frames; deregister on close. Ping/
 Per-client buffered send channel; ⚠️ if a slow client's buffer fills, **drop/coalesce** rather than blocking the broadcast — one slow consumer must never stall the hub.
 
 ## Task 6 — Gateway: serve SPA + scaffold + Docker
-**File:** `cmd/gateway/main.go`, `internal/config/*`, `Dockerfile`, `docker-compose.yml` · **Effort:** 1.5 d
+**File:** `cmd/server/main.go`, `internal/app/*`, `internal/config/*`, `Dockerfile`, `docker-compose.yml` · **Effort:** 1.5 d
 
 ### Task 6.1 — Serve the built React app (same origin)  `# NEW`
 Embed `web/dist` with `embed.FS`; serve it from the gateway mux alongside `/ws`. Same-origin → no CORS, trivial WS origin check.
@@ -202,7 +217,7 @@ Connect, apply snapshot then frames, track applied `Rev`, ignore stale (§2.6); 
 Render cars as plain markers at their `P` coordinates and a simple ordered standings list. ⚠️ No pretty track yet — this step exists to prove Python→Redis→Go→React with *position* data before any polish.
 
 ## Task 8 — 1b: Polished track + smooth animation
-**File:** `web/src/track/draw.ts`, `web/src/track/interpolate.ts`, `web/src/components/Map.tsx` · **Effort:** 3 d
+**File:** `web/src/components/Map.tsx`, `web/src/components/TrackPath.tsx`, `web/src/hooks/useSmoothedCars.ts` · **Effort:** 3 d
 
 ### Task 8.1 — Draw the circuit from the `Track` points
 Render the closed path (SVG or Canvas), team colours, start/finish marker.
@@ -211,13 +226,13 @@ Render the closed path (SVG or Canvas), team colours, start/finish marker.
 Interpolate car positions between frames (the data is downsampled, §2.3) so motion is fluid; tween on each new frame. ⚠️ Handle cars that go `Pit`/`Out` (stop animating, dim marker).
 
 ## Task 9 — Loading / skeleton + connection states
-**File:** `web/src/components/Skeleton.tsx`, `web/src/components/StatusBadge.tsx` · **Effort:** 0.5 d
+**File:** `web/src/App.tsx` (skeleton), `web/src/components/StatusBadge.tsx` · **Effort:** 0.5 d
 
 ### Task 9.1 — Cold-start skeleton  `# NEW`
 While no snapshot exists yet, show a skeleton map + `Warming up the timing feed…`; render the live/replay badge and `Reconnecting…` / `Waiting for timing data…` per Product §4.5.
 
 ## Task 10 — 1c: Live feed + manual toggle
-**File:** `ingest/live.py`, `internal/api/control.go` · **Effort:** 2 d
+**File:** `ingest/live.py`, `internal/app/gateway.go` · **Effort:** 2 d
 
 ### Task 10.1 — Python live source  `# NEW`
 FastF1 live client → normalise to the §2.2 contract → publish to Redis as the active writer. ⚠️ **Best-effort:** FastF1 live leans toward "capture during session" — verify how real-time it is early, and don't over-harden; if it glitches, the operator flips back to replay.
@@ -238,7 +253,7 @@ Open two streams (e.g. `monza-2025-race`, `monza-2026-race`), render the **same 
 2–4 min exciting segments, downsampled, a few MB each — **including a same-track two-year pair** for the comparison demo. Committed so `docker compose up` works on clone.
 
 ## Task 13 — Hub convergence integration test
-**File:** `internal/ws/hub_integration_test.go` · **Effort:** 0.5 d
+**File:** `internal/ws/hub_test.go`, `internal/app/integration_test.go` · **Effort:** 0.5 d
 
 ### Task 13.1 — Late-joiner + slow-client convergence
 Spin the hub against in-memory Redis (`miniredis`) + a fake writer. Assert: a late joiner gets the snapshot then converges; a slow client is dropped without stalling the broadcast; a frame published between subscribe and snapshot-read is not lost (§2.5). This test *is* the evidence for the system-design claims.
@@ -274,8 +289,9 @@ Architecture diagram (§2.1), GIF of the map + the two-year comparison, `docker 
 ## Built differently than planned (as-built deltas)
 
 > This section reconciles the plan above (written pre-build) with the code as it
-> actually shipped. The task table and file paths above are kept as the historical
-> plan; where reality diverged, the truth is here. The living architecture docs are
+> actually shipped. The task breakdown and effort estimates above are kept as the
+> historical plan; the file paths in it have been corrected to the shipped layout, and
+> each structural divergence is recorded below. The living architecture docs are
 > the [README](../README.md) and the [`knowledge/`](../knowledge/index.md) bundle.
 
 - **Gateway entrypoint** is `cmd/server/main.go` (the plan said `cmd/gateway/main.go`).
@@ -283,12 +299,18 @@ Architecture diagram (§2.1), GIF of the map + the two-year comparison, `docker 
 - **The source-toggle control endpoint** (`GET`/`POST /control/source`) lives in
   `internal/app/gateway.go`, not the planned `internal/api/control.go`.
 - **The Python side of the contract is inline** in `ingest/live.py` (and
-  `ingest/record.py`) — there is no separate `ingest/model.py` or `ingest/normalise.py`.
-  The Go types in `internal/model/model.go` are the canonical contract; the Python
-  writer emits the byte-identical JSON shape directly.
+  `ingest/record.py`) — there is no separate `ingest/model.py` or `ingest/normalise.py`
+  as the plan imagined. The Go types in `internal/model/model.go` are the canonical
+  contract; the Python writer emits the byte-identical JSON shape directly. The one
+  shared Python helper that did emerge is `ingest/resample.py` (grid resampling and
+  per-frame position reconciliation), used by `record.py`, `live_signalr.py`, and
+  `check_live_contract.py`.
 - **Track drawing and smoothing live in the frontend components**, not a `web/src/track/`
-  module: the circuit is drawn in `web/src/components/Map.tsx` and inter-frame motion is
-  smoothed in `web/src/hooks/useSmoothedCars.ts`.
+  module: the circuit path is `web/src/components/TrackPath.tsx`, rendered by
+  `web/src/components/Map.tsx`, and inter-frame motion is smoothed in
+  `web/src/hooks/useSmoothedCars.ts`.
+- **There is no `Skeleton.tsx`** — the cold-start skeleton and the connection-state
+  copy live in `web/src/App.tsx` alongside `web/src/components/StatusBadge.tsx`.
 - **`cmd/genclip`** (Go) is a Phase-1 synthetic-clip generator (`data/replays/synthetic.jsonl`
   only) not named in the plan's task table; the committed real-session clips (Monza
   2023/2024, Silverstone 2024) are baked by `ingest/record.py` from FastF1 data.
