@@ -19,19 +19,35 @@ const TABS = [
   { key: 'ghost', href: '#ghost', label: 'OVERLAY', sub: 'lap delta' },
 ] as const;
 
+// The visible page title, per route (accessibility L-2). The <h1> used to be
+// visually hidden on every route because the rail already carried the brand — a
+// correct heading chain that nobody could see, so a sighted reader landing on
+// #ghost had no titled thing on the page above the panel headings. Rather than
+// add a title band above a rail that is already the page's masthead, the brand
+// IS the h1 and it names the route after itself: "F1 RACE TRACKER · LAP DELTA
+// OVERLAY". One element, no new band, and the chain below it is unchanged.
+const ROUTE_TITLES = {
+  board: 'Race board',
+  compare: 'Compare',
+  ghost: 'Lap delta overlay',
+  settings: 'F1TV link',
+} as const;
+
 // StatusRail is the persistent instrument strip on every route — the
 // signature element. On the board it carries live session identity, the
 // race clock, and lane health; on Compare/Ghost (two independent lanes,
 // no single clock to show) it's a lighter shell: brand, a static note,
 // and the same view tabs.
 export function StatusRail({
-  active, state, status, staleSec, note, children,
+  active, state, status, staleSec, note, onReconnect, laneNamedElsewhere, children,
 }: {
   active: 'board' | 'compare' | 'ghost' | 'settings';
   state?: RaceState;
   status?: ConnStatus;
   staleSec?: number;
   note?: string;
+  onReconnect?: () => void;
+  laneNamedElsewhere?: boolean;
   children?: ReactNode;
 }) {
   // The race leader's current lap, out of the session's total — the recorder bakes
@@ -42,7 +58,13 @@ export function StatusRail({
 
   return (
     <div className="rail">
-      <span className="rail-brand">F1 Race Tracker</span>
+      {/* The route's <h1>. Route no longer renders one — two would break the
+          chain this comment block exists to keep straight. */}
+      <h1 className="rail-brand">
+        F1 Race Tracker
+        <span className="rail-brand-sep" aria-hidden="true">·</span>
+        <span className="rail-route">{ROUTE_TITLES[active]}</span>
+      </h1>
       {state && (
         <>
           {state.label && <span className="rail-session">{state.label}</span>}
@@ -61,7 +83,13 @@ export function StatusRail({
           {/* No live-region wrapper here any more: StatusBadge carries its own, so
               Compare's two lanes announce their transitions too and there is no
               chance of nesting two polite regions and double-announcing. */}
-          <StatusBadge status={status ?? 'connecting'} state={state} staleSec={staleSec} />
+          <StatusBadge
+            status={status ?? 'connecting'}
+            state={state}
+            staleSec={staleSec}
+            onReconnect={onReconnect}
+            laneNamedElsewhere={laneNamedElsewhere}
+          />
         </>
       )}
       {note && <span className="rail-note">{note}</span>}

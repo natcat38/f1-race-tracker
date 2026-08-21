@@ -7,6 +7,20 @@ interface Props {
   status: ConnStatus;
   state: RaceState;
   staleSec?: number;
+  // Handed down from the socket when it gives up (see MAX_RECONNECT_ATTEMPTS).
+  // Absent everywhere else, which is why the terminal chip renders its button
+  // conditionally rather than assuming one is always available.
+  onReconnect?: () => void;
+  // True on a route that already carries a Replay/Live control (the board's
+  // SourceToggle sits ~40px to the left of this chip). The healthy chip and that
+  // control said the same word with the same glyph, one a readout and one a
+  // button, so a reader could not tell which one to press (ui-ux m8). Where the
+  // control exists the chip stands down in the healthy case and keeps only the
+  // exceptional states — warming, stale, reconnecting, offline, failed — which
+  // is where a chip earns its slot. Routes with no toggle (Compare's two lanes,
+  // the static demo's board, Settings) leave this false and keep the readout,
+  // because there it is the only thing naming the lane.
+  laneNamedElsewhere?: boolean;
 }
 
 const STALE_THRESHOLD_SEC = 4;
@@ -14,7 +28,22 @@ const STALE_THRESHOLD_SEC = 4;
 const LIVE_CAVEAT =
   'Demo lane streaming a second replay clip — real live ingestion not yet verified';
 
-function Chip({ status, state, staleSec }: Props) {
+function Chip({ status, state, staleSec, onReconnect, laneNamedElsewhere }: Props) {
+  // Terminal, and the only chip in the set that carries an action: the socket
+  // has stopped dialling, so nothing will change on its own and the reader needs
+  // to be told that as well as given the way out.
+  if (status === 'offline') {
+    return (
+      <span className="chip chip-stall">
+        ⚠ Connection lost — not retrying any more
+        {onReconnect && (
+          <button type="button" className="btn chip-action" onClick={onReconnect}>
+            Reconnect
+          </button>
+        )}
+      </span>
+    );
+  }
   if (status === 'failed') {
     return <span className="chip chip-stall">⚠ Demo data failed to load — refresh the page to retry.</span>;
   }
@@ -40,6 +69,8 @@ function Chip({ status, state, staleSec }: Props) {
       </span>
     );
   }
+  // Everything below this line is the healthy case — see laneNamedElsewhere.
+  if (laneNamedElsewhere) return null;
   if (state.mode === 'live') {
     return (
       // "LIVE (DEMO)" put the qualifier in a parenthesis and the truth in a

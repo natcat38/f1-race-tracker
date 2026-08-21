@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   fmtGapEstimate, fmtLongGap, median, updateGapSmoothing, displayGaps, holdOrder,
-  hasNoData, needsDriverTag, axisTicks, GAP_WINDOW, GAP_HYSTERESIS_MS, settle,
+  hasNoData, needsDriverTag, splitWallClock, axisTicks, GAP_WINDOW, GAP_HYSTERESIS_MS, settle,
   type GapSmoothing,
 } from './timingHelpers';
 import { car } from '../state/testCar';
@@ -180,5 +180,34 @@ describe('axisTicks', () => {
   it('degenerates safely for a session with no lap count', () => {
     expect(axisTicks(1)).toEqual([1]);
     expect(axisTicks(0)).toEqual([1]);
+  });
+});
+
+describe('splitWallClock', () => {
+  it('lifts the trailing time of day FastF1 appends off the end of the prose', () => {
+    expect(splitWallClock('CAR 55 (SAI) TIME 1:25.423 DELETED - TRACK LIMITS AT TURN 2 LAP 13 15:20:51'))
+      .toEqual({
+        text: 'CAR 55 (SAI) TIME 1:25.423 DELETED - TRACK LIMITS AT TURN 2 LAP 13',
+        wallClock: '15:20:51',
+      });
+  });
+
+  it('leaves a message with no trailing stamp exactly as it arrived', () => {
+    const m = 'PIT LANE INCIDENT INVOLVING CAR 3 (RIC) NOTED';
+    expect(splitWallClock(m)).toEqual({ text: m });
+  });
+
+  it('does not eat a time that is part of what the message says', () => {
+    // The deleted lap time is the subject of the sentence, not a stamp — and
+    // 1:25.423 is not the h:mm:ss shape anyway.
+    const m = 'CAR 55 TIME 1:25.423 DELETED';
+    expect(splitWallClock(m)).toEqual({ text: m });
+    // A mid-string time of day stays put; only the anchored one is lifted.
+    expect(splitWallClock('INCIDENT AT 15:20:51 UNDER INVESTIGATION').wallClock).toBeUndefined();
+  });
+
+  it('rejects shapes that only look like a clock', () => {
+    expect(splitWallClock('LAP 13 25:99:00').wallClock).toBeUndefined();
+    expect(splitWallClock('LAP 13 15:20').wallClock).toBeUndefined();
   });
 });

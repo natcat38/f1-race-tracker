@@ -112,19 +112,41 @@
   --sp-4: 16px;
   --sp-6: 24px;
 
+  /* The house corner. 4px appeared as a raw literal at thirteen sites across two
+     file types (eight rules in components.css plus four inline styles), which
+     made "soften the corners" a find-and-replace rather than an edit. The value
+     is unchanged; only its name is new. The 2px and 1px corners on the strategy
+     bars and sparkline rects stay raw: they are graph geometry scaled to a 10px
+     bar, not chrome, and pinning them to the chrome radius would round a bar
+     into a lozenge the moment this token moved. */
+  --radius: 4px;
+
+  /* The telemetry row's label column. Three rows in TelemetryPanel repeated
+     `width: 64` verbatim (design-system 2.7); named here so the label gutter and
+     the value column can move together. */
+  --tele-label-w: 64px;
+
   /* rem, not px, so raising the browser's default font size actually scales the
      board — the accommodation a low-vision user reaches for before page zoom.
      :root deliberately sets no font-size, so 1rem stays the user's own default
      (16px unless they changed it) and the px values in the comments are just
      what each token resolves to at that default.
 
-     The bottom two rungs are retired: --fs-3xs was 9px and --fs-2xs 10px, and
-     they carried real meaning (sector-best S/P marks, sector delta superscripts,
-     the tyre legend, Race Control timestamps) at a size a lot of sighted readers
-     can't parse either. They now alias --fs-xs/--fs-sm; the names stay so the
-     intent at each call site is still legible. */
-  --fs-3xs: 0.6875rem;  /* 11px */
-  --fs-2xs: 0.75rem;    /* 12px */
+     --fs-3xs (9px) and --fs-2xs (10px) used to be the bottom two rungs, carrying
+     real meaning (sector-best S/P marks, sector delta superscripts, the tyre
+     legend, Race Control timestamps) at a size a lot of sighted readers cannot
+     parse. Agent 2 retired both by aliasing them to --fs-xs/--fs-sm, which left
+     four names for two sizes and no rule for picking between them — the report's
+     own complaint (design-system 2.10) was that the same job was already being
+     done at two different rungs. The aliases are now gone rather than
+     documented: every former --fs-3xs site reads --fs-xs and every former
+     --fs-2xs site reads --fs-sm, so the scale is six rungs and a size has one
+     name. The two jobs the aliases used to name are now carried by the two
+     surviving rungs:
+       --fs-xs — chrome that labels something else (tyre legend, sector marks,
+                 footnotes, the rival picker's label).
+       --fs-sm — supporting readouts that are read on their own (timestamps,
+                 category tags, rail labels, body-adjacent copy). */
   --fs-xs: 0.6875rem;   /* 11px */
   --fs-sm: 0.75rem;     /* 12px */
   --fs-md: 0.8125rem;   /* 13px */

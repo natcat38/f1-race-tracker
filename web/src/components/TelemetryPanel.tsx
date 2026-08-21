@@ -12,15 +12,15 @@ const MIN_SPARK_POINTS = 4;
 // at a glance.
 function Bar({ label, value, tone }: { label: string; value: number; tone: 'good' | 'bad' }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', fontSize: 'var(--fs-sm)' }}>
-      <span style={{ width: 64, color: 'var(--slate)' }}>{label}</span>
-      <div style={{ flex: 1, height: 8, background: 'var(--edge)', borderRadius: 4 }}>
+    <div className="tele-row">
+      <span className="tele-label">{label}</span>
+      <div style={{ flex: 1, height: 8, background: 'var(--edge)', borderRadius: 'var(--radius)' }}>
         <div style={{
           width: `${Math.max(0, Math.min(100, value))}%`, height: '100%',
-          background: tone === 'good' ? 'var(--good)' : 'var(--bad)', borderRadius: 4,
+          background: tone === 'good' ? 'var(--good)' : 'var(--bad)', borderRadius: 'var(--radius)',
         }} />
       </div>
-      <span style={{ width: 36, textAlign: 'right' }}>{value}</span>
+      <span className="tele-value">{value}</span>
     </div>
   );
 }
@@ -119,15 +119,15 @@ function CarTelemetry({ car, history, gapHistory, role }: {
       <Bar label="Throttle" value={car.throttle ?? 0} tone="good" />
       <Bar label="Brake" value={car.brake ?? 0} tone="bad" />
       {trend(history) && history && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', fontSize: 'var(--fs-sm)' }}>
-          <span style={{ width: 64, color: 'var(--slate)' }}>Laps</span>
+        <div className="tele-row">
+          <span className="tele-label">Laps</span>
           <Sparkline values={history} label={`${car.code} lap time trend`} />
           <span>{fmtLap(history[history.length - 1])}</span>
         </div>
       )}
       {trend(gapHistory) && gapHistory && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', fontSize: 'var(--fs-sm)' }}>
-          <span style={{ width: 64, color: 'var(--slate)' }}>Gap</span>
+        <div className="tele-row">
+          <span className="tele-label">Gap</span>
           <Sparkline values={gapHistory} label={`${car.code} gap trend`} />
           {/* The derived gap, at the derived gap's resolution — same rule as the
               tower's Gap column. */}
@@ -135,7 +135,7 @@ function CarTelemetry({ car, history, gapHistory, role }: {
         </div>
       )}
       {!trend(history) && (
-        <div className="empty" style={{ fontSize: 'var(--fs-2xs)' }}>
+        <div className="empty" style={{ fontSize: 'var(--fs-sm)' }}>
           Lap and gap trends build after {MIN_SPARK_POINTS} laps.
         </div>
       )}

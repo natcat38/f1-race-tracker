@@ -500,6 +500,24 @@ export function needsDriverTag(message: string, code: string, driverNum: number)
   return !words.includes(code.toUpperCase()) && !words.includes(String(driverNum));
 }
 
+// FastF1's race-control feed appends the circuit's time of day to some message
+// bodies — "…TRACK LIMITS AT TURN 2 LAP 13 15:20:51". Rendered raw that put a
+// bare 15:20:51 a few pixels from the row's own race clock (1:14:24), two
+// unlabelled clocks side by side reading as different values of the same thing
+// (ui-ux m14). splitWallClock lifts it out of the prose so the row can label it
+// as a time of day, or drop it, instead of leaving it mid-sentence.
+//
+// Anchored to the END of the string only: a time in the middle of a message is
+// part of what the message says (a deleted lap time, a penalty duration), and
+// the trailing stamp is the one FastF1 appends.
+const TRAILING_WALL_CLOCK = /\s+([0-2]?\d:[0-5]\d:[0-5]\d)\s*$/;
+
+export function splitWallClock(message: string): { text: string; wallClock?: string } {
+  const m = TRAILING_WALL_CLOCK.exec(message);
+  if (!m) return { text: message };
+  return { text: message.slice(0, m.index), wallClock: m[1] };
+}
+
 // axisTicks picks readable lap labels for a race of `total` laps: first, last,
 // and a round step between them. Ten-lap steps for a normal grand prix, five for
 // a sprint, so the strip never crowds.

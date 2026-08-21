@@ -2,7 +2,7 @@
  * The React app shell: mounts the root component, wires the live WebSocket or static-replay data source into race state, and lays out the dashboard panels.
  * @packageDocumentation
  */
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { connectRace, type ConnStatus } from './realtime/socket';
 import { connectStaticReplay } from './realtime/staticReplay';
 import { emptyState, type RaceState } from './state/race';
@@ -24,18 +24,24 @@ import { Ghost } from './components/Ghost';
 import { Settings } from './components/Settings';
 import { StintChart } from './components/StintChart';
 import { STATIC_DEMO } from './staticDemo';
+import { buildHash, parseHash } from './routing';
 
 // How long the clip-wrapped notice stays up. Long enough to be read after the
 // clock visibly jumps, short enough not to become part of the chrome.
 const LOOP_NOTICE_MS = 8000;
 
-// Three distinct reasons the map is missing, so the copy never contradicts what
+// Four distinct reasons the map is missing, so the copy never contradicts what
 // the rest of the board is showing: an unrecoverable static-demo load failure,
-// a session streaming fine but without a track outline, or nothing yet at all.
-function SkeletonMap({ failed, trackless }: { failed?: boolean; trackless?: boolean }) {
+// a live socket that has spent its reconnect budget, a session streaming fine
+// but without a track outline, or nothing yet at all.
+function SkeletonMap({ failed, offline, trackless }: {
+  failed?: boolean; offline?: boolean; trackless?: boolean;
+}) {
   const copy = failed
     ? 'The demo replay could not be loaded. Refresh the page to retry.'
-    : trackless
+    : offline
+      ? 'Connection lost. Use Reconnect in the status rail above to try again.'
+      : trackless
       ? 'No track outline for this session — timing still works.'
       : 'Warming up the timing feed…';
   return <div className="track-skeleton">{copy}</div>;
@@ -97,12 +103,24 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // The socket hands its retry function over with the 'offline' status (see
+  // MAX_RECONNECT_ATTEMPTS). Held in a ref and pressed through a stable callback
+  // so handing it to the rail does not re-render the board every time the status
+  // changes, and so a handle from a torn-down connection is replaced rather than
+  // captured in a stale closure.
+  const retryRef = useRef<(() => void) | null>(null);
+  const reconnect = useCallback(() => { retryRef.current?.(); }, []);
+
   useEffect(() => {
     const onState = (s: RaceState) => {
       latestRef.current = s;
       if (!frozenRef.current) setState(s);
     };
-    return (STATIC_DEMO ? connectStaticReplay : connectRace)(onState, setStatus);
+    const onStatus = (s: ConnStatus, retry?: () => void) => {
+      retryRef.current = retry ?? null;
+      setStatus(s);
+    };
+    return (STATIC_DEMO ? connectStaticReplay : connectRace)(onState, onStatus);
   }, []);
 
   useEffect(() => {
@@ -138,18 +156,64 @@ export default function App() {
   // The flag, not `selected == null`, is what makes this fire exactly once: a
   // user who clears the selection later (ui-ux M4, agent 5's) must not have the
   // leader pushed back at them on the very next frame.
+  //
+  // A `?car=` in the URL overrides the leader (accessibility M-7): someone who
+  // was sent `#board?car=VER` asked for VER, and seeding the leader first would
+  // make the board flash the wrong car before correcting itself.
+  const { route, car: carParam } = parseHash(hash);
   const [leaderSeeded, setLeaderSeeded] = useState(false);
   if (!leaderSeeded) {
     const leader = leaderOf(state.cars);
     if (leader) {
       setLeaderSeeded(true);
-      if (selected == null) setSelected(leader.driverNum);
+      const linked = carParam
+        ? Object.values(state.cars).find((c) => c.code.toUpperCase() === carParam)
+        : undefined;
+      if (linked) setSelected(linked.driverNum);
+      else if (selected == null) setSelected(leader.driverNum);
     }
   }
 
-  if (hash === '#compare') return <Compare />;
-  if (hash === '#ghost') return <Ghost initialSelected={selected} />;
-  if (hash === '#settings') return <Settings />;
+  // The URL is an input as well as an output: a hash change that names a car —
+  // pasting a shared link into the address bar of an already-open board, or Back
+  // onto one — must move the selection. The seed block above only fires on the
+  // first frame with cars, so without this a link pasted into a warm tab changed
+  // the URL and nothing else. Reads the cars off the ref rather than state so the
+  // effect is keyed on the car code alone and does not re-run at 10 Hz; a code
+  // that names nobody in this session is left alone rather than clearing the
+  // selection, since the likeliest cause is a link from a different race.
+  useEffect(() => {
+    if (!carParam) return;
+    const linked = Object.values(latestRef.current.cars)
+      .find((c) => c.code.toUpperCase() === carParam);
+    if (linked) setSelected(linked.driverNum);
+  }, [carParam]);
+
+  // Selection is deep-linkable, so it has to be written back — with
+  // replaceState, never pushState: the reference car changes on every click of a
+  // twenty-row tower, and pushing would bury the previous page under twenty Back
+  // presses. Keyed off the code rather than the state object so the effect runs
+  // when the selection changes and not at 10 Hz with every frame; and gated on
+  // the seed, so it cannot erase the `?car=` in the URL before the first frame
+  // with cars has had a chance to read it.
+  const selectedCode = selected != null ? state.cars[selected]?.code ?? null : null;
+  useEffect(() => {
+    // Board only. This effect runs on every route (the hooks above all sit
+    // before the route switch, so the socket and the selection stay alive while
+    // #ghost is on screen) and an unguarded write would quietly rewrite a
+    // #compare URL to the board's — invisibly, because replaceState fires no
+    // hashchange, so the view would stay put and only a reload would betray it.
+    if (!leaderSeeded || route !== 'board') return;
+    const next = buildHash({ route: 'board', car: selectedCode });
+    // location.hash is '' for a bare page and '#' for buildHash's empty board;
+    // compare the built forms so an unchanged URL is never rewritten.
+    if (buildHash(parseHash(location.hash)) === next) return;
+    history.replaceState(null, '', next);
+  }, [selectedCode, leaderSeeded, route, hash]);
+
+  if (route === 'compare') return <Compare />;
+  if (route === 'ghost') return <Ghost initialSelected={selected} />;
+  if (route === 'settings') return <Settings />;
 
   // A snapshot without a track outline would render an invisible map, so stand
   // in for it — but say which of the two cases it is, because "warming up" is a
@@ -169,6 +233,11 @@ export default function App() {
           // stopped" — so the staleness chip must not start claiming an outage the
           // moment a user pauses to read a row.
           staleSec={frozen ? 0 : staleSec}
+          onReconnect={reconnect}
+          // The board is the one route that carries a Replay/Live control, so
+          // the rail's healthy lane chip would only repeat it (ui-ux m8). On the
+          // static demo there is no control, and the chip stays.
+          laneNamedElsewhere={!STATIC_DEMO}
         >
           {!STATIC_DEMO && <SourceToggle state={state} />}
           {/* Label swap rather than aria-pressed, matching the overlay's existing
@@ -189,20 +258,26 @@ export default function App() {
     >
       <div className="board-top">
         <Panel label="Track">
-          {status === 'reconnecting' && !showSkeleton && (
+          {(status === 'reconnecting' || status === 'offline') && !showSkeleton && (
             <div style={{ position: 'relative', display: 'inline-block' }}>
               <Map state={state} paused={frozen} selected={selected} rival={effectiveRival} />
               <div className="chip chip-reconnect" style={{
                 position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
               }}>
-                ↺ Reconnecting…
+                {status === 'offline' ? '⚠ Connection lost' : '↺ Reconnecting…'}
               </div>
             </div>
           )}
-          {!showSkeleton && status !== 'reconnecting' && (
+          {!showSkeleton && status !== 'reconnecting' && status !== 'offline' && (
             <Map state={state} paused={frozen} selected={selected} rival={effectiveRival} />
           )}
-          {showSkeleton && <SkeletonMap failed={status === 'failed'} trackless={trackless} />}
+          {showSkeleton && (
+            <SkeletonMap
+              failed={status === 'failed'}
+              offline={status === 'offline'}
+              trackless={trackless}
+            />
+          )}
         </Panel>
         <Panel label="Timing">
           <TimingTower state={state} selected={selected} onSelect={setSelected} />

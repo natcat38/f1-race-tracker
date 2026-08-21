@@ -101,12 +101,12 @@ function StintChartInner({ state, selected, rival }: {
       {/* The tyre key lived in the Timing panel, several hundred pixels away and
           in a different container — and on touch there is no hover to recover the
           compound from. It costs one line to repeat it where the colours are. */}
-      <div className="empty tt-legend" style={{ fontSize: 'var(--fs-2xs)' }}>
+      <div className="empty tt-legend" style={{ fontSize: 'var(--fs-sm)' }}>
         {(['SOFT', 'MEDIUM', 'HARD', 'INTERMEDIATE', 'WET'] as const).map((t) => (
           <span key={t} style={{ color: TYRE_COLOUR[t] }}>{t[0]}{t.slice(1).toLowerCase()}</span>
         ))}
       </div>
-      <div className="empty" style={{ fontSize: 'var(--fs-2xs)', marginTop: 'var(--sp-0)' }}>
+      <div className="empty" style={{ fontSize: 'var(--fs-sm)', marginTop: 'var(--sp-0)' }}>
         Full-race stint plan baked from session data — the marker is where the replay currently sits.
       </div>
     </div>
