@@ -194,6 +194,30 @@ describe('TimingTower phone card layout', () => {
   });
 });
 
+describe('TimingTower gap-units control', () => {
+  test('the gap toggle is a labelled radiogroup, not a self-swapping button (M13/M14)', () => {
+    const html = renderToStaticMarkup(
+      <TimingTower state={field()} selected={null} onSelect={() => {}} />,
+    );
+    expect(html).toContain('role="radiogroup"');
+    expect(html).toContain('aria-label="Gap units for lapped cars"');
+    expect(html).toContain('class="rail-scope"');
+    expect(html).toContain('Gaps');
+    expect(html.match(/role="radio"/g)).toHaveLength(2);
+    expect(html).not.toContain('Gaps in seconds');
+  });
+
+  test('defaults to the Laps segment checked, not Seconds', () => {
+    const html = renderToStaticMarkup(
+      <TimingTower state={field()} selected={null} onSelect={() => {}} />,
+    );
+    const lapsButton = html.slice(html.lastIndexOf('<button', html.indexOf('>Laps<')));
+    const secondsButton = html.slice(html.lastIndexOf('<button', html.indexOf('>Seconds<')));
+    expect(lapsButton.split('>')[0]).toContain('aria-checked="true"');
+    expect(secondsButton.split('>')[0]).toContain('aria-checked="false"');
+  });
+});
+
 describe('TimingTower absent data', () => {
   test('a car the feed says nothing about reads NO DATA, not six em-dashes', () => {
     const state = field([{ driverNum: 10, code: 'GAS', pos: 4 }]);

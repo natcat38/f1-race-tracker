@@ -11,6 +11,12 @@ import {
 } from './timingHelpers';
 import type { Bests, GapSmoothing } from './timingHelpers';
 import { teamColour } from './teamColours';
+import { SegmentedControl } from './SegmentedControl';
+
+const GAP_UNIT_OPTIONS = [
+  { key: 'laps', label: 'Laps' },
+  { key: 'seconds', label: 'Seconds' },
+] as const;
 
 // The header row, in order. A list rather than ten literals because the phone
 // layout reads the same names back out of each cell's data-label.
@@ -177,19 +183,20 @@ export function TimingTower({
 
   return (
     <div>
-    <button
-      type="button"
-      onClick={() => setSecondsMode((m) => !m)}
-      // A stable label plus aria-pressed, rather than a label that swaps between
-      // "Show seconds" and "Show laps": with a swapping label there is no state to
-      // report non-visually, and the button reads as an action whose current
-      // setting is invisible.
-      aria-pressed={secondsMode}
-      className={secondsMode ? 'btn btn-active' : 'btn'}
-      style={{ marginBottom: 'var(--sp-2)' }}
-    >
-      Gaps in seconds
-    </button>
+    {/* "Gaps in seconds" swapped its own label between "Show seconds" and "Show
+        laps" — M13 found this was one of three different toggle idioms on one
+        screen, and M14 found the label gave no scope: nineteen of twenty rows
+        don't change, so pressing it looked like it did nothing. A labelled
+        radiogroup names what it governs up front. */}
+    <div style={{ marginBottom: 'var(--sp-2)' }}>
+      <SegmentedControl
+        scope="Gaps"
+        ariaLabel="Gap units for lapped cars"
+        options={GAP_UNIT_OPTIONS}
+        value={secondsMode ? 'seconds' : 'laps'}
+        onPick={(key) => setSecondsMode(key === 'seconds')}
+      />
+    </div>
     <div
       className="tt-scroll"
       ref={scrollRef}

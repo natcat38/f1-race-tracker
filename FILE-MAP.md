@@ -222,6 +222,7 @@ Presentational components — map, timing tower, telemetry, comms, race control,
 
 | File | Purpose |
 | --- | --- |
+| `Comms.render.test.tsx` | Render tests for the Comms panel's radio on/off control. |
 | `Comms.tsx` | The team-radio layer: a now-playing banner over a short replayable history. |
 | `Ghost.render.test.tsx` | Render tests for the overlay: both comparison scenarios, per-side team colours, and the states where there is nothing to compare. |
 | `Ghost.tsx` | The overlay route: two reference laps animated against each other on one track map, across two seasons or two drivers in the same race. |
@@ -494,4 +495,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-45 directories, 175 files listed, 0 without a declared purpose.
+45 directories, 176 files listed, 0 without a declared purpose.
