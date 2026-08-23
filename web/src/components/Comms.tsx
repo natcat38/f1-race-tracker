@@ -4,6 +4,12 @@ import type { RaceState } from '../state/race';
 import { useComms } from '../hooks/useComms';
 import { teamColour } from './teamColours';
 import { fmtClock } from './timingHelpers';
+import { SegmentedControl } from './SegmentedControl';
+
+const RADIO_OPTIONS = [
+  { key: 'off', label: 'Off' },
+  { key: 'on', label: 'On' },
+] as const;
 
 // Comms is the toggleable team-radio layer: a now-playing banner + a short
 // replayable history. Audio streams from F1's public URL (ADR-0003).
@@ -19,19 +25,19 @@ export function Comms({ state }: { state: RaceState }) {
 
   return (
     <div style={{ display: 'grid', gap: 'var(--sp-2)' }}>
-      {/* "Comms ON"/"Comms OFF" was ambiguous about whether it described the
-          current state or the action the press would take. A stable noun plus
-          aria-pressed puts the state where assistive tech reads it, and leaves
-          .btn-active to carry it visually. */}
-      <button
-        type="button"
-        onClick={toggle}
-        aria-pressed={enabled}
-        className={enabled ? 'btn btn-active' : 'btn'}
-        style={{ justifySelf: 'start' }}
-      >
-        Comms
-      </button>
+      {/* "Comms ON"/"Comms OFF" was an ad-hoc toggle with no scope word — M13
+          found three different toggle idioms on one screen. This is a pick
+          between two persistent states, so it goes through the rail's one
+          control grammar: a labelled radiogroup, same as the lane switch. */}
+      <div style={{ justifySelf: 'start' }}>
+        <SegmentedControl
+          scope="Radio"
+          ariaLabel="Team radio"
+          options={RADIO_OPTIONS}
+          value={enabled ? 'on' : 'off'}
+          onPick={(key) => { if ((key === 'on') !== enabled) toggle(); }}
+        />
+      </div>
 
       {enabled && nowPlaying && (
         <div style={{
