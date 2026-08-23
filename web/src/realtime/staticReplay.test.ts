@@ -53,6 +53,45 @@ describe('connectStaticReplay', () => {
     expect(states.at(-1)?.rev).toBe(3);
   });
 
+  test('a real-time stall resyncs the pacer instead of bursting through the rest of the clip', async () => {
+    // A five-frame clip, 100ms apart, so a burst is easy to tell from paced delivery.
+    const clip = [
+      JSON.stringify({ type: 'snapshot', data: { session: 'x', mode: 'replay', label: 'Test', cars: {}, timeMs: 0, rev: 0 } }),
+      ...[1, 2, 3, 4, 5].map((n) => JSON.stringify({
+        type: 'frame',
+        data: { rev: n, timeMs: n * 100, cars: [{ driverNum: 1, code: 'VER', team: 'Red Bull', pos: 1, p: { x: 0, y: 0 }, status: 'OnTrack' }] },
+      })),
+    ].join('\n') + '\n';
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ ok: true, text: () => Promise.resolve(clip) })));
+
+    const states: RaceState[] = [];
+    connectStaticReplay((s) => {
+      states.push(s);
+      // Simulate real processing (a slow commit, a layout thrash, a GC pause)
+      // eating 500ms of wall-clock time while still "inside" the delivery of
+      // frame 1 — the same way React work runs between one setTimeout firing
+      // and the next being scheduled. Only done once, on the first frame.
+      if (s.rev === 1) vi.setSystemTime(Date.now() + 500);
+    });
+    await vi.waitFor(() => expect(states.length).toBeGreaterThanOrEqual(2), { interval: 1 }); // snapshot + frame 1
+
+    // Frame 2 was already scheduled behind (500ms stall vs its 100ms offset),
+    // so it fires on the next tick of the clock: one frame is allowed to catch up.
+    await vi.advanceTimersByTimeAsync(10);
+    expect(states.at(-1)?.rev).toBe(2);
+
+    // But the pacer must have resynced rather than staying 500ms behind: a
+    // small further advance must NOT also deliver frame 3. The pre-fix
+    // scheduler stayed permanently behind schedule after any stall and fired
+    // every remaining frame back-to-back regardless of elapsed time.
+    await vi.advanceTimersByTimeAsync(10);
+    expect(states.at(-1)?.rev).toBe(2); // frame 3 needs its own ~100ms, not 10ms more
+
+    // Normal pacing resumes: frame 3 needs the rest of its ~100ms budget.
+    await vi.advanceTimersByTimeAsync(90);
+    expect(states.at(-1)?.rev).toBe(3);
+  });
+
   test('the returned close function stops scheduling further frames', async () => {
     const states: RaceState[] = [];
     const close = connectStaticReplay((s) => states.push(s));
