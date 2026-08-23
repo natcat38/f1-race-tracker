@@ -54,23 +54,191 @@
 }
 
 /* The <main> landmark inherits the page grid so wrapping the panels in it
-   does not change any spacing. */
+   does not change any spacing. scroll-margin-top keeps the skip link honest on
+   a phone, where a 48px sticky strip would otherwise sit on top of the first
+   thing focus lands on. */
 .route-main {
+  scroll-margin-top: 64px;
   display: grid;
   gap: var(--sp-6);
 }
 
 /* Status rail — the signature element */
 
+/* The rail is an instrument cluster of four zones — IDENTITY, INSTRUMENTS,
+   STATE, CONTROLS — and it wraps at the seams BETWEEN zones, never inside one.
+   That is the whole trick: flex-wrap on a flat list of fourteen elements is why
+   the 1440px rail used to be two rows with the lane switch on one and Freeze on
+   the other, a thousand pixels apart. Wrapping a list of four clusters can only
+   ever produce whole clusters on a line.
+
+   container-type so the collapse can be expressed against the rail's own width
+   rather than the viewport's — the rail sits inside the page's padding and, on
+   the overlay, beside narrower content. */
 .rail {
   display: flex;
-  align-items: center;
-  gap: var(--sp-4);
-  padding: var(--sp-3) var(--sp-4);
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 0;
+  padding: var(--sp-2) var(--sp-4);
   background: var(--carbon);
   border: 1px solid var(--edge);
   border-radius: var(--radius);
+}
+
+/* Two grouping wrappers that are invisible on desktop (display: contents, so
+   their children are the rail's own flex items and `order` below places them)
+   and become real boxes at the phone breakpoint, where .rail-strip is lifted
+   into a 48px sticky bar. They exist so the phone layout re-flows the SAME
+   nodes: duplicating the <nav> would give two aria-current targets and two tab
+   stops for one link. */
+.rail-block,
+.rail-strip {
+  display: contents;
+}
+
+/* A zone. The hairline is on the cluster itself rather than on an adjacent
+   sibling selector, because a zone that renders null (no session on the
+   overlay, no lane control on Settings) must not leave its seam behind — and
+   with `order` in play, DOM adjacency is not visual adjacency. IDENTITY is
+   always first and always suppresses its own edge. */
+.rail-cluster {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: var(--sp-2);
+  padding-inline: var(--sp-2);
+  border-left: 1px solid var(--edge);
+}
+
+.rail-identity {
+  order: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--sp-0);
+  padding-left: 0;
+  border-left: none;
+}
+
+.rail-instruments { order: 1; gap: 0; }
+.rail-conditions { order: 2; }
+.rail-controls { order: 4; }
+.rail-tabs { order: 5; }
+.rail-exits { order: 6; gap: var(--sp-0); }
+
+/* STATE. A reserved slot: min-width rather than a fixed width, so the stall,
+   FROZEN and CLIP-LOOPED chips arriving and leaving never reflow the rail, but
+   the eight-second loop notice — the one chip that MUST be readable in the
+   moment it appears — is never clipped either. 15ch is the measured width of
+   the widest resting chip. */
+.rail-state {
+  order: 3;
   flex-wrap: wrap;
+  gap: var(--sp-2);
+  min-width: 22ch;
+}
+
+/* Chips shrink before the rail gains a row. The transient chips are the widest
+   things that can arrive in the cluster — the eight-second loop notice is ~340px
+   — and reserving that permanently would cost more than the row it saves, while
+   reserving nothing lets a chip reflow the whole rail for eight seconds. Letting
+   the slot shrink and the chip ellipsise resolves it: the chip is whole wherever
+   there is room, clipped where there is not, and its text — and so the polite
+   announcement — is unchanged either way. Not the terminal chip: it carries the
+   Reconnect button, and a truncated way out is no way out. */
+.rail-state > *,
+.rail-state .chip {
+  min-width: 0;
+}
+
+.rail-state .chip:not(:has(.chip-action)) {
+  display: block;
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The slot is reserved, so it keeps its width even when the board is healthy
+   and every chip has stood down (ui-ux m8) — but a hairline with nothing
+   behind it is the stray seam this whole structure exists to avoid. The border
+   belongs to the chip, not to the reservation. */
+.rail-state:not(:has(.chip)) {
+  border-left: none;
+}
+
+/* An instrument: the value over the label that says what it is. Hairline-split
+   sub-cells, so the cluster reads as one gauge face rather than three numbers. */
+.rail-metric {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--sp-0);
+  padding-inline: var(--sp-2);
+}
+
+.rail-metric:first-child { padding-left: 0; }
+
+.rail-metric + .rail-metric {
+  border-left: 1px solid var(--edge);
+}
+
+.rail-metric-value {
+  display: flex;
+  align-items: baseline;
+  line-height: 1;
+}
+
+/* No new rung: --fs-xs (11px) uppercase --slate is exactly the idiom
+   .rail-tab-sub already established for "chrome that labels something else". */
+.rail-metric-label {
+  font-family: var(--display);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--slate);
+  white-space: nowrap;
+}
+
+/* The segmented control and the word that says what it governs. */
+.rail-segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.rail-scope {
+  font-family: var(--display);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--slate);
+  white-space: nowrap;
+}
+
+/* Segments abut into one control rather than floating as two buttons: the pick
+   is one object with two states, and a gap between them says "two buttons". */
+.rail-segments {
+  display: inline-flex;
+}
+
+.rail-segments .btn:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.rail-segments .btn:last-child {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  margin-left: -1px;
+}
+
+.rail-segments .btn-active {
+  position: relative;
+  z-index: 1;
 }
 
 /* This is the page's <h1>, so the UA's 2em/1.34em margins have to go — a heading
@@ -145,18 +313,22 @@
   font-size: var(--fs-sm);
 }
 
+/* The gap between the readout zones and the control zones. An element rather
+   than margin-left:auto on the first control zone, because which zone that is
+   depends on the route: the overlay has no lane control and Settings has no
+   instruments, and an auto margin on two candidates splits the space between
+   them instead of collecting it in one place. order:2 with the STATE zone puts
+   it after state and before controls on every route. */
 .rail-spacer {
-  flex: 1;
+  order: 3;
+  flex: 1 1 0;
+  min-width: 0;
+  border-left: none;
+  padding: 0;
 }
 
-/* margin-left: auto as well as the spacer, because .rail-spacer collapses when
-   the rail wraps: the nav then dropped to a LEFT-aligned second row and the
-   chrome visibly changed shape. The auto margin re-anchors it on either line. */
 .rail-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-  margin-left: auto;
+  gap: var(--sp-1);
   /* justify-content matters only once it wraps: a wrapped nav that centred its
      orphan row would read as a different component on the second line. */
   justify-content: flex-end;
@@ -167,7 +339,7 @@
   flex-direction: column;
   align-items: center;
   gap: var(--sp-0);
-  padding: var(--sp-1) var(--sp-3);
+  padding: var(--sp-1) var(--sp-2);
   border: 1px solid var(--edge);
   border-radius: var(--radius);
   text-decoration: none;
@@ -196,7 +368,7 @@
 .rail-tab-sub {
   white-space: nowrap;
   font-family: var(--data);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   font-weight: 400;
   letter-spacing: 0;
   text-transform: none;
@@ -212,15 +384,27 @@
 .rail-repo {
   display: inline-flex;
   align-items: center;
-  padding: var(--sp-2) var(--sp-2);
+  padding: var(--sp-2) var(--sp-1);
   font-family: var(--display);
   font-size: var(--fs-xs);
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--slate);
   text-decoration: none;
   white-space: nowrap;
+}
+
+/* Scoped to the rail so nothing below it changes: the cluster is a dense strip
+   of controls and the desktop board's density depends on it staying that way.
+   The coarse-pointer block still raises every one of these to 44px. */
+.rail .btn {
+  padding-inline: var(--sp-2);
+}
+
+/* Hidden until the rail runs out of room; see the 1220px block. */
+.rail-repo-glyph {
+  display: none;
 }
 
 .rail-repo:hover {
@@ -969,6 +1153,12 @@ select.btn {
     min-height: 44px;
     justify-content: center;
   }
+
+  /* The two exits were 32px tall — below the 44px floor even on touch, and the
+     only leftover from the H-4 sweep. They stay link-weight; only the box grows. */
+  .rail-repo {
+    min-height: 44px;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -1355,11 +1545,209 @@ select.btn {
 
 /* Phone chrome */
 
+/* Between a full-width desktop and the phone the rail sheds decoration before
+   it sheds a row: the tab captions and the tracking on the instrument labels
+   are the two things worth less than a single 64px line. Below this the rail is
+   still one row of six zones; only under ~1050px does it start wrapping, and
+   then only at a cluster seam. */
+@media (max-width: 1360px) {
+  .rail-tab-sub {
+    display: none;
+  }
+
+  /* Out of the flow, not out of the accessibility tree: the link is still
+     called "F1TV Link" when it is read aloud, it just stops paying for the
+     second word in pixels. */
+  .rail-repo-long {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .rail-metric-label,
+  .rail-scope {
+    letter-spacing: 0.08em;
+  }
+
+  .rail {
+    padding-inline: var(--sp-2);
+  }
+
+  .rail-controls,
+  .rail-segmented {
+    gap: var(--sp-1);
+  }
+
+  /* The exits go to their glyphs — they are the quietest thing in the rail and
+     the last thing worth a row of their own. Their names stay in the
+     accessibility tree, out of the flow. */
+  .rail-repo-glyph {
+    display: inline;
+  }
+
+  .rail-repo-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .rail-repo {
+    padding-inline: var(--sp-2);
+    font-size: var(--fs-lg);
+  }
+
+  .rail-state {
+    min-width: 6ch;
+  }
+
+  .rail-state .chip:not(:has(.chip-action)) {
+    max-width: 12ch;
+  }
+
+  .rail-metric {
+    padding-inline: var(--sp-1);
+  }
+}
+
+/* The last thing to go before the rail wraps. 22px is an existing rung
+   (--fs-2xl), the one the phone strip uses, and the clock is still by a wide
+   margin the largest number in the chrome at it. */
+@media (max-width: 1220px) {
+  .rail-clock {
+    font-size: var(--fs-2xl);
+  }
+
+  /* The value keeps a degree sign and a slash; at this width that is enough to
+     say what it is without spending 90px on the caption. */
+  .rail-conditions .rail-metric-label {
+    display: none;
+  }
+
+  .rail-state {
+    min-width: 4ch;
+  }
+
+  .rail-state .chip:not(:has(.chip-action)) {
+    max-width: 10ch;
+  }
+
+}
+
+/* The phone rail: one 48px sticky strip plus a scroll-away block.
+
+   At 390px the flat rail was 379px tall — 7.8% of the document and ~44% of the
+   first screen — and once you scrolled past it there was no navigation on the
+   page at all (ui-ux m22). `display: contents` dissolves the rail box so its two
+   wrappers become children of the .page grid; .rail-strip can then be sticky
+   against the page scroll (a sticky element inside a 160px-tall rail would have
+   160px of travel and be useless), while the block scrolls away. Same nodes, no
+   duplication — the <nav>, its aria-current and its tab stops are the ones the
+   desktop rail uses. */
+@media (max-width: 700px) {
+  .rail {
+    display: contents;
+  }
+
+  .rail-strip {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    order: -1;
+    position: sticky;
+    /* Above the panels, below the skip link (z-index 10) — the skip link is
+       pinned over this exact corner and must never end up behind it. */
+    top: 0;
+    z-index: 5;
+    min-height: 48px;
+    /* env() resolves to 0 without viewport-fit=cover in index.html's viewport
+       meta, which is why that attribute is not optional here. */
+    padding: env(safe-area-inset-top) max(var(--sp-3), env(safe-area-inset-right))
+             0 max(var(--sp-3), env(safe-area-inset-left));
+    background: var(--carbon);
+    border: 1px solid var(--edge);
+    border-radius: var(--radius);
+  }
+
+  .rail-block {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+    order: 0;
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--carbon);
+    border: 1px solid var(--edge);
+    border-radius: var(--radius);
+  }
+
+  /* No seams on the phone: the two boxes already separate readouts from the
+     rest, and a hairline between every wrapped pair reads as a table. */
+  .rail-cluster,
+  .rail-metric,
+  .rail-metric:first-child {
+    padding-inline: 0;
+    border-left: none;
+  }
+
+  .rail-instruments {
+    gap: var(--sp-3);
+  }
+
+  /* Both wrappers are grid items of .page now, and a grid item's automatic
+     minimum size is its min-content width — which for a nowrap control cluster
+     is the whole cluster. Left at auto it widens the page's single column and
+     every panel below it with it, which is a document-wide horizontal scrollbar
+     caused by the rail. */
+  .rail-strip,
+  .rail-block,
+  .rail-cluster {
+    min-width: 0;
+  }
+
+  .rail-controls,
+  .rail-exits {
+    flex-wrap: wrap;
+  }
+
+  /* The strip is 48px and the clock is the tallest thing in it. --fs-2xl is an
+     existing rung, not a new one. */
+  .rail-strip .rail-clock {
+    font-size: var(--fs-2xl);
+  }
+
+  /* The strip has room for the tabs but not for the tabs and their captions. */
+  .rail-strip .rail-metric-label {
+    display: none;
+  }
+}
+
 @media (max-width: 500px) {
   /* Four sub-labels are ~34% of the first screen on a 390px phone, and the four
      primary words say the same thing. */
   .rail-tab-sub {
     display: none;
+  }
+
+  /* The strip is clock + lap + tabs and there is no room left for a sentence,
+     so an exception chip truncates to its glyph and first word rather than
+     pushing the tabs off the strip. The text is unchanged in the DOM, so the
+     polite announcement is byte-for-byte what it always was. */
+  .rail-strip .rail-state {
+    min-width: 0;
+  }
+
+  .rail-strip .chip {
+    display: inline-block;
+    max-width: 8ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 

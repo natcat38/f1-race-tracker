@@ -234,8 +234,8 @@ Presentational components — map, timing tower, telemetry, comms, race control,
 | `StaticDemoNotice.tsx` | The placeholder gateway-backed views render on the static GitHub Pages build, where no gateway exists. |
 | `StatusBadge.render.test.tsx` | Render tests for the connection/staleness badge, including the live-lane caveat. |
 | `StatusBadge.tsx` | The connection/staleness badge: what the socket is doing and how old the data is. |
-| `StatusRail.render.test.tsx` | Render tests for the top rail: tabs, clock and status. |
-| `StatusRail.tsx` | The top rail: brand, route tabs, session clock and connection status. |
+| `StatusRail.render.test.tsx` | Render tests for the top rail: instrument clusters, empty zones, tabs and status. |
+| `StatusRail.tsx` | The top rail as an instrument cluster: identity, instruments, state, controls. |
 | `StintChart.render.test.tsx` | Render tests for the strategy timeline's stint segments and leader marker. |
 | `StintChart.tsx` | The full-race strategy timeline: one row per car, each stint a coloured segment on a lap axis. |
 | `TelemetryPanel.tsx` | The selected car's telemetry readout: speed, gear, pedal bars and lap/gap sparklines. |
