@@ -242,22 +242,33 @@ export default function App() {
           // the rail's healthy lane chip would only repeat it (ui-ux m8). On the
           // static demo there is no control, and the chip stays.
           laneNamedElsewhere={!STATIC_DEMO}
-        >
-          {!STATIC_DEMO && <SourceToggle state={state} />}
-          {/* Label swap rather than aria-pressed, matching the overlay's existing
-              Play/Pause: a transport control names the action it will take. The
-              resulting state is carried by the chip, in a region that is present
-              before it fills so the transition is actually announced. */}
-          <button type="button" className="btn" onClick={toggleFrozen}>
-            {frozen ? '▶ Resume' : '⏸ Freeze'}
-          </button>
-          <span role="status" aria-live="polite">
-            {frozen && <span className="chip chip-replay">⏸ FROZEN</span>}
-            {justLooped && (
-              <span className="chip chip-loop">↻ CLIP LOOPED — the recording restarted</span>
-            )}
-          </span>
-        </StatusRail>
+          // Zone D. The lane pick and the transport verb travel together now:
+          // at 1440 they used to land on different rows a thousand pixels apart,
+          // because the rail wrapped wherever it happened to run out of room.
+          controls={
+            <>
+              {!STATIC_DEMO && <SourceToggle state={state} />}
+              {/* Label swap rather than aria-pressed, matching the overlay's existing
+                  Play/Pause: a transport control names the action it will take. The
+                  resulting state is carried by the chip, in a region that is present
+                  before it fills so the transition is actually announced. */}
+              <button type="button" className="btn" onClick={toggleFrozen}>
+                {frozen ? '▶ Resume' : '⏸ Freeze'}
+              </button>
+            </>
+          }
+          // Zone C, beside the connection chip: these are readouts of transport
+          // state, not controls, and they belong in the reserved slot so the rail
+          // does not change shape for eight seconds every time the clip wraps.
+          stateChips={
+            <span role="status" aria-live="polite">
+              {frozen && <span className="chip chip-replay">⏸ FROZEN</span>}
+              {justLooped && (
+                <span className="chip chip-loop">↻ CLIP LOOPED — the recording restarted</span>
+              )}
+            </span>
+          }
+        />
       }
     >
       <div className="board-top">
