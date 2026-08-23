@@ -11,7 +11,8 @@ synonyms. This file is a glossary, not a spec — no implementation details. See
 One independent stream of race state, identified by a **session key**, with its own
 snapshot and frame channel. A lane is fed by exactly one **writer** at a time. The
 running lanes are **replay** (the default Monza clip), **live** (the Python-fed
-lane), and the two **compare** lanes (same circuit, two seasons, played in phase).
+lane), and the two `compare-*` lanes (same circuit, two seasons, played in phase),
+which are the **ghost overlay**'s cross-season sources.
 
 - _Use_ "lane", not "channel", "feed", or "stream" when you mean this whole unit.
 - Lanes never touch each other's state.
@@ -99,15 +100,6 @@ anything about the real pipeline. A third front door alongside the README/video 
 
 - _Use_ "static demo" (or "the Pages demo"); never call it "replay" — that term is
   reserved for the pipeline-backed source above.
-
-## Compare
-
-The cross-year view: the same circuit across two seasons shown as two maps side by
-side, kept in phase. It is the single-map view rendered twice over two **compare
-lanes** — no new data type.
-
-- _Use_ "compare" / "comparison", not "diff" or "overlay" — **overlay** is the
-  separate computed-delta view (below), **compare** is the uncomputed side-by-side one.
 
 ## Gap
 
@@ -203,11 +195,10 @@ snapshot — the **race control** pattern (ADR-0008).
 The toggleable **layer** that surfaces **team radio** during replay: a now-playing
 banner (driver attribution) and a short replayable history, switched by the comms
 toggle. It auto-plays each clip as the replay clock reaches its moment. Shown only
-on the main board — the comparison views (**compare**, **ghost overlay**) stay
-radio-free analytics surfaces.
+on the main board — the **ghost overlay** stays a radio-free analytics surface.
 
-- _Use_ "comms" / "comms layer"; never "overlay" (that is the cross-year ghost view,
-  below) and not "lane" (a lane is a whole stream of state, not a UI toggle).
+- _Use_ "comms" / "comms layer"; never "overlay" (that is the ghost overlay, below)
+  and not "lane" (a lane is a whole stream of state, not a UI toggle).
 
 ## Race control
 
@@ -223,12 +214,23 @@ which rides the snapshot whole and fixed from the very first frame.
 
 ## Ghost overlay
 
-The cross-year analytics view: one track map replaying a driver's **reference lap**
-from two seasons in sync — this year solid, last year a translucent **ghost** — paired
-with a **delta bar**. Computation is what sets it apart from **compare** (side-by-side,
-no computation). It is a self-contained looping player, not the live race.
+The app's comparison view — the only one (ADR-0009). One track map replays two
+**reference laps** in sync, side A solid and side B a translucent **ghost**, paired
+with a **delta bar**. A **side** is a `(session, driver)` pair, so the same view spans
+both comparison axes:
 
-- _Use_ "overlay" / "ghost overlay"; not "compare" (the uncomputed side-by-side view).
+- **same driver, two seasons** — VER at Monza 2024 vs 2023, one lane each;
+- **two drivers, one race** — VER vs LEC at Monza 2024, both sides sharing one lane,
+  because every **snapshot** already carries every driver's **lap trace** (ADR-0004).
+
+Across seasons the ghost is drawn on side A's outline: the two clips are normalised
+independently, so the placement is approximate and the view says so. Within one
+session both sides share an outline and the placement is exact. Either way the delta
+itself is exact. It is a self-contained looping player, not the live race.
+
+- _Use_ "overlay" / "ghost overlay" and "side A / side B"; not "compare" — the
+  side-by-side COMPARE view is deleted, and `compare-monza-*` survives only as a
+  historical **session key**.
 
 ## Ghost
 

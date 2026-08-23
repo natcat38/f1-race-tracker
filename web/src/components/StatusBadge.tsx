@@ -17,8 +17,8 @@ interface Props {
   // button, so a reader could not tell which one to press (ui-ux m8). Where the
   // control exists the chip stands down in the healthy case and keeps only the
   // exceptional states — warming, stale, reconnecting, offline, failed — which
-  // is where a chip earns its slot. Routes with no toggle (Compare's two lanes,
-  // the static demo's board, Settings) leave this false and keep the readout,
+  // is where a chip earns its slot. Routes with no toggle (the overlay's
+  // lanes, the static demo's board, Settings) leave this false and keep the readout,
   // because there it is the only thing naming the lane.
   laneNamedElsewhere?: boolean;
 }
@@ -95,7 +95,7 @@ function Chip({ status, state, staleSec, onReconnect, laneNamedElsewhere }: Prop
 }
 
 // The polite live region lives here rather than around the badge at each call
-// site. StatusRail wrapped it and Compare did not, so on the one route where two
+// site. StatusRail wrapped it and other callers did not, so on a route where two
 // lanes can stall independently the transitions were silent — and the region has
 // to be in the DOM before the text changes for the change to be announced at all,
 // which an always-rendered wrapper guarantees.

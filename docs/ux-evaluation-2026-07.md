@@ -4,6 +4,13 @@
 
 > **Method:** hands-on, driven via `docker compose up --build -d` against `http://localhost:8080`, all three routes (main board, `#compare`, `#ghost`), plus source reads to confirm root cause. Screenshots weren't available in this environment (the headless renderer timed out on screenshot capture); findings below are verified via DOM/text extraction, JS state inspection, and network/console instrumentation instead — every finding marked "observed" was driven live, not inferred from code alone.
 >
+> **Superseded in part (August 2026):** `#compare` no longer exists — it was folded
+> into `#ghost`, which now picks each side as a *(session, driver)* pair and so covers
+> both the cross-season and the two-driver comparison. See
+> [ADR-0009](adr/0009-overlay-absorbs-compare.md). The `#compare` findings below (P2
+> "no pit-wall data", and the naming/cross-linking item) are recorded as history, not
+> as open work.
+>
 > **Yardstick:** does this help me understand how the car is performing, and would a first-time user get there with zero instructions? Severity: **P1** blocks/misleads, **P2** pit-wall value missing or confusing (workaround exists), **P3** polish.
 
 ## TL;DR

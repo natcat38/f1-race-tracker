@@ -40,11 +40,14 @@ Open [http://localhost:8080](http://localhost:8080).
 
 The default view shows the Monza 2024 race clip (replay lane) — a mid-race window around laps 13–17 chosen to include real pit stops, so tyre stints, pit-lane status, and the strategy chart actually have something to show. Use the toggle at the top of the page to switch to the Silverstone 2024 clip on the "Live (demo)" lane — see [What's not done](#whats-not-done) for what "demo" means there. That clip's window (laps 25–28) sits in a real rain phase: expect the weather badge to show `RAIN` and cars to change from slicks to intermediates mid-clip.
 
-### Cross-year comparison
+### Lap-delta overlay
 
-![Monza 2023 vs 2024 side by side](docs/assets/compare.png)
+Open <http://localhost:8080/#ghost> for **OVERLAY** — one track map replaying two reference laps against each other, side A solid and side B a translucent ghost, under a per-corner delta bar. Each side is picked independently as a *(session, driver)* pair, so the same view does both comparisons:
 
-Open <http://localhost:8080/#compare> for the side-by-side **Monza 2023 vs 2024** view — two maps fed by two `compare-*` lanes through the same gateway via `/ws?session=<key>`, kept in phase by the replay lanes' wall-clock-phased loop. Switch views any time with the **BOARD / COMPARE / OVERLAY** tabs in the status rail; OVERLAY (<http://localhost:8080/#ghost>) is the computed ghost-overlay lap delta.
+- **Same driver, two seasons** — VER at Monza 2024 vs Monza 2023, one `compare-*` lane each through the same gateway via `/ws?session=<key>`. Across seasons the ghost is drawn on side A's outline (the clips are normalised independently), so the view says positions are approximate; the delta itself is exact.
+- **Two drivers, one race** — VER vs LEC at Monza 2024, both sides sharing a single socket. Every snapshot already carries every driver's baked lap trace, so this costs no extra connection.
+
+A comparison is linkable: the pickers write `#ghost?a=monza-2024:VER&b=monza-2023:VER`. Switch views any time with the **BOARD / OVERLAY** tabs in the status rail. The old `#compare` side-by-side view was folded into this one — see [ADR-0009](docs/adr/0009-overlay-absorbs-compare.md); its URL still redirects here.
 
 ### Beta: live timing with your own F1TV subscription
 
@@ -135,8 +138,10 @@ The React UI toggle at the top of the page POSTs this endpoint. The active butto
 | `compare-2024` | Go | Loops the Monza 2024 clip, wall-clock phased | `compare-monza-2024` |
 | `gateway`| Go       | Serves SPA + WebSocket, switchable lane | starts on `replay` |
 
-The two `compare-*` lanes exist only to feed the side-by-side view; the toggle at the
-top of the board switches the gateway between `replay` and `live` and never touches them.
+The two `compare-*` lanes are the overlay's cross-season sources (the `compare-`
+prefix is historical — see [ADR-0009](docs/adr/0009-overlay-absorbs-compare.md)); the
+toggle at the top of the board switches the gateway between `replay` and `live` and
+never touches them.
 
 ## Further reading
 

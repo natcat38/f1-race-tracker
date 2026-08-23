@@ -1,18 +1,21 @@
-// Ghost-overlay maths: signed cross-year delta series and the clock-to-index inversion
-// the animation needs.
+// Overlay maths: the signed delta between two reference laps, the clock-to-index
+// inversion the animation needs, and the per-side driver options.
 
 import type { ConnStatus } from '../realtime/socket';
+import type { Car } from './race';
 
-// Pure helpers for the cross-year ghost overlay. The route holds both years'
-// lap traces (cumulative ms per track-outline index, baked per clip); these turn
-// them into a signed delta and invert a trace (clock -> index) for animation.
+// Pure helpers for the lap-delta overlay. A side is a (session, driver) pair, and
+// both sides may name the SAME session — every snapshot carries a lap trace for
+// every driver with an accurate lap (ADR-0004), so a two-driver comparison is the
+// same subtraction against one socket. Nothing below knows or cares which case it
+// is looking at.
 
-// deltaSeries: this-year minus last-year at each index, in ms. Positive = this
-// year is slower at that point on the lap. Clamped to the shorter trace.
-export function deltaSeries(thisYear: number[], lastYear: number[]): number[] {
-  const n = Math.min(thisYear.length, lastYear.length);
+// deltaSeries: side A minus side B at each outline index, in ms. Positive = A is
+// slower at that point on the lap. Clamped to the shorter trace.
+export function deltaSeries(a: number[], b: number[]): number[] {
+  const n = Math.min(a.length, b.length);
   const out: number[] = [];
-  for (let i = 0; i < n; i++) out.push(thisYear[i] - lastYear[i]);
+  for (let i = 0; i < n; i++) out.push(a[i] - b[i]);
   return out;
 }
 
@@ -28,30 +31,55 @@ export function indexAtTime(trace: number[], tMs: number): number {
   return idx;
 }
 
-// commonDrivers: numeric driver keys present in both trace maps, ascending.
-export function commonDrivers(
-  a: Record<number, number[]>,
-  b: Record<number, number[]>,
-): number[] {
-  return Object.keys(a)
+// driversWithTrace: the driver numbers this lane can actually be asked for,
+// ascending. Only drivers with a baked reference lap appear — a driver who never
+// set an accurate lap has no trace, and offering them would produce an empty
+// overlay with no explanation.
+export function driversWithTrace(lapTrace: Record<number, number[]>): number[] {
+  return Object.keys(lapTrace)
     .map(Number)
-    .filter((n) => b[n] !== undefined)
+    .filter((n) => Number.isFinite(n) && (lapTrace[n]?.length ?? 0) > 0)
     .sort((x, y) => x - y);
 }
 
-// The Ghost route's skeleton copy. Priority: a confirmed data gap (both lanes
-// loaded, zero common drivers) beats a connection complaint, which beats the
-// generic loading line — so a user always sees the most specific truth.
-export function ghostSkeletonCopy(
+// driverCode: the label a picker shows for a driver number — the FIA abbreviation
+// when the lane has published one, the car number otherwise (same fallback the
+// board's `?car=` grammar uses).
+export function driverCode(cars: Record<number, Car>, num: number): string {
+  return cars[num]?.code || String(num);
+}
+
+// findByCode: resolve a code from a URL back to this lane's driver number. Codes are
+// compared case-insensitively and the car-number fallback is honoured, so both
+// `?a=monza-2024:VER` and `?a=monza-2024:1` name Verstappen.
+export function findByCode(
+  cars: Record<number, Car>,
+  drivers: number[],
+  code: string,
+): number | null {
+  const want = code.toUpperCase();
+  return drivers.find((n) => driverCode(cars, n).toUpperCase() === want) ?? null;
+}
+
+// The overlay's skeleton copy. Priority: the one thing the user can fix themselves
+// (both sides naming the same driver in the same session, which is a zero delta and
+// not a comparison) beats a confirmed data gap, which beats a connection complaint,
+// which beats the generic loading line — so a user always sees the most specific
+// truth, and one they can act on before one they cannot.
+export function overlaySkeletonCopy(
+  samePair: boolean,
   lanesLoaded: boolean,
   driverCount: number,
-  statusThis: ConnStatus,
-  statusLast: ConnStatus,
+  statusA: ConnStatus,
+  statusB: ConnStatus,
 ): string {
-  if (lanesLoaded && driverCount === 0) {
-    return 'No driver appears in both seasons — ghost overlay needs a common driver.';
+  if (samePair) {
+    return 'Both sides are the same lap — pick two different drivers, or a different session.';
   }
-  if (statusThis === 'reconnecting' || statusLast === 'reconnecting') {
+  if (lanesLoaded && driverCount === 0) {
+    return 'No driver in this session has a reference lap yet.';
+  }
+  if (statusA === 'reconnecting' || statusB === 'reconnecting') {
     return 'Connection lost — retrying automatically…';
   }
   return 'Loading reference laps…';

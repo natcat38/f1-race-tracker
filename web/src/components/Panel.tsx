@@ -1,7 +1,7 @@
 // The shared panel chrome every dashboard card renders inside: title, framing and spacing.
 
 /**
- * The dashboard's presentational components — map, timing tower, standings, telemetry, comms, race control, ghost/compare overlays, and their shared layout/formatting helpers.
+ * The dashboard's presentational components — map, timing tower, telemetry, comms, race control, the lap-delta overlay, and their shared layout/formatting helpers.
  * @packageDocumentation
  */
 import type { ReactNode } from 'react';

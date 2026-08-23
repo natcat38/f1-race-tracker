@@ -29,7 +29,7 @@ const MIN_PAD = 14;
 // The ink around the path is asymmetric: a driver code is drawn 10 units to the
 // RIGHT of its marker and runs about three glyphs wide, so a car sitting on the
 // easternmost point of the circuit needs room the other three sides do not.
-// Measured on the running compare lanes, where a label was clipping by ~6 units.
+// Measured on the running overlay lanes, where a label was clipping by ~6 units.
 const LABEL_ALLOWANCE = 34;
 
 const r2 = (n: number) => Math.round(n * 100) / 100;

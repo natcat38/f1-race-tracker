@@ -90,7 +90,7 @@ DIRS = {
     "web/dist": ("Web", "Vite build output. Generated, gitignored except for the .gitkeep that keeps web/embed.go compiling."),
     "web/public": ("Web", "Static assets copied verbatim into the build: favicon and social preview image."),
     "web/src": ("Web", "The app shell: entry point, root component, error boundary, static-demo bootstrap."),
-    "web/src/components": ("Web", "Presentational components — map, timing tower, standings, telemetry, comms, race control, ghost/compare — and their shared layout and formatting helpers."),
+    "web/src/components": ("Web", "Presentational components — map, timing tower, telemetry, comms, race control, the lap-delta overlay — and their shared layout and formatting helpers."),
     "web/src/hooks": ("Web", "Hooks deriving UI-facing state (staleness, gap/lap history, smoothed positions, comms playback) from the raw RaceState stream."),
     "web/src/realtime": ("Web", "Data-source connections: a reconnecting live WebSocket and a paced static-replay reader, both feeding the same reducer."),
     "web/src/state": ("Web", "Race state: wire message types, the applyMessage reducer, and the comms/ghost/auth sub-state it composes."),
