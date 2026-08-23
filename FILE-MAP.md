@@ -229,6 +229,7 @@ Presentational components — map, timing tower, telemetry, comms, race control,
 | `Panel.tsx` | The shared panel chrome every dashboard card renders inside: title, framing and spacing. |
 | `RaceControl.tsx` | The race-control log: the most recent marshalling messages, announced politely as they arrive. |
 | `Route.tsx` | The shared page frame every route renders inside: skip link, heading, and the main landmark. |
+| `SegmentedControl.tsx` | The rail's one control grammar for a choice between persistent states: a labelled radiogroup of .btn segments with roving tabindex. |
 | `Settings.tsx` | The settings page: F1 TV link status and the operator instructions for establishing it. |
 | `SourceToggle.tsx` | The replay/live lane switch, including the caveat text that keeps the live lane honest. |
 | `StaticDemoNotice.tsx` | The placeholder gateway-backed views render on the static GitHub Pages build, where no gateway exists. |
@@ -493,4 +494,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-45 directories, 174 files listed, 0 without a declared purpose.
+45 directories, 175 files listed, 0 without a declared purpose.
