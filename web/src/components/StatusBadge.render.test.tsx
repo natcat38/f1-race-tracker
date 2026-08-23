@@ -18,8 +18,8 @@ describe('StatusBadge', () => {
   });
 
   test('carries its own polite region, so every caller announces transitions', () => {
-    // It used to be wrapped at the call site — StatusRail did, Compare did not, so
-    // the one route where two lanes stall independently announced nothing.
+    // It used to be wrapped at the call site — StatusRail did, other callers did
+    // not, so a route whose two lanes stall independently announced nothing.
     const html = renderToStaticMarkup(<StatusBadge status="reconnecting" state={emptyState()} />);
     expect(html).toContain('role="status"');
     expect(html).toContain('aria-live="polite"');

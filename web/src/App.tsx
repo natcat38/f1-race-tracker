@@ -19,7 +19,6 @@ import { leaderOf } from './components/timingHelpers';
 import { useStale } from './hooks/useStale';
 import { useLapHistory } from './hooks/useLapHistory';
 import { useGapHistory } from './hooks/useGapHistory';
-import { Compare } from './components/Compare';
 import { Ghost } from './components/Ghost';
 import { Settings } from './components/Settings';
 import { StintChart } from './components/StintChart';
@@ -160,7 +159,7 @@ export default function App() {
   // A `?car=` in the URL overrides the leader (accessibility M-7): someone who
   // was sent `#board?car=VER` asked for VER, and seeding the leader first would
   // make the board flash the wrong car before correcting itself.
-  const { route, car: carParam } = parseHash(hash);
+  const { route, car: carParam, a: overlayA, b: overlayB } = parseHash(hash);
   const [leaderSeeded, setLeaderSeeded] = useState(false);
   if (!leaderSeeded) {
     const leader = leaderOf(state.cars);
@@ -201,7 +200,7 @@ export default function App() {
     // Board only. This effect runs on every route (the hooks above all sit
     // before the route switch, so the socket and the selection stay alive while
     // #ghost is on screen) and an unguarded write would quietly rewrite a
-    // #compare URL to the board's — invisibly, because replaceState fires no
+    // #ghost URL to the board's — invisibly, because replaceState fires no
     // hashchange, so the view would stay put and only a reload would betray it.
     if (!leaderSeeded || route !== 'board') return;
     const next = buildHash({ route: 'board', car: selectedCode });
@@ -211,8 +210,13 @@ export default function App() {
     history.replaceState(null, '', next);
   }, [selectedCode, leaderSeeded, route, hash]);
 
-  if (route === 'compare') return <Compare />;
-  if (route === 'ghost') return <Ghost initialSelected={selected} />;
+  // Keyed on the sides the URL names so a hash pasted while the overlay is already
+  // on screen remounts it. The overlay's own replaceState writes fire no hashchange,
+  // so `hash` (and this key) stay put while its pickers are driven from inside.
+  if (route === 'ghost') {
+    const sides = `${overlayA?.session}:${overlayA?.car}|${overlayB?.session}:${overlayB?.car}`;
+    return <Ghost key={sides} initialA={overlayA} initialB={overlayB} />;
+  }
   if (route === 'settings') return <Settings />;
 
   // A snapshot without a track outline would render an invisible map, so stand

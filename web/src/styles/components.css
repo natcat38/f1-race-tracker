@@ -190,8 +190,8 @@
   border-color: var(--chalk);
 }
 
-/* nowrap: at phone widths these compressed and broke inside the phrase —
-   "COMPARE / side by / side" — which is both ugly and taller. Keeping each on one
+/* nowrap: at phone widths these compressed and broke inside their phrase —
+   "OVERLAY / lap / delta" — which is both ugly and taller. Keeping each on one
    line measured a 383px rail down to 254px. */
 .rail-tab-sub {
   white-space: nowrap;
@@ -687,27 +687,71 @@ select.btn {
   }
 }
 
-.compare-lanes {
+/* Overlay — the two source pickers. A row per side so the session and the driver
+   read as one selection, wrapping to a column on a narrow screen rather than
+   squeezing two dropdowns and a label onto one line. */
+.overlay-sources {
   display: flex;
-  gap: var(--sp-6);
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.overlay-side {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
   flex-wrap: wrap;
 }
 
-/* Inside a lane the map sat beside the standings in a flex row, which on a phone
-   shrank it to a ~110px thumbnail with twenty dots on top of each other. Below
-   700px the map goes above the list instead, at full lane width. */
-@media (max-width: 700px) {
-  .lane-body {
-    flex-direction: column;
-  }
+.overlay-side-label {
+  font-family: var(--data);
+  font-size: var(--fs-sm);
+  color: var(--slate);
+  min-width: 9ch;
 }
 
-/* The lanes had no flex at all, so at 1600px they sized to content and left a
-   ~400px dead margin on the right of the view. A basis rather than `flex: 1`
-   alone, so they still wrap to one column on a narrow screen. */
-.compare-lanes > .panel {
-  flex: 1 1 460px;
-  min-width: 0;
+/* The picker dropdowns. A class rather than inline styles so the coarse-pointer
+   block at the end of this file can raise them to a 44px touch target. */
+.overlay-select {
+  min-height: 32px;
+  background: var(--asphalt);
+  color: var(--chalk);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  padding: var(--sp-1) var(--sp-2);
+  font-family: var(--data);
+  font-size: var(--fs-sm);
+}
+
+.overlay-side-session {
+  font-family: var(--data);
+  font-size: var(--fs-sm);
+}
+
+.overlay-presets {
+  display: flex;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.overlay-note {
+  margin: var(--sp-2) 0 0;
+  max-width: 70ch;
+}
+
+/* The key's colour swatch. Two sides can now be two different teams, so the dot
+   has to carry the colour the marker is drawn in rather than a static glyph. */
+.key-dot {
+  display: inline-block;
+  width: 0.7em;
+  height: 0.7em;
+  border-radius: 50%;
+  vertical-align: baseline;
+}
+
+.key-dot-ghost {
+  opacity: 0.45;
+  outline: 1px dashed var(--track-label);
 }
 
 .ghost-controls {
@@ -890,6 +934,7 @@ select.btn {
 @media (pointer: coarse) {
   .btn,
   .btn-icon,
+  .overlay-select,
   .tt-clear {
     min-height: 44px;
   }
@@ -1258,31 +1303,6 @@ select.btn {
 .rc-row-mine {
   border-left: 2px solid var(--chalk);
   padding-left: var(--sp-2);
-}
-
-/* Compare — the standings list */
-
-/* A fixed grid, not wrapped inline spans: entries broke mid-phrase (the unit
-   splitting from its number) and wrapped differently row to row, which made
-   twenty aligned numbers ragged. */
-.standings {
-  display: grid;
-  gap: var(--sp-1);
-  font-variant-numeric: tabular-nums;
-  font-size: var(--fs-sm);
-}
-
-.standings-row {
-  display: grid;
-  grid-template-columns: 2.5ch 4ch 4ch 1fr auto;
-  align-items: baseline;
-  gap: var(--sp-2);
-  white-space: nowrap;
-}
-
-.standings-pos {
-  color: var(--slate);
-  text-align: right;
 }
 
 /* Overlay — keys and the headline delta */

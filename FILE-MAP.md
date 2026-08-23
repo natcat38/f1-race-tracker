@@ -212,27 +212,25 @@ The app shell: entry point, root component, error boundary, static-demo bootstra
 | `App.tsx` | The React app shell: mounts the root component, wires the live WebSocket or static-replay data source into race state, and lays out the dashboard panels. |
 | `ErrorBoundary.tsx` | React error boundary that keeps one component's render-time exception from blanking the whole app. |
 | `main.tsx` | Browser entry point: mounts App under an error boundary and pulls in the global fonts and stylesheets. |
-| `routing.test.ts` | Unit tests for hash parsing and serialising: route names and the deep-linked car code. |
-| `routing.ts` | The app's hash routing: which view a URL names, and which car it pre-selects. |
+| `routing.test.ts` | Unit tests for hash parsing and serialising: route names, the deep-linked car code, and the overlay's two `(session, driver)` sides. |
+| `routing.ts` | The app's hash routing: which view a URL names, which car it pre-selects, and which pair of laps the overlay opens on. |
 | `staticDemo.ts` | Build-time identity of the public GitHub Pages demo, and the repo it came from. |
 
 ### `web/src/components`
 
-Presentational components — map, timing tower, standings, telemetry, comms, race control, ghost/compare — and their shared layout and formatting helpers.
+Presentational components — map, timing tower, telemetry, comms, race control, the lap-delta overlay — and their shared layout and formatting helpers.
 
 | File | Purpose |
 | --- | --- |
 | `Comms.tsx` | The team-radio layer: a now-playing banner over a short replayable history. |
-| `Compare.tsx` | The compare route: two lanes side by side, each its own socket and standings readout. |
-| `Ghost.tsx` | The ghost route: a cross-year lap overlay animating this year's car against last year's trace. |
+| `Ghost.render.test.tsx` | Render tests for the overlay: both comparison scenarios, per-side team colours, and the states where there is nothing to compare. |
+| `Ghost.tsx` | The overlay route: two reference laps animated against each other on one track map, across two seasons or two drivers in the same race. |
 | `Map.tsx` | The track map: cars drawn as smoothed dots on the baked track outline, with the board's selection highlighted. |
 | `Panel.tsx` | The shared panel chrome every dashboard card renders inside: title, framing and spacing. |
 | `RaceControl.tsx` | The race-control log: the most recent marshalling messages, announced politely as they arrive. |
 | `Route.tsx` | The shared page frame every route renders inside: skip link, heading, and the main landmark. |
 | `Settings.tsx` | The settings page: F1 TV link status and the operator instructions for establishing it. |
 | `SourceToggle.tsx` | The replay/live lane switch, including the caveat text that keeps the live lane honest. |
-| `Standings.render.test.tsx` | Render tests for the compare-lane standings list. |
-| `Standings.tsx` | The compare route's per-lane readout: raw tyre, last-lap and gap fields, deliberately uncomputed. |
 | `StaticDemoNotice.tsx` | The placeholder gateway-backed views render on the static GitHub Pages build, where no gateway exists. |
 | `StatusBadge.render.test.tsx` | Render tests for the connection/staleness badge, including the live-lane caveat. |
 | `StatusBadge.tsx` | The connection/staleness badge: what the socket is doing and how old the data is. |
@@ -249,7 +247,7 @@ Presentational components — map, timing tower, standings, telemetry, comms, ra
 | `gapDisplay.test.ts` | Unit tests for gap smoothing, hysteresis and the long-gap display rules. |
 | `geometry.test.ts` | Tests that track outlines are letterboxed into the square viewBox without distortion. |
 | `geometry.ts` | Shared map geometry: the coordinate space the track outline and the car markers both live in, and the two derivations every map surface needs. |
-| `staticDemoGating.render.test.tsx` | Tests that gateway-backed views render the static-demo notice instead of dialling a socket that cannot connect. |
+| `staticDemoGating.render.test.tsx` | Tests what each route does on the static Pages build: the ones that genuinely need the gateway say so, and the overlay — which does not — runs for real. |
 | `teamColours.ts` | The constructor colour palette used everywhere a car is drawn or listed. |
 | `timingHelpers.ts` | Shared formatting and ordering helpers for the timing views: lap/gap/sector rendering, running order, personal bests. |
 
@@ -261,6 +259,7 @@ Hooks deriving UI-facing state (staleness, gap/lap history, smoothed positions, 
 | --- | --- |
 | `useComms.ts` | Drives the comms layer: queues fired radio clips into one audio element and keeps a short history. |
 | `useGapHistory.ts` | Rolling per-driver gap-trend history, one entry per completed lap. |
+| `useLane.ts` | React binding for the shared lane registry: one session key, one connection, however many overlay sides name it. |
 | `useLapHistory.ts` | Rolling per-driver lap-time history. |
 | `useReducedMotion.ts` | Subscribes to prefers-reduced-motion for the two places motion is driven from JavaScript. |
 | `useRollingHistory.ts` | The shared fold behind the lap and gap histories, including reset on session switch or replay-loop restart. |
@@ -273,6 +272,8 @@ Data-source connections: a reconnecting live WebSocket and a paced static-replay
 
 | File | Purpose |
 | --- | --- |
+| `lanes.test.ts` | Tests for the lane registry: one connection per session key, however many subscribers, and a clean close when the last one leaves. |
+| `lanes.ts` | A refcounted registry of open lanes, so two overlay sides naming the same session share one connection instead of opening two. |
 | `socket.test.ts` | Tests for the live socket: reconnect backoff, status transitions and message dispatch. |
 | `socket.ts` | The live data source: a reconnecting WebSocket that feeds parsed messages into the race reducer. |
 | `staticReplay.test.ts` | Tests for the static-replay reader: clip pacing, looping and status reporting. |
@@ -289,10 +290,11 @@ Race state: wire message types, the applyMessage reducer, and the comms/ghost/au
 | `contract.test.ts` | Contract test: the golden snapshot fixture must apply cleanly through the frontend reducer. |
 | `f1auth.test.ts` | Tests for parsing and rendering the F1 TV link status. |
 | `f1auth.ts` | F1TV beta auth status served by /api/f1auth (ADR-0007). |
-| `ghost.test.ts` | Tests for the ghost overlay maths: delta series, index lookup and common-driver selection. |
-| `ghost.ts` | Ghost-overlay maths: signed cross-year delta series and the clock-to-index inversion the animation needs. |
+| `ghost.test.ts` | Tests for the overlay maths: delta series, index lookup, per-side driver options and the skeleton copy. |
+| `ghost.ts` | Overlay maths: the signed delta between two reference laps, the clock-to-index inversion the animation needs, and the per-side driver options. |
 | `race.test.ts` | Tests for the race reducer: snapshot init, frame application, and rejection of malformed messages. |
 | `race.ts` | The race state core: wire message types, parseMsg, and the applyMessage reducer everything reads from. |
+| `sessions.ts` | The overlay's source catalogue: the sessions a comparison side may name, and the short slugs that address them in a URL. |
 | `testCar.ts` | Shared test fixture: a minimal valid Car matching the wire contract, with per-test overrides. |
 
 ### `web/src/styles`
@@ -397,6 +399,7 @@ Architecture Decision Records — why the system is shaped the way it is. Read t
 | `0006-static-gh-pages-demo-as-third-front-door.md` | ADR-0006: the static GitHub Pages demo is a third front door, not a reversal of the self-hosted stance. |
 | `0007-f1tv-auth-delegated-operator-link.md` | ADR-0007: beta live timing authenticates via an operator-linked F1 TV session, delegated to FastF1. |
 | `0008-live-radio-rides-frames.md` | ADR-0008: live team radio rides frames, while replay radio stays fixed in the snapshot. |
+| `0009-overlay-absorbs-compare.md` | ADR-0009: the ghost overlay absorbs the side-by-side COMPARE view and addresses each side as a (session, driver) pair. |
 
 ### `docs/agents`
 
@@ -490,4 +493,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-45 directories, 171 files listed, 0 without a declared purpose.
+45 directories, 174 files listed, 0 without a declared purpose.

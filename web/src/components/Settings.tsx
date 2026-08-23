@@ -110,7 +110,7 @@ function NextStep({ auth }: { auth: AuthStatus }) {
 }
 
 // The one place in the app that says what was built and links back to it — the
-// board, compare and overlay routes are all instruments with no room for prose
+// board and overlay routes are both instruments with no room for prose
 // (ui-ux review M15). The rail carries a compact repo link on every route; this
 // is the sentence behind it.
 function About() {

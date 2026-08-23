@@ -7,15 +7,16 @@ import { StatusBadge } from './StatusBadge';
 import { fmtClock, leaderLapOf } from './timingHelpers';
 import { REPO_URL } from '../staticDemo';
 
-// Three views, not four. LINK is an operator runbook — pip commands, browser
-// extension setup, an ADR reference — and it was the fourth of four top-level
-// tabs, peer to the board. For the reader this app is built for, the fourth click
-// landed on shell commands. It keeps a permanent affordance (below, beside the
+// Two primary tabs, plus two permanent affordances below. COMPARE was folded into
+// OVERLAY (ADR-0009) — it showed two maps side by side and computed nothing, which
+// is the thing OVERLAY does properly. LINK is an operator runbook — pip commands,
+// browser extension setup, an ADR reference — and it was once a top-level tab, peer
+// to the board. For the reader this app is built for, that click landed on shell
+// commands. It keeps a permanent affordance (below, beside the
 // repo link) rather than a primary slot: quieter, still one click, and honest
 // about being a setting rather than a view.
 const TABS = [
   { key: 'board', href: '#', label: 'BOARD', sub: 'live board' },
-  { key: 'compare', href: '#compare', label: 'COMPARE', sub: 'two replays' },
   { key: 'ghost', href: '#ghost', label: 'OVERLAY', sub: 'lap delta' },
 ] as const;
 
@@ -28,20 +29,19 @@ const TABS = [
 // OVERLAY". One element, no new band, and the chain below it is unchanged.
 const ROUTE_TITLES = {
   board: 'Race board',
-  compare: 'Compare',
   ghost: 'Lap delta overlay',
   settings: 'F1TV link',
 } as const;
 
 // StatusRail is the persistent instrument strip on every route — the
 // signature element. On the board it carries live session identity, the
-// race clock, and lane health; on Compare/Ghost (two independent lanes,
-// no single clock to show) it's a lighter shell: brand, a static note,
-// and the same view tabs.
+// race clock, and lane health; on the overlay (two reference laps on their
+// own scrubbable clock, no session clock to show) it's a lighter shell:
+// brand, a static note, and the same view tabs.
 export function StatusRail({
   active, state, status, staleSec, note, onReconnect, laneNamedElsewhere, children,
 }: {
-  active: 'board' | 'compare' | 'ghost' | 'settings';
+  active: 'board' | 'ghost' | 'settings';
   state?: RaceState;
   status?: ConnStatus;
   staleSec?: number;
@@ -81,7 +81,7 @@ export function StatusRail({
             </span>
           )}
           {/* No live-region wrapper here any more: StatusBadge carries its own, so
-              Compare's two lanes announce their transitions too and there is no
+              every lane announces its transitions too and there is no
               chance of nesting two polite regions and double-announcing. */}
           <StatusBadge
             status={status ?? 'connecting'}
