@@ -2,7 +2,7 @@
 
 # F1 Race Tracker
 
-![Live lane — Silverstone 2024 on the track map](docs/assets/live-lane.png)
+![Pit-wall board — Monza 2024 replay: track map, timing tower, telemetry, strategy, comms and race control](docs/assets/board.png)
 
 An F1 race tracker that puts you on the pit wall — watch the cars on circuit, read the gaps, tyres, sector times and team radio like a race engineer, and dig into where a car is losing time. Built as a polyglot stack: Python ingests position data, Redis is the seam, a Go gateway fans it out over WebSocket, and a React SPA renders an interactive track map updating at 10 Hz. The design is track-map-first: car positions on circuit are the primary view.
 
@@ -17,7 +17,7 @@ An F1 race tracker that puts you on the pit wall — watch the cars on circuit, 
 - **Weather** — track/air temperature and a rain badge in the status rail, baked from the session's real weather samples.
 - **Team-radio comms layer** — a toggleable layer that auto-plays driver↔engineer radio in sync with the replay clock, with a now-playing banner and a short replayable history. The audio streams straight from F1's public URLs at play time — nothing is committed or downloaded — so the comms audio (only) needs network access; positions and timing stay fully offline from the committed clips. See [docs/adr/0003-team-radio-streamed-not-committed.md](docs/adr/0003-team-radio-streamed-not-committed.md).
 - **Race control feed** — a timestamped, rolling log of real session messages (flags, safety car, investigations), baked from the session's actual race-control feed and replayed in sync alongside the timing tower.
-- **Ghost overlay** — a cross-year lap comparison: this year's reference lap solid, last year's translucent, with a red/green delta bar showing exactly where a lap is won or lost round the circuit.
+- **Lap-delta overlay** — two reference laps replayed against each other on one map, side A solid and side B a translucent ghost, with a red/green delta bar showing exactly where a lap is won or lost round the circuit. Each side is a *(session, driver)* pick, so it covers both the same driver across two seasons and two drivers in the same race.
 
 The product is judged first by whether it helps you understand how the car is performing. The engineering underneath — real-time, byte-identical across two languages — is what makes that possible at scale:
 
@@ -41,6 +41,8 @@ Open [http://localhost:8080](http://localhost:8080).
 The default view shows the Monza 2024 race clip (replay lane) — a mid-race window around laps 13–17 chosen to include real pit stops, so tyre stints, pit-lane status, and the strategy chart actually have something to show. Use the toggle at the top of the page to switch to the Silverstone 2024 clip on the "Live (demo)" lane — see [What's not done](#whats-not-done) for what "demo" means there. That clip's window (laps 25–28) sits in a real rain phase: expect the weather badge to show `RAIN` and cars to change from slicks to intermediates mid-clip.
 
 ### Lap-delta overlay
+
+![Lap-delta overlay — VER solid vs LEC ghost, Monza 2024, each driver's fastest lap](docs/assets/overlay.png)
 
 Open <http://localhost:8080/#ghost> for **OVERLAY** — one track map replaying two reference laps against each other, side A solid and side B a translucent ghost, under a per-corner delta bar. Each side is picked independently as a *(session, driver)* pair, so the same view does both comparisons:
 
@@ -89,7 +91,7 @@ takes three separate opt-ins to reach. See
 
 The "Live (demo)" toggle is honestly labelled: it streams a second committed replay clip (Silverstone 2024) through Python to exercise the polyglot seam, not a real live-timing connection. True live ingestion (`ingest/live_signalr.py`) parses `TimingData`/`TimingAppData` for lap, gap/interval, and tyre fields alongside position. The connect-time snapshot shape was verified for real on 2026-08-20, but the *incremental* message shapes — the ones that only arrive during a running session — are all still marked `UNVERIFIED:` in the source. See [docs/runbooks/live-verification.md](docs/runbooks/live-verification.md) for the checklist to run through and close them out field-by-field the next time a live session is available.
 
-Gap/Int in the timing tower remain best-effort estimates derived from track position, not official per-tick timing data (the tower says so). There's no per-rival two-car map overlay, and the stint chart shows the full baked plan rather than only what's happened so far in the replay window (noted in its own footnote).
+Gap/Int in the timing tower are estimates derived from track position and the leader's own pace, not official per-tick timing data (the tower says so) — validated against official line-crossing times to a median error of ~30 ms, shown to a tenth (see [ingest/README.md](ingest/README.md)). There's no per-rival two-car map overlay, and the stint chart shows the full baked plan rather than only what's happened so far in the replay window (noted in its own footnote).
 
 ## Architecture — two lanes, one seam
 
