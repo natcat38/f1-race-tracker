@@ -101,7 +101,23 @@ export function connectStaticReplay(
         timer = setTimeout(() => playFrom(loopRestartIndex), 0);
         return;
       }
-      const wait = Math.max(0, offsets[i] - (Date.now() - loopStart));
+      // If real processing (React committing the previous frame, the tower's
+      // per-render layout read, a GC pause — anything) has eaten into the
+      // budget far enough that we're now behind this frame's own offset,
+      // resync loopStart to "now" instead of chasing the deficit. Without
+      // this, elapsed keeps growing relative to the ORIGINAL start while the
+      // baked offsets only advance 100ms per frame, so every remaining frame
+      // in the lap computes a negative (clamped-to-0) wait and the whole rest
+      // of the clip fires back-to-back — feeding React far faster than the
+      // live 10 Hz socket ever does, which is exactly the burst that trips
+      // the nested-update guard in effects sized for a paced 10 Hz stream
+      // (e.g. TimingTower's per-render scroll measurement). Resyncing drops
+      // the missed wall-clock time once and resumes normal pacing, the same
+      // way the rest of the app treats a stall as "fell behind", not "must
+      // catch up at any cost".
+      const now = Date.now();
+      if (now - loopStart > offsets[i]) loopStart = now - offsets[i];
+      const wait = Math.max(0, offsets[i] - (now - loopStart));
       timer = setTimeout(() => {
         const msg = messages[i];
         const bumped: Msg = msg.type === 'frame' && lapsCompleted > 0
