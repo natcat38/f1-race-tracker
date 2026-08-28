@@ -1,3 +1,4 @@
+<!-- Index of the repo's portable agent memory: one line per memory file, plus the convention for adding one. -->
 # Memory Index
 
 This directory IS the memory system — it lives in the repo, not in `.claude/`, so it
