@@ -92,7 +92,7 @@ def monotonicity(frames):
         cars = json.loads(frames[i])["frame"]["cars"]
         gaps = [c["gapMs"] for c in sorted(cars, key=lambda c: c["pos"]) if "gapMs" in c]
         total += 1
-        ok += all(a <= b for a, b in zip(gaps, gaps[1:]))
+        ok += all(a <= b for a, b in zip(gaps, gaps[1:], strict=False))  # pairwise: one shorter
     return ok / total if total else 1.0
 
 

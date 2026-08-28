@@ -38,7 +38,7 @@ import math
 def _cumulative_arc(xy):
     """Cumulative Euclidean arc length at each point of an open polyline."""
     cum = [0.0]
-    for (x0, y0), (x1, y1) in zip(xy, xy[1:]):
+    for (x0, y0), (x1, y1) in zip(xy, xy[1:], strict=False):  # pairwise by construction: one shorter
         cum.append(cum[-1] + math.hypot(x1 - x0, y1 - y0))
     return cum
 

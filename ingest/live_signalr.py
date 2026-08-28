@@ -133,8 +133,6 @@ import logging
 import os
 import sys
 import time
-import zlib
-import base64
 
 # Contract helpers — must match internal/model/model.go exactly.
 from live import (
@@ -145,7 +143,15 @@ from live import (
     build_frame,
 )
 from radio import live_radio_refs
-from resample import UNKNOWN_POS
+from resample import UNKNOWN_POS, normalise_point
+from live_parsers import (
+    TEAM_MAP,
+    _decode_position_payload,
+    _parse_timing_line,
+    _parse_tyre_line,
+    _map_status,
+    _safe_int,
+)
 
 # Live team-radio clips resolve against this + SessionInfo.Path (ADR-0003 amended).
 STATIC_BASE = "https://livetiming.formula1.com"
@@ -170,20 +176,6 @@ BOUND_WARMUP_S = 30
 # on Redis under a raw stream.
 TARGET_HZ = 4
 FRAME_INTERVAL_S = 1.0 / TARGET_HZ
-
-# FastF1 team name → frontend colour map key (mirrors record.py exactly)
-TEAM_MAP = {
-    'Red Bull Racing': 'Red Bull',
-    'Ferrari':         'Ferrari',
-    'Mercedes':        'Mercedes',
-    'McLaren':         'McLaren',
-    'Aston Martin':    'Aston Martin',
-    'Alpine':          'Alpine',
-    'Williams':        'Williams',
-    'RB':              'RB',
-    'Kick Sauber':     'Kick Sauber',
-    'Haas F1 Team':    'Haas',
-}
 
 # ---------------------------------------------------------------------------
 # Normalization helpers
@@ -235,9 +227,7 @@ class BoundBox:
         max_range = max(x_range, y_range)
         x_offset = (max_range - x_range) / 2
         y_offset = (max_range - y_range) / 2
-        nx = (x - self._x_min + x_offset) / max_range
-        ny = 1.0 - (y - self._y_min + y_offset) / max_range  # flip Y for SVG
-        return round(float(nx), 4), round(float(ny), 4)
+        return normalise_point(x, y, self._x_min, self._y_min, max_range, x_offset, y_offset)
 
 
 # ---------------------------------------------------------------------------
@@ -293,6 +283,91 @@ def _session_path_from_payload(payload):
     if isinstance(payload, dict) and isinstance(payload.get('Path'), str):
         return "/static/" + payload['Path']
     return ""
+
+
+# --- Shared message-handling blocks (item #3) -------------------------------
+# `_replay_capture` and `handle_message` (inside `_run_live_signalr`) both see
+# the same four topic shapes, one from a capture file's (td, payload) tuples,
+# the other from one live payload at a time — the per-payload merge logic
+# itself is identical either way, so it's factored out here. What surrounds
+# each call site (looping over capture entries vs a single live payload;
+# `continue` vs `return`) is intrinsically different and stays put.
+
+def _apply_driver_list(driver_info, payload):
+    """Fold one DriverList patch dict into driver_info in place."""
+    for num_str, patch in payload.items():
+        if not isinstance(patch, dict):
+            continue
+        if num_str not in driver_info:
+            driver_info[num_str] = {'code': '???', 'team': 'Unknown'}
+        if 'Tla' in patch:
+            driver_info[num_str]['code'] = patch['Tla']
+        if 'TeamName' in patch:
+            raw_team = patch['TeamName']
+            driver_info[num_str]['team'] = TEAM_MAP.get(raw_team, raw_team)
+
+
+def _apply_timing_data(payload, running_positions, timing_extra):
+    """Fold a TimingData payload's Lines into running_positions/timing_extra."""
+    lines = payload.get('Lines', {})
+    for num_str, drv_data in lines.items():
+        if not isinstance(drv_data, dict):
+            continue
+        if 'Position' in drv_data:
+            try:
+                running_positions[num_str] = int(drv_data['Position'])
+            except (ValueError, TypeError):
+                pass
+        parsed = _parse_timing_line(drv_data)
+        if parsed:
+            timing_extra.setdefault(num_str, {}).update(parsed)
+
+
+def _apply_tyre_data(payload, tyre_extra):
+    """Fold a TimingAppData payload's Lines into tyre_extra."""
+    lines = payload.get('Lines', {})
+    for num_str, drv_data in lines.items():
+        if not isinstance(drv_data, dict):
+            continue
+        parsed = _parse_tyre_line(drv_data)
+        if parsed:
+            tyre_extra.setdefault(num_str, {}).update(parsed)
+
+
+def _apply_position_samples(pos_samples, bounds, driver_info, running_positions,
+                             timing_extra, tyre_extra, latest_cars):
+    """Decode Position.z samples into car dicts and fold them into latest_cars.
+
+    Only the decode-error handling and the rate-limited publish that follows
+    (which reads a different clock — recorded session time vs wall clock —
+    in each caller) stay out of this helper.
+    """
+    for sample in pos_samples:
+        for num_str, coords in sample.get('Entries', {}).items():
+            if not isinstance(coords, dict):
+                continue
+            try:
+                x = float(coords['X'])
+                y = float(coords['Y'])
+            except (KeyError, TypeError, ValueError):
+                continue
+
+            bounds.update(x, y)
+            nx, ny = bounds.normalise(x, y)
+            raw_status = coords.get('Status', 'OnTrack')
+
+            info = driver_info.get(num_str, {'code': '???', 'team': 'Unknown'})
+            car = {
+                'driverNum': _safe_int(num_str),
+                'code':      info['code'],
+                'team':      info['team'],
+                'pos':       running_positions.get(num_str, UNKNOWN_POS),
+                'p':         {'x': nx, 'y': ny},
+                'status':    _map_status(raw_status),
+            }
+            car.update(timing_extra.get(num_str, {}))
+            car.update(tyre_extra.get(num_str, {}))
+            latest_cars[num_str] = car
 
 
 def _publish_frame(r, session, snapshot, rev, time_ms, latest_cars, running_positions, radio):
@@ -428,19 +503,9 @@ def _replay_capture(r, session: str, label: str, capture_path: str) -> None:
     # --- Driver list (best-effort from DriverList topic) ---
     driver_info = {}  # str_num -> {'code': str, 'team': str}
     if livedata.has('DriverList'):
-        for td, content in livedata.get('DriverList'):
-            if not isinstance(content, dict):
-                continue
-            for num_str, patch in content.items():
-                if not isinstance(patch, dict):
-                    continue
-                if num_str not in driver_info:
-                    driver_info[num_str] = {'code': '???', 'team': 'Unknown'}
-                if 'Tla' in patch:
-                    driver_info[num_str]['code'] = patch['Tla']
-                if 'TeamName' in patch:
-                    raw_team = patch['TeamName']
-                    driver_info[num_str]['team'] = TEAM_MAP.get(raw_team, raw_team)
+        for _td, content in livedata.get('DriverList'):
+            if isinstance(content, dict):
+                _apply_driver_list(driver_info, content)
     _log.info(f"Drivers from DriverList: {list(driver_info.keys())}")
 
     if not livedata.has('Position.z'):
@@ -515,18 +580,7 @@ def _replay_capture(r, session: str, label: str, capture_path: str) -> None:
             # Update running positions + lap/gap/interval/last-lap from TimingData
             # UNVERIFIED shape: payload should be dict with 'Lines' key
             if isinstance(payload, dict):
-                lines = payload.get('Lines', {})
-                for num_str, drv_data in lines.items():
-                    if not isinstance(drv_data, dict):
-                        continue
-                    if 'Position' in drv_data:
-                        try:
-                            running_positions[num_str] = int(drv_data['Position'])
-                        except (ValueError, TypeError):
-                            pass
-                    parsed = _parse_timing_line(drv_data)
-                    if parsed:
-                        timing_extra.setdefault(num_str, {}).update(parsed)
+                _apply_timing_data(payload, running_positions, timing_extra)
             continue
 
         if kind == 'sessioninfo':
@@ -542,13 +596,7 @@ def _replay_capture(r, session: str, label: str, capture_path: str) -> None:
         if kind == 'appdata':
             # Tyre compound/age from TimingAppData
             if isinstance(payload, dict):
-                lines = payload.get('Lines', {})
-                for num_str, drv_data in lines.items():
-                    if not isinstance(drv_data, dict):
-                        continue
-                    parsed = _parse_tyre_line(drv_data)
-                    if parsed:
-                        tyre_extra.setdefault(num_str, {}).update(parsed)
+                _apply_tyre_data(payload, tyre_extra)
             continue
 
         # kind == 'pos': decompress and emit
@@ -564,35 +612,8 @@ def _replay_capture(r, session: str, label: str, capture_path: str) -> None:
             _log.debug(f"Position decode error: {exc}")
             continue
 
-        for sample in pos_samples:
-            entries = sample.get('Entries', {})
-            for num_str, coords in entries.items():
-                if not isinstance(coords, dict):
-                    continue
-                try:
-                    x = float(coords['X'])
-                    y = float(coords['Y'])
-                except (KeyError, TypeError, ValueError):
-                    continue
-
-                bounds.update(x, y)
-                nx, ny = bounds.normalise(x, y)
-
-                raw_status = coords.get('Status', 'OnTrack')
-                status = _map_status(raw_status)
-
-                info = driver_info.get(num_str, {'code': '???', 'team': 'Unknown'})
-                car = {
-                    'driverNum': _safe_int(num_str),
-                    'code':      info['code'],
-                    'team':      info['team'],
-                    'pos':       running_positions.get(num_str, UNKNOWN_POS),
-                    'p':         {'x': nx, 'y': ny},
-                    'status':    status,
-                }
-                car.update(timing_extra.get(num_str, {}))
-                car.update(tyre_extra.get(num_str, {}))
-                latest_cars[num_str] = car
+        _apply_position_samples(pos_samples, bounds, driver_info, running_positions,
+                                 timing_extra, tyre_extra, latest_cars)
 
         # Rate-limit publishing
         now = time.monotonic()
@@ -684,45 +705,16 @@ def _run_live_signalr(r, session: str, label: str) -> None:
         regardless of processing errors.
         """
         if topic == 'DriverList':
-            if not isinstance(payload, dict):
-                return
-            for num_str, patch in payload.items():
-                if not isinstance(patch, dict):
-                    continue
-                if num_str not in driver_info:
-                    driver_info[num_str] = {'code': '???', 'team': 'Unknown'}
-                if 'Tla' in patch:
-                    driver_info[num_str]['code'] = patch['Tla']
-                if 'TeamName' in patch:
-                    raw = patch['TeamName']
-                    driver_info[num_str]['team'] = TEAM_MAP.get(raw, raw)
+            if isinstance(payload, dict):
+                _apply_driver_list(driver_info, payload)
 
         elif topic == 'TimingData':
-            if not isinstance(payload, dict):
-                return
-            lines = payload.get('Lines', {})
-            for num_str, drv_data in lines.items():
-                if not isinstance(drv_data, dict):
-                    continue
-                if 'Position' in drv_data:
-                    try:
-                        running_positions[num_str] = int(drv_data['Position'])
-                    except (ValueError, TypeError):
-                        pass
-                parsed = _parse_timing_line(drv_data)
-                if parsed:
-                    timing_extra.setdefault(num_str, {}).update(parsed)
+            if isinstance(payload, dict):
+                _apply_timing_data(payload, running_positions, timing_extra)
 
         elif topic == 'TimingAppData':
-            if not isinstance(payload, dict):
-                return
-            lines = payload.get('Lines', {})
-            for num_str, drv_data in lines.items():
-                if not isinstance(drv_data, dict):
-                    continue
-                parsed = _parse_tyre_line(drv_data)
-                if parsed:
-                    tyre_extra.setdefault(num_str, {}).update(parsed)
+            if isinstance(payload, dict):
+                _apply_tyre_data(payload, tyre_extra)
 
         elif topic == 'SessionInfo':
             session_path_holder[0] = (_session_path_from_payload(payload)
@@ -740,34 +732,12 @@ def _run_live_signalr(r, session: str, label: str) -> None:
             except Exception as exc:
                 _log.warning(f"Position.z decode error: {exc}")
                 return
-            now = time.monotonic()
-            for sample in samples:
-                for num_str, coords in sample.get('Entries', {}).items():
-                    if not isinstance(coords, dict):
-                        continue
-                    try:
-                        x = float(coords['X'])
-                        y = float(coords['Y'])
-                    except (KeyError, TypeError, ValueError):
-                        continue
 
-                    bounds.update(x, y)
-                    nx, ny = bounds.normalise(x, y)
-                    raw_status = coords.get('Status', 'OnTrack')
-                    info = driver_info.get(num_str, {'code': '???', 'team': 'Unknown'})
-                    car = {
-                        'driverNum': _safe_int(num_str),
-                        'code':      info['code'],
-                        'team':      info['team'],
-                        'pos':       running_positions.get(num_str, UNKNOWN_POS),
-                        'p':         {'x': nx, 'y': ny},
-                        'status':    _map_status(raw_status),
-                    }
-                    car.update(timing_extra.get(num_str, {}))
-                    car.update(tyre_extra.get(num_str, {}))
-                    latest_cars[num_str] = car
+            _apply_position_samples(samples, bounds, driver_info, running_positions,
+                                     timing_extra, tyre_extra, latest_cars)
 
             # Rate-limited publish
+            now = time.monotonic()
             if (now - last_publish[0]) < FRAME_INTERVAL_S or not latest_cars:
                 return
             last_publish[0] = now
@@ -865,180 +835,6 @@ def _dispatch_message(msg, callback) -> None:
                     callback(str(item[0]), _decode_payload(item[1]))
             except Exception as exc:
                 _log.error(f"handler failed for item={item!r}: {exc}")
-
-
-# ---------------------------------------------------------------------------
-# Codec helpers
-# ---------------------------------------------------------------------------
-
-def _decode_position_payload(payload) -> list:
-    """Decode a Position.z message payload to a list of position samples.
-
-    The payload from LiveTimingData is already the JSON-parsed Python object.
-    However, the ".z" suffix means the original wire format is zlib-compressed
-    base64. After LiveTimingData._parse_line calls json.loads on the line,
-    the payload for 'Position.z' is the JSON-decoded content.
-
-    Based on fastf1._api.parse() and position_data():
-      - After json.loads the Position.z payload is a dict-like object with key 'Position'
-        containing a list of {Timestamp, Entries} dicts.
-      - But the raw wire value is still a zlib+base64 string that fastf1._api.parse()
-        decompresses. After LiveTimingData loads it, the payload is already a string
-        (the compressed blob) because LiveTimingData stores the raw JSON string
-        from the file without calling parse().
-
-    UNVERIFIED: The exact type stored by LiveTimingData for Position.z entries.
-    We handle both cases:
-      1. payload is a str → attempt zlib decompress → parse JSON → extract 'Position'
-      2. payload is a dict with 'Position' key → use directly
-      3. payload is a dict without 'Position' → return []
-    """
-    if isinstance(payload, dict):
-        return payload.get('Position', [])
-
-    if isinstance(payload, str):
-        # Try zlib-compressed base64 (fastf1._api.parse zipped=True path)
-        try:
-            raw = base64.b64decode(payload)
-            decompressed = zlib.decompress(raw, -15)  # raw deflate (no header)
-            decoded = json.loads(decompressed)
-            return decoded.get('Position', [])
-        except Exception:
-            pass
-        # Try plain JSON
-        try:
-            decoded = json.loads(payload)
-            return decoded.get('Position', [])
-        except Exception:
-            pass
-
-    return []
-
-
-def _parse_gap_str(s: str):
-    """Parse a gap/interval string ('+0.512', '1L', '1 LAP') into (gapMs, gapLaps).
-
-    UNVERIFIED: exact string forms based on public reverse-engineering of the F1
-    timing feed (fastf1 treats these as opaque strings) — confirm against a real
-    capture per docs/runbooks/live-verification.md.
-    """
-    if not s:
-        return None, None
-    s = s.strip()
-    upper = s.upper()
-    if upper.endswith('L') or 'LAP' in upper:
-        digits = ''.join(ch for ch in s if ch.isdigit())
-        return (None, int(digits)) if digits else (None, None)
-    try:
-        # Clamp to non-negative: every other gapMs/intMs producer in this
-        # codebase (ingest/record.py) is non-negative by convention (a
-        # "catching" interval is never rendered as a signed value downstream),
-        # so a feed variant that encodes it with a leading '-' shouldn't leak
-        # a negative value into the contract.
-        return max(0, int(round(float(s) * 1000))), None
-    except ValueError:
-        return None, None
-
-
-def _parse_laptime_str(s: str):
-    """Parse 'M:SS.mmm' or 'SS.mmm' into milliseconds, or None if unparseable."""
-    if not s:
-        return None
-    parts = s.split(':')
-    try:
-        if len(parts) == 2:
-            total_s = int(parts[0]) * 60 + float(parts[1])
-        else:
-            total_s = float(parts[0])
-        return int(round(total_s * 1000))
-    except ValueError:
-        return None
-
-
-def _parse_timing_line(drv_data: dict) -> dict:
-    """Extract lap/gap/interval/last-lap fields from one TimingData Lines[num] entry.
-
-    UNVERIFIED: field names ('GapToLeader', 'IntervalToPositionAhead.Value',
-    'LastLapTime.Value', 'NumberOfLaps') are based on community documentation of
-    the F1 timing feed, not confirmed against a real capture — see
-    docs/runbooks/live-verification.md for how to verify and correct these.
-    """
-    out = {}
-    if 'NumberOfLaps' in drv_data:
-        try:
-            # UNVERIFIED: assumed to be the car's current (in-progress) lap
-            # number, matching ingest/record.py's 'lap' (from FastF1's
-            # LapNumber). If the real feed instead counts *completed* laps,
-            # this is off-by-one vs. the replay path until the driver crosses
-            # the line — check this specifically per the runbook's
-            # NumberOfLaps checklist item before relying on it.
-            out['lap'] = int(drv_data['NumberOfLaps'])
-        except (ValueError, TypeError):
-            pass
-    gap = drv_data.get('GapToLeader')
-    if isinstance(gap, str) and gap:
-        gap_ms, gap_laps = _parse_gap_str(gap)
-        if gap_ms is not None:
-            out['gapMs'] = gap_ms
-        if gap_laps is not None:
-            out['gapLaps'] = gap_laps
-    interval = drv_data.get('IntervalToPositionAhead')
-    if isinstance(interval, dict):
-        int_ms, _ = _parse_gap_str(interval.get('Value', ''))
-        if int_ms is not None:
-            out['intMs'] = int_ms
-    last_lap = drv_data.get('LastLapTime')
-    if isinstance(last_lap, dict):
-        ms = _parse_laptime_str(last_lap.get('Value', ''))
-        if ms is not None:
-            out['lastLapMs'] = ms
-    return out
-
-
-def _parse_tyre_line(app_data: dict) -> dict:
-    """Extract current tyre compound/age from one TimingAppData Lines[num] entry.
-
-    UNVERIFIED: 'Stints' shape (dict keyed by stint index vs a plain list) varies
-    by feed version; the current stint is taken as the highest-indexed entry.
-    See docs/runbooks/live-verification.md.
-    """
-    stints = app_data.get('Stints')
-    if isinstance(stints, dict) and stints:
-        current = stints[max(stints, key=lambda k: _safe_int(k))]
-    elif isinstance(stints, list) and stints:
-        current = stints[-1]
-    else:
-        current = None
-    if not isinstance(current, dict):
-        return {}
-    out = {}
-    compound = current.get('Compound')
-    if isinstance(compound, str) and compound:
-        out['tyre'] = compound.upper()
-    age = current.get('TotalLaps')
-    if age is not None:
-        try:
-            out['tyreAge'] = int(age)
-        except (ValueError, TypeError):
-            pass
-    return out
-
-
-def _map_status(raw: str) -> str:
-    """Map F1 live-timing status strings to contract status values."""
-    if raw == 'OnTrack':
-        return 'OnTrack'
-    if raw in ('Pitlane', 'Pit', 'PitLane'):
-        return 'Pit'
-    return 'Out'
-
-
-def _safe_int(s: str) -> int:
-    """Convert a driver number string to int, fallback 0."""
-    try:
-        return int(s)
-    except (ValueError, TypeError):
-        return 0
 
 
 # ---------------------------------------------------------------------------

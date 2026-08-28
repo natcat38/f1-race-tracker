@@ -29,7 +29,7 @@ def build_lap_trace(sample_ts, sample_xy, track_xy):
     # or sample density grows enough to matter, switch to a spatial index (e.g.
     # a k-d tree) or bisection against a precomputed cumulative-arc-length
     # parameterization of the outline.
-    for ts, (sx, sy) in zip(sample_ts, sample_xy):
+    for ts, (sx, sy) in zip(sample_ts, sample_xy, strict=True):
         bi, bd = 0, None
         for i, (tx, ty) in enumerate(track_xy):
             d = (tx - sx) ** 2 + (ty - sy) ** 2

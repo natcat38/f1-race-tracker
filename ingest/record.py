@@ -41,7 +41,8 @@ from fastf1 import _api
 from radio import extract_radio
 from race_control import extract_race_control
 from ghost import build_lap_trace
-from resample import nearest_index, step_value, in_window_ms, reconcile_positions, UNKNOWN_POS
+from resample import nearest_index, step_value, in_window_ms, reconcile_positions, UNKNOWN_POS, normalise_point
+from live_parsers import TEAM_MAP
 from geometry import (
     resample_closed_loop, project_to_arc, wrap_counts, invert_distance_curve, lap_deficit,
 )
@@ -74,20 +75,6 @@ TRACK_POINTS = 150  # number of track outline points
 # comms layer has enough team radio to feel alive — see ADR-0003 / Phase 3 spec).
 WINDOW_START_S = 3300   # 55 min into session
 WINDOW_END_S   = 3750   # 62.5 min  (7.5-min window)
-
-# FastF1 team name → frontend colour map key (from web/src/components/teamColours.ts)
-TEAM_MAP = {
-    'Red Bull Racing': 'Red Bull',
-    'Ferrari':         'Ferrari',
-    'Mercedes':        'Mercedes',
-    'McLaren':         'McLaren',
-    'Aston Martin':    'Aston Martin',
-    'Alpine':          'Alpine',
-    'Williams':        'Williams',
-    'RB':              'RB',
-    'Kick Sauber':     'Kick Sauber',
-    'Haas F1 Team':    'Haas',
-}
 
 # ---------------------------------------------------------------------------
 # Load session
@@ -240,10 +227,7 @@ y_offset = (max_range - y_range) / 2
 def normalise(x, y):
     """Normalise X/Y coords to [0,1] unit box, preserving aspect ratio.
     Flip Y because SVG y-axis grows downward but F1 telemetry Y grows upward."""
-    nx = (x - x_min + x_offset) / max_range
-    # Flip Y: 1.0 - ... so track isn't upside-down
-    ny = 1.0 - (y - y_min + y_offset) / max_range
-    return round(float(nx), 4), round(float(ny), 4)
+    return normalise_point(x, y, x_min, y_min, max_range, x_offset, y_offset)
 
 # ---------------------------------------------------------------------------
 # Build track outline from one clean lap of the leader
@@ -273,7 +257,7 @@ print(f"Track lap: SessionTime {lap_start_t} -> {lap_end_t}, {len(lap_pos)} raw 
 
 # Keep the full-rate reference lap in RAW METRES before the outline downsample —
 # the gap estimator's centreline is built from it (see the centreline section).
-centreline_ref_xy = list(zip(lap_pos['X'].astype(float), lap_pos['Y'].astype(float)))
+centreline_ref_xy = list(zip(lap_pos['X'].astype(float), lap_pos['Y'].astype(float), strict=True))
 
 # Downsample to ~TRACK_POINTS evenly spaced points
 if len(lap_pos) > TRACK_POINTS:
@@ -649,7 +633,7 @@ for dnum, fr in driver_frames.items():
     xs, ys = np.asarray(fr['x'], dtype=float), np.asarray(fr['y'], dtype=float)
     idx = _nearest_nodes(xs, ys)
     s_raw = [project_to_arc(float(x), float(y), centreline, int(i), _LAP_RAW)
-             for x, y, i in zip(xs, ys, idx)]
+             for x, y, i in zip(xs, ys, idx, strict=True)]
 
     # Pit lane: not on the centreline, so projecting a stopped car would smear it
     # onto whichever track point happens to be nearest. Freeze arc length at its
@@ -660,7 +644,7 @@ for dnum, fr in driver_frames.items():
     in_pit = [_in_pit(dnum, float(t)) for t in t_grid_s]
     frozen = []
     held = None
-    for s, pit in zip(s_raw, in_pit):
+    for s, pit in zip(s_raw, in_pit, strict=True):
         if pit and held is not None:
             frozen.append(held)
         else:
@@ -669,7 +653,7 @@ for dnum, fr in driver_frames.items():
     counts = wrap_counts(frozen, _LAP_RAW)
 
     lap0 = _lap_number(dnum, float(t_grid_s[0]))
-    d = np.array([(lap0 + c) * _LAP_RAW + s for c, s in zip(counts, frozen)]) / 10.0
+    d = np.array([(lap0 + c) * _LAP_RAW + s for c, s in zip(counts, frozen, strict=True)]) / 10.0
     # Race distance can only increase; a backwards step is position noise, and the
     # curve must be monotone for invert_distance_curve's bisection to be sound.
     race_dist[dnum] = np.maximum.accumulate(d).tolist()
@@ -786,12 +770,15 @@ with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
         leader_curve = race_dist.get(leader_car['driverNum']) if leader_car else None
         leader_dist = leader_curve[i] if leader_curve else 0.0
 
-        def _behind_ms(curve, d_car):
+        def _behind_ms(curve, d_car, t_s=t_s):
             """ms since the reference car (whose curve this is) was at d_car.
 
             None when the answer would be fabricated: the reference car was never
             observed at that distance inside this window (window-edge case), or it
             is somehow behind, which the classified order says it is not.
+
+            t_s defaulted to bind this frame's value — the closure is only ever
+            called within this same loop iteration, but B023 can't tell that.
             """
             t_ref = invert_distance_curve(t_grid_list, curve, d_car)
             if t_ref is None or t_ref > t_s:
@@ -885,7 +872,7 @@ try:
     assert isinstance(hdr['totalLaps'], int) and hdr['totalLaps'] >= 0, "totalLaps must be a non-negative int"
     assert 'stints' in hdr, "header missing 'stints'"
     assert len(hdr['stints']) >= 15, f"expected stints for >=15 drivers, got {len(hdr['stints'])}"
-    for dn, stint_list in hdr['stints'].items():
+    for _dn, stint_list in hdr['stints'].items():
         for st in stint_list:
             assert {'compound', 'startLap', 'endLap'} <= set(st.keys()), f"stint missing fields: {st}"
     print(f"  Header OK: {len(hdr['track'])} track points, maxRev={hdr['maxRev']}, {len(hdr['radio'])} radio clips, totalLaps={hdr['totalLaps']}, stints for {len(hdr['stints'])} drivers")
