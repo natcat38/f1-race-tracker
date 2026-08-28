@@ -51,12 +51,12 @@ The Python side: records FastF1 sessions to JSONL clips and runs the true-live S
 | `check_gap_estimator.py` | Measure the baked gap/interval estimator against official line-crossing times. |
 | `check_live_contract.py` | Assert live.py builds messages whose key sets exactly match the Go contract. |
 | `conftest.py` | Make the self-check scripts importable from any pytest invocation dir. |
-| `explore.py` | FastF1 data exploration script. |
 | `f1tv_auth.py` | F1TV auth status for the beta live path (ADR-0007). |
 | `f1tv_link.py` | Sign in to F1 for the beta live path (ADR-0007). |
 | `geometry.py` | Pure geometry behind the replay gap/interval estimator. |
 | `ghost.py` | Pure helper for baking a per-driver lap trace into a clip header. |
 | `live.py` | Live ingester — publishes normalized race frames to Redis using the SAME contract |
+| `live_parsers.py` | Pure parsers for the live SignalR feed, extracted from live_signalr.py. |
 | `live_signalr.py` | True-live FastF1 SignalR ingest mode (exploratory, session-only). |
 | `pytest.ini` | Pytest configuration for the ingest suite: which files count as tests, and where collection starts. |
 | `race_control.py` | Pure helper for baking race-control messages into clip frames. |
@@ -72,6 +72,7 @@ The Python side: records FastF1 sessions to JSONL clips and runs the true-live S
 | `test_f1tv_auth.py` | Self-check for ingest/f1tv_auth.auth_status (no fastf1/network needed). |
 | `test_geometry.py` | Unit tests for the pure gap-estimator geometry in ingest/geometry.py. |
 | `test_ghost.py` | Self-check for ingest/ghost.build_lap_trace (no fastf1/numpy/network needed). |
+| `test_live_parsers.py` | Direct self-check for live_parsers.py's pure feed parsers (no fastf1/network). |
 | `test_live_publish.py` | Unit tests for live_signalr.py's two publish paths, without fastf1 or Redis. |
 | `test_race_control.py` | Self-check for ingest/race_control.extract_race_control (no fastf1/network needed). |
 | `test_radio.py` | Self-check for ingest/radio.extract_radio (no fastf1/network needed). |
@@ -209,6 +210,7 @@ The app shell: entry point, root component, error boundary, static-demo bootstra
 
 | File | Purpose |
 | --- | --- |
+| `App.test.tsx` | Regression coverage for the shell's data-source connection: opened once when the board is first shown, and kept alive across route changes. |
 | `App.tsx` | The React app shell: mounts the root component, wires the live WebSocket or static-replay data source into race state, and lays out the dashboard panels. |
 | `ErrorBoundary.tsx` | React error boundary that keeps one component's render-time exception from blanking the whole app. |
 | `main.tsx` | Browser entry point: mounts App under an error boundary and pulls in the global fonts and stylesheets. |
@@ -226,6 +228,7 @@ Presentational components — map, timing tower, telemetry, comms, race control,
 | `Comms.tsx` | The team-radio layer: a now-playing banner over a short replayable history. |
 | `Ghost.render.test.tsx` | Render tests for the overlay: both comparison scenarios, per-side team colours, and the states where there is nothing to compare. |
 | `Ghost.tsx` | The overlay route: two reference laps animated against each other on one track map, across two seasons or two drivers in the same race. |
+| `Map.interaction.test.tsx` | Interaction coverage for the track map: the animation loop and the marker updates that static rendering never exercises. |
 | `Map.tsx` | The track map: cars drawn as smoothed dots on the baked track outline, with the board's selection highlighted. |
 | `Panel.tsx` | The shared panel chrome every dashboard card renders inside: title, framing and spacing. |
 | `RaceControl.tsx` | The race-control log: the most recent marshalling messages, announced politely as they arrive. |
@@ -240,6 +243,7 @@ Presentational components — map, timing tower, telemetry, comms, race control,
 | `StatusRail.tsx` | The top rail as an instrument cluster: identity, instruments, state, controls. |
 | `StintChart.render.test.tsx` | Render tests for the strategy timeline's stint segments and leader marker. |
 | `StintChart.tsx` | The full-race strategy timeline: one row per car, each stint a coloured segment on a lap axis. |
+| `TelemetryPanel.interaction.test.tsx` | Interaction coverage for the telemetry panel: picking and clearing a rival from the "Compare with" select, the one interaction it actually owns. |
 | `TelemetryPanel.tsx` | The selected car's telemetry readout: speed, gear, pedal bars and lap/gap sparklines. |
 | `TimingTower.render.test.tsx` | Render tests for the timing tower's rows, columns and empty states. |
 | `TimingTower.test.ts` | Unit tests for the timing helpers: lap/gap/sector formatting, ordering and personal bests. |
@@ -260,9 +264,7 @@ Hooks deriving UI-facing state (staleness, gap/lap history, smoothed positions, 
 | File | Purpose |
 | --- | --- |
 | `useComms.ts` | Drives the comms layer: queues fired radio clips into one audio element and keeps a short history. |
-| `useGapHistory.ts` | Rolling per-driver gap-trend history, one entry per completed lap. |
 | `useLane.ts` | React binding for the shared lane registry: one session key, one connection, however many overlay sides name it. |
-| `useLapHistory.ts` | Rolling per-driver lap-time history. |
 | `useReducedMotion.ts` | Subscribes to prefers-reduced-motion for the two places motion is driven from JavaScript. |
 | `useRollingHistory.ts` | The shared fold behind the lap and gap histories, including reset on session switch or replay-loop restart. |
 | `useSmoothedCars.ts` | Interpolates car positions at display refresh rate so 10 Hz frames render as continuous motion. |
@@ -385,7 +387,6 @@ Long-form documentation: product and technical scope, UX evaluations, and the su
 | --- | --- |
 | `F1_Race_Tracker_Product_Scope.md` | Product scope: who this is for, what it shows them, and what it deliberately leaves out. |
 | `F1_Race_Tracker_Tech_Scope.md` | Technical scope: the stack, the tiers, and the code-level breakdown of how the pieces fit. |
-| `ux-evaluation-2026-07.md` | Hands-on UX evaluation of all three routes (July 2026), with observed findings and root causes. |
 
 ### `docs/adr`
 
@@ -509,4 +510,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-46 directories, 183 files listed, 0 without a declared purpose.
+46 directories, 184 files listed, 0 without a declared purpose.
