@@ -1,9 +1,13 @@
-// @vitest-environment jsdom
-//
-// Interaction/effect coverage for the track map that renderToStaticMarkup cannot
-// reach: useSmoothedCars' rAF loop only exists as a real DOM effect, so whether it
-// starts/stops with `paused` and whether a new frame actually reaches the marker
-// are invisible to the SSR render tests (Ghost.render.test.tsx et al).
+/**
+ * Interaction coverage for the track map: the animation loop and the marker
+ * updates that static rendering never exercises.
+ *
+ * useSmoothedCars' rAF loop only exists as a real DOM effect, so whether it
+ * starts and stops with `paused`, and whether a new frame actually reaches the
+ * marker, are invisible to the SSR render tests (Ghost.render.test.tsx et al).
+ *
+ * @vitest-environment jsdom
+ */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';

@@ -1,10 +1,14 @@
-// @vitest-environment jsdom
-//
-// The one interaction TelemetryPanel actually owns: picking a rival from the
-// "Compare with" select. This is a controlled component (rival/onRivalChange are
-// props), so a real user event has to round-trip through a small stateful
-// harness — the same shape App.tsx itself uses — to prove the readout actually
-// updates rather than just that onRivalChange fires with the right value.
+/**
+ * Interaction coverage for the telemetry panel: picking and clearing a rival
+ * from the "Compare with" select, the one interaction it actually owns.
+ *
+ * A controlled component (rival/onRivalChange are props), so a real user event
+ * has to round-trip through a small stateful harness — the same shape App.tsx
+ * itself uses — to prove the readout updates, rather than only that
+ * onRivalChange fired with the right value.
+ *
+ * @vitest-environment jsdom
+ */
 
 import { describe, test, expect, afterEach } from 'vitest';
 import { useState } from 'react';

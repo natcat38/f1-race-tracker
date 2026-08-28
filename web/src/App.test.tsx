@@ -1,15 +1,21 @@
-// @vitest-environment jsdom
-//
-// #22 regression coverage: the mount effect used to call connectRace/
-// connectStaticReplay unconditionally, before the route switch, so a deep link
-// straight to #ghost or #settings paid for the connection (and, on the static
-// build, the ~24 MB clip fetch) despite never showing the board. The fix is
-// lazy-connect-once-then-keep-alive — connect the first time the board is
-// actually shown, and never tear the connection down just because the route
-// changed away from it (only a real unmount does). Ghost is stubbed out: it
-// owns its own independent lane subscriptions (useLane -> subscribeLane ->
-// connectRace with a session argument), which are irrelevant to the App-level
-// bug this test targets and would otherwise inflate the call count.
+/**
+ * Regression coverage for the shell's data-source connection: opened once when
+ * the board is first shown, and kept alive across route changes.
+ *
+ * The mount effect used to call connectRace/connectStaticReplay
+ * unconditionally, above the route switch, so a deep link straight to #ghost or
+ * #settings paid for the connection — and, on the static build, the clip fetch —
+ * despite never showing the board. The fix is lazy-connect-once then keep-alive:
+ * connect the first time the board actually renders, and never tear the
+ * connection down merely because the route changed away from it (only a real
+ * unmount does).
+ *
+ * Ghost is stubbed out. It owns independent lane subscriptions (useLane ->
+ * subscribeLane -> connectRace with a session argument) that are irrelevant to
+ * the App-level behaviour under test and would otherwise inflate the count.
+ *
+ * @vitest-environment jsdom
+ */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
