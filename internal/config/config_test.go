@@ -7,7 +7,7 @@ import "testing"
 
 func TestLoad_Defaults(t *testing.T) {
 	// Empty means "unset" to env(), so this exercises every default path.
-	for _, k := range []string{"ROLE", "REDIS_URL", "SESSION_KEY", "CLIP_FILE", "SPEED", "ADDR", "PHASE_WALLCLOCK", "ALLOWED_ORIGINS", "ALLOWED_SESSIONS"} {
+	for _, k := range []string{"ROLE", "REDIS_URL", "SESSION_KEY", "CLIP_FILE", "SPEED", "ADDR", "PHASE_WALLCLOCK", "ALLOWED_ORIGINS", "ALLOWED_SESSIONS", "ALLOWED_HOSTS"} {
 		t.Setenv(k, "")
 	}
 	cfg := Load()
@@ -19,6 +19,9 @@ func TestLoad_Defaults(t *testing.T) {
 	}
 	if len(cfg.AllowedSessions) != 0 {
 		t.Errorf("AllowedSessions default = %v, want empty (gateway compare-lane default applies)", cfg.AllowedSessions)
+	}
+	if len(cfg.AllowedHosts) != 0 {
+		t.Errorf("AllowedHosts default = %v, want empty (loopback-only default applies)", cfg.AllowedHosts)
 	}
 	if cfg.Speed != 1 {
 		t.Errorf("Speed default = %v, want 1", cfg.Speed)
@@ -57,6 +60,18 @@ func TestLoad_PhaseWallclockIsPresenceNotTruthiness(t *testing.T) {
 	t.Setenv("PHASE_WALLCLOCK", "false")
 	if !Load().PhaseWallclock {
 		t.Error(`PHASE_WALLCLOCK="false" still enables the flag (presence check) — expected true`)
+	}
+}
+
+func TestLoad_AllowedHostsFromEnv(t *testing.T) {
+	t.Setenv("ALLOWED_HOSTS", " example.com , demo.local ")
+	got := Load().AllowedHosts
+	if len(got) != 2 || got[0] != "example.com" || got[1] != "demo.local" {
+		t.Errorf("AllowedHosts = %v, want [example.com demo.local] trimmed", got)
+	}
+	t.Setenv("ALLOWED_HOSTS", "")
+	if got := Load().AllowedHosts; len(got) != 0 {
+		t.Errorf("AllowedHosts with blank env = %v, want empty (loopback-only default applies)", got)
 	}
 }
 

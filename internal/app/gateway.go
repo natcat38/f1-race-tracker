@@ -7,7 +7,9 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"net"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/redis/go-redis/v9"
@@ -34,6 +36,7 @@ type Gateway struct {
 	baseCtx         context.Context
 	allowedOrigins  []string        // WS origin allowlist, applied to every hub this gateway creates
 	allowedSessions map[string]bool // /ws?session= registry allowlist (S1); set before serving
+	allowedHosts    map[string]bool // extra Host-header allowlist for control endpoints (L-1); loopback is always allowed
 
 	mu      sync.Mutex
 	session string
@@ -67,6 +70,32 @@ func (g *Gateway) SetAllowedSessions(sessions []string) {
 		return
 	}
 	g.allowedSessions = toSet(sessions)
+}
+
+// SetAllowedHosts adds extra hostnames (port stripped) to the Host-header allowlist checked by
+// handleControl (L-1: DNS rebinding makes a cross-site POST look same-origin, so the
+// Sec-Fetch-Site guard alone isn't enough). Call before serving; loopback is always allowed
+// regardless of this list.
+func (g *Gateway) SetAllowedHosts(hosts []string) {
+	if len(hosts) == 0 {
+		return
+	}
+	g.allowedHosts = toSet(hosts)
+}
+
+// hostAllowed reports whether reqHost (an http.Request.Host value, usually "host:port") names
+// an allowed control-endpoint target: loopback always qualifies; anything else must be in extra.
+// The port is stripped before matching since ADDR/reverse proxies vary it.
+func hostAllowed(reqHost string, extra map[string]bool) bool {
+	h := reqHost
+	if hh, _, err := net.SplitHostPort(reqHost); err == nil {
+		h = hh
+	}
+	h = strings.ToLower(h)
+	if h == "localhost" || h == "127.0.0.1" || h == "::1" {
+		return true
+	}
+	return extra[h]
 }
 
 // toSet builds a membership set from a slice.
@@ -245,6 +274,13 @@ func (g *Gateway) handleControl(w http.ResponseWriter, r *http.Request) {
 		// clients omit it and are allowed; pair with a shared secret if ever internet-exposed.
 		if site := r.Header.Get("Sec-Fetch-Site"); site != "" && site != "same-origin" && site != "none" {
 			http.Error(w, "cross-site control request rejected", http.StatusForbidden)
+			return
+		}
+		// Host allowlist (L-1): DNS rebinding re-resolves an attacker domain to loopback,
+		// making the request genuinely same-origin and slipping past the Sec-Fetch-Site
+		// guard above. Additive, not a replacement for it.
+		if !hostAllowed(r.Host, g.allowedHosts) {
+			http.Error(w, "unrecognized host", http.StatusForbidden)
 			return
 		}
 		var body struct {

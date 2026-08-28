@@ -45,14 +45,14 @@ def test_extract_radio_rejects_bad_base_url():
     # Non-https base_url is rejected.
     try:
         extract_radio(caps, t0, 3300, 3750, "http://livetiming.formula1.com", "/static/x/")
-        assert False, "expected ValueError for non-https base_url"
+        raise AssertionError("expected ValueError for non-https base_url")
     except ValueError as e:
         assert "https" in str(e).lower(), e
 
     # Non-formula1.com host is rejected even over https (spoofed-origin guard).
     try:
         extract_radio(caps, t0, 3300, 3750, "https://evil.example.com", "/static/x/")
-        assert False, "expected ValueError for non-formula1.com host"
+        raise AssertionError("expected ValueError for non-formula1.com host")
     except ValueError as e:
         assert "formula1.com" in str(e).lower(), e
 
@@ -100,12 +100,12 @@ def test_live_radio_refs_rejects_bad_host():
     # Same spoofed-origin guard as extract_radio (S5) — shared _require_f1_host.
     try:
         live_radio_refs([], "https://evil.example", "/static/", set())
-        assert False, "expected ValueError for non-formula1.com host"
+        raise AssertionError("expected ValueError for non-formula1.com host")
     except ValueError as e:
         assert "formula1.com" in str(e).lower(), e
     try:
         live_radio_refs([], "http://livetiming.formula1.com", "/static/", set())
-        assert False, "expected ValueError for non-https base_url"
+        raise AssertionError("expected ValueError for non-https base_url")
     except ValueError as e:
         assert "https" in str(e).lower(), e
 

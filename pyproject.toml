@@ -1,0 +1,23 @@
+# Root config for repo-wide Python tooling. No build system here — ingest/bench/
+# scripts stay plain scripts installed from requirements*.txt, not a packaged project.
+
+[tool.ruff]
+target-version = "py311"  # matches ci.yml's actions/setup-python version
+
+[tool.ruff.lint]
+# Defaults (pyflakes F + a slice of pycodestyle) plus the rest of pycodestyle (E/W)
+# and flake8-bugbear (B) for real-bug classes (mutable defaults, loop-var footguns,
+# useless comparisons, etc.).
+#
+# isort (I) is deliberately left out: nearly every test file does
+# `sys.path.insert(...)` before a local import (see ingest/pytest.ini), which
+# isort's import-sorting flags as unsorted on every one of them — reordering
+# would mean touching a dozen files this pass doesn't own, for a convention
+# that's intentional here, not disorder.
+extend-select = ["E", "W", "B"]
+ignore = [
+  "E501",  # line-too-long — codebase predates any line-length convention (up to
+           # ~195 chars, ~100 lines over the 88-char default); a reformat, not a
+           # lint-config change. Everything else this config catches has been
+           # fixed at the source instead of ignored — see ingest/ for the fixes.
+]

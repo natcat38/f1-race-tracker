@@ -10,7 +10,7 @@ timestamp: 2026-07-25T00:00:00Z
 # Schema
 
 The contract is defined identically in Go and Python — positions first; the same data gives
-the running order for free (see [leaderboard](/domain/leaderboard.md)). Source of truth:
+the running order for free (see [leaderboard](leaderboard.md)). Source of truth:
 `internal/model/model.go`.
 
 - **CarState** — `driverNum`, `code` (e.g. "VER"), `team`, `pos` (running order), `lap`, `p`

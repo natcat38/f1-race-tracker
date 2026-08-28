@@ -31,6 +31,7 @@ type Config struct {
 	PhaseWallclock  bool
 	AllowedOrigins  []string // WebSocket origin allowlist (coder/websocket OriginPatterns)
 	AllowedSessions []string // /ws?session= registry allowlist; empty => gateway compare-lane default
+	AllowedHosts    []string // extra Host-header allowlist for control endpoints; empty => loopback only
 }
 
 // Validate reports an error for an unusable config. Call before any side effects
@@ -53,6 +54,7 @@ func Load() Config {
 		PhaseWallclock:  env("PHASE_WALLCLOCK", "") != "",
 		AllowedOrigins:  allowedOrigins(),
 		AllowedSessions: csv("ALLOWED_SESSIONS"),
+		AllowedHosts:    csv("ALLOWED_HOSTS"),
 	}
 }
 

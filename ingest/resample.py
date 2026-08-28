@@ -33,6 +33,20 @@ def step_value(times, values, t, default):
     return values[i] if i >= 0 else default
 
 
+def normalise_point(x, y, x_min, y_min, max_range, x_offset, y_offset):
+    """Normalise one X/Y sample into a [0,1] unit box given precomputed bounds.
+
+    Just the formula: record.py fixes x_min/y_min/max_range/offsets once from
+    the whole session up front, live_signalr.py's BoundBox grows them
+    incrementally then freezes — those bounds-accumulation strategies are
+    legitimately different and stay in each caller; only the shared final
+    step lives here.
+    """
+    nx = (x - x_min + x_offset) / max_range
+    ny = 1.0 - (y - y_min + y_offset) / max_range  # flip Y for SVG
+    return round(float(nx), 4), round(float(ny), 4)
+
+
 def in_window_ms(time_ms, window_start_s, window_end_s):
     """True if time_ms (session-relative ms) falls in the baked window
     [window_start_s, window_end_s) seconds — half-open, so a message/capture
@@ -56,34 +70,46 @@ def reconcile_positions(cars):
     can be stale relative to another's, producing duplicate positions, gaps,
     and UNKNOWN_POS (99) reaching the wire (see issue #66).
 
-    This reconciles once per frame: sort by each driver's most recent known
-    raw position (UNKNOWN_POS sorts last), tie-broken by laps completed
-    (descending) then driver number (ascending) — the same tie-break
-    web/src/components/timingHelpers.ts's orderCars uses, so a frame that
-    still needed a tie-break server-side agrees with how the frontend would
-    have broken it. Then renumber 1..N so every frame's running order is
-    unique and contiguous, and 99 never reaches the wire.
+    This reconciles once per frame: retired cars (status 'Out') sink to the
+    tail as one block, kept in their existing relative order (stable sort —
+    no further tie-break among them, since a retired car's raw 'pos'/'lap'
+    freeze the moment it retires and aren't a meaningful ranking any more).
+    Every still-running car sorts ahead of that block, by its most recent
+    known raw position (UNKNOWN_POS sorts last within the running group),
+    tie-broken by laps completed (descending) then driver number (ascending)
+    — the same tie-break web/src/components/timingHelpers.ts's orderCars
+    uses, so a frame that still needed a tie-break server-side agrees with
+    how the frontend would have broken it. Then renumber 1..N over the whole
+    sorted list so every frame's running order is unique and contiguous, and
+    99 never reaches the wire.
 
-    KNOWN LIMITATIONS (accepted, not yet addressed):
-      - Cold start: the renumbering is over whoever is in `cars` right now, so a
-        partial roster (only some drivers have reported at session start) gets a
-        dense 1..N over that subset — i.e. a plausible-looking but wrong running
-        order until the whole field reports.
-      - Retired cars: a car with status 'Out' still takes a rank inline rather
-        than being sunk to the tail, so a retirement holds its last position
-        ahead of cars still racing.
+    # ponytail: cold start is a known gap, deliberately left unfixed here.
+    # The renumbering is over whoever is in `cars` right now, so a partial
+    # roster (only some drivers have reported at session start) gets a dense
+    # 1..N over that subset — i.e. a plausible-looking but wrong running
+    # order until the whole field reports. Ceiling: every writer sends a
+    # full-roster DriverList within the first couple of frames, so the
+    # wrong-order window is a handful of frames at session start, never a
+    # whole session — not worth the complexity below. Upgrade path, if it
+    # ever matters: withhold reconciliation (or flag the frame's order
+    # provisional) until a known full-roster count is reached.
 
     cars: list of dicts, each with at least 'driverNum' and 'pos' (raw,
     possibly stale/duplicate/UNKNOWN_POS), and optionally 'lap' (laps
-    completed so far). Mutates each dict's 'pos' in place. Returns the same
-    list, now sorted into running order (rank 1 first).
+    completed so far) and 'status'. Mutates each dict's 'pos' in place.
+    Returns the same list, now sorted into running order (rank 1 first).
 
     Callers must pass RAW feed positions, not a previous call's output mixed
     with fresh values: this renumbers in place, so re-feeding a car's own rank
     as if it were feed data lets that rank stick (see live_signalr's
     _publish_frame, which re-stamps every car from running_positions first).
     """
-    cars.sort(key=lambda c: (c.get('pos', UNKNOWN_POS), -(c.get('lap') or 0), c['driverNum']))
+    def _rank_key(c):
+        if c.get('status') == 'Out':
+            return (True,)  # retired: one tail block, stable among themselves
+        return (False, c.get('pos', UNKNOWN_POS), -(c.get('lap') or 0), c['driverNum'])
+
+    cars.sort(key=_rank_key)
     for i, c in enumerate(cars):
         c['pos'] = i + 1
     return cars

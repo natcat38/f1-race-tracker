@@ -8,7 +8,10 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // `coverage` holds vitest's generated HTML report, whose bundled scripts trip
+  // the unused-eslint-disable warning. CI lints before it runs coverage so it
+  // never saw them; a local run in the other order did.
+  globalIgnores(['dist', 'coverage']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

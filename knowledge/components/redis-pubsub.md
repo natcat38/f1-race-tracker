@@ -10,7 +10,7 @@ timestamp: 2026-06-15T00:00:00Z
 # Schema
 
 Redis is the only shared state and the seam: Python and Go never call each other, they agree
-only on the [event model](/domain/event-model.md) JSON over Redis.
+only on the [event model](../domain/event-model.md) JSON over Redis.
 
 - On each applied frame the active writer does `SET snapshot:{session}` **then**
   `PUBLISH frames:{session}` — ⚠️ **SET before PUBLISH**, always.

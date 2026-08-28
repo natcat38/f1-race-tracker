@@ -16,4 +16,4 @@ ones; don't duplicate what CLAUDE.md, FILE-MAP.md, CONTEXT.md, or git history al
 - [Token economy](token-economy.md) — rules are GLOBAL in ~/.claude/CLAUDE.md ("Subagents & Token Economy"); file keeps the why/history
 - [Code-review level](code-review-level.md) — default `code-review high --fix`; `max` only when the user explicitly asks
 - [Subagent model hook](subagent-model-hook.md) — omit `model` → hook defaults sonnet; explicit model (e.g. opus) is respected
-- [F1 build gotchas](f1-build-gotchas.md) — vite wipes .gitkeep; bench/results.* canonical; no cgo locally, -race is CI-only
+- [F1 build gotchas](f1-build-gotchas.md) — vite wipes .gitkeep; bench/results.* canonical; no cgo locally, -race is CI-only; static demo needs a bake + temp web/.env.local

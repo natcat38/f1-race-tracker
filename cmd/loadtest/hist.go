@@ -24,12 +24,8 @@ func newHist() *latencyHist {
 
 // Add records one latency sample (negative values are clamped to 0).
 func (h *latencyHist) Add(ms int64) {
-	if ms < 0 {
-		ms = 0
-	}
-	if ms > h.max {
-		h.max = ms
-	}
+	ms = max(ms, 0)
+	h.max = max(h.max, ms)
 	h.count++
 	if ms >= histMaxMs {
 		h.over++
@@ -45,9 +41,7 @@ func (h *latencyHist) Merge(o *latencyHist) {
 	}
 	h.over += o.over
 	h.count += o.count
-	if o.max > h.max {
-		h.max = o.max
-	}
+	h.max = max(h.max, o.max)
 }
 
 // Percentile returns the smallest latency (ms) at or below which fraction q of
@@ -58,12 +52,8 @@ func (h *latencyHist) Percentile(q float64) int64 {
 		return 0
 	}
 	rank := int64(math.Ceil(q * float64(h.count)))
-	if rank < 1 {
-		rank = 1
-	}
-	if rank > h.count {
-		rank = h.count
-	}
+	rank = max(rank, 1)
+	rank = min(rank, h.count)
 	var cum int64
 	for ms, c := range h.buckets {
 		cum += c

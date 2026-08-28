@@ -262,7 +262,7 @@ function OverlayLive({ initialA, initialB }: { initialA: SideSel; initialB: Side
       rail={
         <StatusRail
           active="ghost"
-          note={`${labelA} solid vs ${labelB} ghost · each driver's fastest lap`}
+          note={`${labelA} vs ${labelB} · each driver's fastest lap`}
         />
       }
     >

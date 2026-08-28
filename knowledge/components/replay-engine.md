@@ -10,13 +10,13 @@ timestamp: 2026-06-15T00:00:00Z
 # Schema
 
 In replay mode the Go replay player is the active writer. It reads a `.jsonl` clip, emits
-[frames](/domain/event-model.md) honouring `timeMs` gaps × a speed factor, and loops at the
+[frames](../domain/event-model.md) honouring `timeMs` gaps × a speed factor, and loops at the
 end. The replay engine can be built and tested against a fake publisher before the Python
-[ingest pipeline](/components/ingest-pipeline.md) exists.
+[ingest pipeline](ingest-pipeline.md) exists.
 
 ⚠️ `Rev` stays monotonic across the loop (offset by `loop × maxRev`) and `T` is re-stamped to
 emit-time, so clients never reject a looped snapshot. It publishes via
-[Redis](/components/redis-pubsub.md).
+[Redis](redis-pubsub.md).
 
 # Citations
 

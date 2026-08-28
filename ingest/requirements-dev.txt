@@ -2,4 +2,5 @@
 # are kept free of fastf1/numpy, so pytest + redis is all that's needed to run them
 # (same philosophy as CI's `contract` job, which installs only redis).
 pytest==9.1.1
+pytest-cov==7.1.0
 redis==8.1.0

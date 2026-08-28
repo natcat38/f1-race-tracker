@@ -18,8 +18,6 @@
      and that survives fine above the threshold. */
   --dim:     #7C8590;
   --amber:   #FFB000;  /* ATTENTION ONLY: stall, reconnect, flags, safety car (9.8:1 on carbon) */
-  --onair:   #E10600;  /* F1 brand red — FILLS ONLY (the LIVE chip wash). Too dark
-                          for text on carbon at 3.6:1; use --bad for red text. */
 
   /* "This car is in the pit lane" — an attention state on a timing tower, not a
      tyre compound. It used to borrow TYRE_COLOUR.MEDIUM, so retuning the medium
