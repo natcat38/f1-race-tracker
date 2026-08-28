@@ -95,6 +95,74 @@ func TestHandleControl_RejectsCrossSitePost(t *testing.T) {
 	}
 }
 
+// L-1: hostAllowed accepts loopback (with or without a port) unconditionally, rejects an
+// arbitrary foreign host by default, and honors the extra allowlist once set.
+func TestHostAllowed(t *testing.T) {
+	cases := []struct {
+		host  string
+		extra map[string]bool
+		want  bool
+	}{
+		{"localhost:8080", nil, true},
+		{"127.0.0.1:8080", nil, true},
+		{"127.0.0.1", nil, true},
+		{"[::1]:8080", nil, true},
+		{"evil.com", nil, false},
+		{"evil.com:8080", nil, false},
+		{"evil.com", map[string]bool{"evil.com": true}, true},
+		{"EVIL.com:443", map[string]bool{"evil.com": true}, true}, // case-insensitive
+	}
+	for _, c := range cases {
+		if got := hostAllowed(c.host, c.extra); got != c.want {
+			t.Errorf("hostAllowed(%q, %v) = %v, want %v", c.host, c.extra, got, c.want)
+		}
+	}
+}
+
+// L-1: a same-origin POST from a foreign Host is rejected even though Sec-Fetch-Site
+// says same-origin — the scenario DNS rebinding produces — while the documented
+// deployments (loopback Host) still switch the source.
+func TestHandleControl_RejectsForeignHost(t *testing.T) {
+	b := testBus(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	for _, s := range []string{"replay", "live"} {
+		seed := model.NewSnapshot(s, "replay", s)
+		if err := b.Publish(ctx, seed, model.Frame{SessionKey: s, Rev: 0}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	g, err := NewGateway(ctx, b, "replay", slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	g.Mount(mux, nil)
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	post := func(host string) int {
+		req, _ := http.NewRequest(http.MethodPost, srv.URL+"/control/source", strings.NewReader(`{"source":"live"}`))
+		req.Header.Set("Sec-Fetch-Site", "same-origin")
+		req.Host = host
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		return resp.StatusCode
+	}
+
+	if code := post("evil.com"); code != http.StatusForbidden {
+		t.Errorf("rebound-host POST status = %d, want 403", code)
+	}
+	// httptest.NewServer listens on 127.0.0.1; a request with no overridden Host still
+	// carries it, so the documented deployment (loopback) keeps working.
+	if code := post("127.0.0.1"); code != http.StatusOK {
+		t.Errorf("loopback-host POST status = %d, want 200", code)
+	}
+}
+
 // C2: toggling the source under concurrent publishing to both sessions must not panic
 // or leave a torn state. Run under -race to catch a stale-frame data race.
 func TestSwitchTo_ConcurrentSwitchAndPublish(t *testing.T) {

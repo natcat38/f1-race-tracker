@@ -57,6 +57,7 @@ func main() {
 			os.Exit(1)
 		}
 		gw.SetAllowedSessions(cfg.AllowedSessions) // no-op unless ALLOWED_SESSIONS overrides the default lanes
+		gw.SetAllowedHosts(cfg.AllowedHosts)       // no-op unless ALLOWED_HOSTS extends the loopback-only default
 		mux := http.NewServeMux()
 		gw.Mount(mux, http.FileServer(http.FS(web.FS())))
 		// ReadHeaderTimeout guards against slow-header (Slowloris) requests; no WriteTimeout
