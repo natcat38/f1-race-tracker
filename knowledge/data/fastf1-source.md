@@ -9,7 +9,7 @@ timestamp: 2026-06-15T00:00:00Z
 
 # Schema
 
-All data is free. The [ingest pipeline](/components/ingest-pipeline.md) uses:
+All data is free. The [ingest pipeline](../components/ingest-pipeline.md) uses:
 
 - **FastF1** (primary) — historical sessions for baking replay clips, and its free live client.
   ⚠️ First load of a session is slow and network-heavy; cache locally — recording is an offline

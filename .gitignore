@@ -12,6 +12,7 @@ __pycache__/
 .venv/
 venv/
 .env
+.coverage
 # FastF1 downloads cache (large; never commit)
 cache/
 .fastf1/
@@ -21,6 +22,7 @@ node_modules/
 web/dist/
 !web/dist/.gitkeep
 web/.vite/
+web/coverage/
 # Baked by `go run ./cmd/bake-static` for the GitHub Pages static demo — CI
 # generates this fresh on every deploy (.github/workflows/pages.yml), it's
 # never committed.

@@ -11,7 +11,7 @@ timestamp: 2026-06-15T00:00:00Z
 
 Each gateway serves the React SPA and a WebSocket endpoint from the same origin.
 
-- **Snapshot-on-join** — a new client receives the in-memory [snapshot](/domain/event-model.md)
+- **Snapshot-on-join** — a new client receives the in-memory [snapshot](../domain/event-model.md)
   as its first WS message, then streams subsequent frames.
 - **Backpressure** — per-client buffered send channel; ⚠️ if a slow client's buffer fills,
   drop/coalesce rather than blocking the broadcast — one slow consumer must never stall the hub.
@@ -21,7 +21,7 @@ Each gateway serves the React SPA and a WebSocket endpoint from the same origin.
 
 The hub convergence integration test (late-joiner + slow-client) is the evidence for these
 system-design claims; the load test measures a **single gateway's** fan-out latency as
-concurrent viewers climb. Scaling out to multiple gateways over [Redis](/components/redis-pubsub.md)
+concurrent viewers climb. Scaling out to multiple gateways over [Redis](redis-pubsub.md)
 is what the stateless design enables but is not yet built — see
 [ADR-0001](../../docs/adr/0001-single-gateway-deferred-multigateway.md).
 

@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   go:
-    name: Go (fmt + vet + test)
+    name: Go (fmt + vet + staticcheck + test)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -26,8 +26,12 @@ jobs:
         run: test -z "$(gofmt -l .)"
       - name: go vet
         run: go vet ./...
+      - name: staticcheck
+        run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.1 ./...
       - name: go test
-        run: go test -race ./...
+        run: go test -race -coverprofile=coverage.out ./...
+      - name: coverage summary
+        run: go tool cover -func=coverage.out | tail -1
 
   web:
     name: Web (build + test)
@@ -45,7 +49,7 @@ jobs:
       - run: npm ci
       - run: npm run lint -- --max-warnings 0
       - run: npm run build
-      - run: npm test
+      - run: npm test -- --coverage
 
   contract:
     name: Python (contract self-checks + bench)
@@ -61,14 +65,14 @@ jobs:
       - name: FILE-MAP is current
         run: python scripts/gen_file_map.py --check
       - name: scripts self-checks (pytest)
-        run: python -m pytest .
+        run: python -m pytest . --cov=. --cov-report=term-missing
         working-directory: scripts
 
       - name: ingest self-checks (pytest)
-        run: python -m pytest .
+        run: python -m pytest . --cov=. --cov-report=term-missing
         working-directory: ingest
       - name: bench self-checks (pytest)
-        run: python -m pytest .
+        run: python -m pytest . --cov=. --cov-report=term-missing
         working-directory: bench
 
   security:
