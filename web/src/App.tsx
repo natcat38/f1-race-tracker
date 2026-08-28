@@ -134,7 +134,12 @@ export default function App() {
     };
     disconnectRef.current = (STATIC_DEMO ? connectStaticReplay : connectRace)(onState, onStatus);
   }, [routeName]);
-  useEffect(() => () => disconnectRef.current(), []);
+  // Clearing connectedRef alongside the disposer is what makes a remount
+  // reconnect. Refs survive unmount, so without the reset the connect effect
+  // sees a stale `true` and returns early — which under StrictMode's
+  // mount/unmount/remount pass killed the connection on the first render and
+  // never opened another, leaving the board permanently on its warm-up skeleton.
+  useEffect(() => () => { disconnectRef.current(); connectedRef.current = false; }, []);
 
   useEffect(() => {
     const onHash = () => setHash(location.hash);

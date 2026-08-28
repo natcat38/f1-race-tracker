@@ -18,6 +18,7 @@
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
+import { StrictMode } from 'react';
 import { render, cleanup, act } from '@testing-library/react';
 
 const connectRaceMock = vi.fn<(...args: unknown[]) => () => void>(() => vi.fn());
@@ -40,7 +41,9 @@ function goTo(hash: string) {
 }
 
 beforeEach(() => {
-  connectRaceMock.mockClear();
+  // Reset, not just clear: one test swaps in its own disposer implementation.
+  connectRaceMock.mockReset();
+  connectRaceMock.mockImplementation(() => vi.fn());
   window.location.hash = '';
 });
 afterEach(cleanup);
@@ -55,6 +58,20 @@ describe('App connection lifecycle (#22)', () => {
 
     goTo('');
     expect(boardConnectCalls()).toHaveLength(1); // no reconnect on nav back
+  });
+
+  // main.tsx mounts App inside StrictMode, whose dev-only mount/unmount/remount
+  // pass disposes the connection and then re-runs the connect effect. The guard
+  // ref survives that unmount, so it has to be cleared alongside the disposer or
+  // the remount returns early and the board never gets a live source at all.
+  test('a StrictMode remount reconnects rather than being left disconnected', () => {
+    const disconnect = vi.fn();
+    connectRaceMock.mockImplementation(() => disconnect);
+
+    render(<StrictMode><App /></StrictMode>);
+
+    expect(disconnect).toHaveBeenCalledTimes(1); // the simulated unmount
+    expect(boardConnectCalls()).toHaveLength(2); // ...and a real reconnect after it
   });
 
   test('deep-linking straight to #ghost never opens the board connection', () => {
