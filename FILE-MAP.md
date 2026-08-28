@@ -473,6 +473,20 @@ Notes on F1 domain concepts: the event model, leaderboard rules.
 | `event-model.md` | The normalised JSON contract (CarState, Snapshot, Frame) shared identically by Python and Go. |
 | `leaderboard.md` | The running order, derived directly from car positions rather than stored separately. |
 
+### `memory`
+
+Portable cross-session agent memory: one fact per file, indexed by memory/MEMORY.md. Lives in the repo (not .claude/) so it survives machine and agent changes.
+
+| File | Purpose |
+| --- | --- |
+| `MEMORY.md` | Index of the repo's portable agent memory: one line per memory file, plus the convention for adding one. |
+| `code-review-level.md` | "Default /code-review effort is `high --fix`; `max` only when the user explicitly asks for it" |
+| `f1-build-gotchas.md` | F1 tracker build/verify gotchas — vite wipes web/dist/.gitkeep; bench artifacts are canonical; no cgo locally so go test -race only works in CI; live SignalR feed needs F1TV auth |
+| `f1-tracker-direction.md` | "F1 Race Tracker: Phases 1-5 shipped, WS5 merged, signalrcore blocker resolved; 2026-08-28 improvement survey in reviews/{backlog-still-open,tech-debt-scan,peer-comparison}.md" |
+| `plain-english-preference.md` | "User prefers plain-English, low-jargon explanations of technical options" |
+| `subagent-model-hook.md` | "Subagent model hook defaults to sonnet only when Agent call omits model; explicit model now wins" |
+| `token-economy.md` | "Token-economy rules are GLOBAL now (~/.claude/CLAUDE.md \"Subagents & Token Economy\") — this file keeps only the project-specific history" |
+
 ## Data
 
 _Recorded clips and fixtures the other layers read._
@@ -495,4 +509,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-45 directories, 176 files listed, 0 without a declared purpose.
+46 directories, 183 files listed, 0 without a declared purpose.

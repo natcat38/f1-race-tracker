@@ -69,6 +69,7 @@ DIRS = {
     "docs/superpowers": ("Docs", "Artefacts from planning sessions, kept as a record of how decisions were reached."),
     "docs/superpowers/plans": ("Docs", "Historical implementation plans. Kept for provenance; not current instructions."),
     "docs/superpowers/specs": ("Docs", "Historical design specs and spike findings. Kept for provenance; not current instructions."),
+    "memory": ("Docs", "Portable cross-session agent memory: one fact per file, indexed by memory/MEMORY.md. Lives in the repo (not .claude/) so it survives machine and agent changes."),
     "ingest": ("Ingest", "The Python side: records FastF1 sessions to JSONL clips and runs the true-live SignalR ingest path."),
     "ingest/tests": ("Ingest", "Captured SignalR wire samples used as fixtures by the ingest tests."),
     "internal": ("Seam", "Go internals; not importable outside this module."),

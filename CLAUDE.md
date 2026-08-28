@@ -19,3 +19,8 @@ Default label vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `read
 - **`CONTEXT.md`** (repo root) — vocabulary.
 - **`docs/adr/`** — decisions.
 - **`docs/agents/*.md`** — how-tos. See `docs/agents/domain.md`.
+- **`memory/`** (repo root) — persistent cross-session memory: user preferences,
+  project direction, build gotchas. Start every session by reading `memory/MEMORY.md`
+  and the files it lists. It is deliberately in the repo, NOT in `.claude/`, so it
+  survives machine changes and works for any agent — write new memories here, never
+  into a tool-specific memory directory.
