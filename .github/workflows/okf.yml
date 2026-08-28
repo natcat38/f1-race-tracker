@@ -17,6 +17,6 @@ jobs:
         with:
           node-version: '20'
       - name: Validate knowledge/ bundle against the house standard
-        uses: natcat38/okf-portfolio-standard@bfc3f188263f0e16adc7e8961000a4ff0fc618d9 # v1
+        uses: natcat38/okf-portfolio-standard@ac51539e19f1c0741b0ff1f6e4c35df32c10cb28 # v1
         with:
           path: .
