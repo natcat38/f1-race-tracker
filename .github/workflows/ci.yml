@@ -14,7 +14,10 @@ concurrency:
 
 jobs:
   go:
-    name: Go (fmt + vet + staticcheck + test)
+    # Keep this name stable: main's branch ruleset lists it verbatim as a required
+    # status check, so renaming the job silently blocks every PR — the required
+    # context simply never reports. Add steps, not words.
+    name: Go (fmt + vet + test)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
