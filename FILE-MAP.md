@@ -495,4 +495,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-45 directories, 176 files listed, 0 without a declared purpose.
+46 directories, 176 files listed, 0 without a declared purpose.
