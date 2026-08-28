@@ -9,8 +9,9 @@ import type { Car, RaceState } from '../state/race';
 // updateGapHistory), resetting on session switch or a replay-loop restart (the
 // baked clip loops forever with timeMs jumping back to the window start, so a
 // timeMs decrease means the next update is not a continuation of the last one).
-// Shared by useLapHistory and useGapHistory, which were previously identical
-// copies of this scaffolding differing only in which `update` fn they called.
+// Used directly in App.tsx for both lap and gap history, passing
+// updateLapHistory/updateGapHistory as the fold — they used to be separate
+// one-line hook wrappers around this, differing only in which fn they passed.
 export function useRollingHistory<H>(state: RaceState, initial: H, update: (prev: H, cars: Car[]) => H): H {
   const [hist, setHist] = useState<H>(initial);
   const histRef = useRef<H>(initial);

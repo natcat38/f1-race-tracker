@@ -15,10 +15,9 @@ import { RaceControl } from './components/RaceControl';
 import { Panel } from './components/Panel';
 import { Route } from './components/Route';
 import { StatusRail } from './components/StatusRail';
-import { leaderOf } from './components/timingHelpers';
+import { leaderOf, updateLapHistory, updateGapHistory } from './components/timingHelpers';
 import { useStale } from './hooks/useStale';
-import { useLapHistory } from './hooks/useLapHistory';
-import { useGapHistory } from './hooks/useGapHistory';
+import { useRollingHistory } from './hooks/useRollingHistory';
 import { Ghost } from './components/Ghost';
 import { Settings } from './components/Settings';
 import { StintChart } from './components/StintChart';
@@ -63,8 +62,8 @@ export default function App() {
   const frozenRef = useRef(false);
   const latestRef = useRef<RaceState>(state);
   const staleSec = useStale(state);
-  const lapHistory = useLapHistory(state);
-  const gapHistory = useGapHistory(state);
+  const lapHistory = useRollingHistory(state, {}, updateLapHistory);
+  const gapHistory = useRollingHistory(state, {}, updateGapHistory);
 
   // The replay clip is a few minutes long and wraps forever. When it does, the
   // race clock jumps backwards and the lap counter counts down — which, to anyone
@@ -110,7 +109,21 @@ export default function App() {
   const retryRef = useRef<(() => void) | null>(null);
   const reconnect = useCallback(() => { retryRef.current?.(); }, []);
 
+  // #22: the socket/clip fetch used to open unconditionally on mount, so a deep
+  // link straight to #ghost or #settings paid for it despite never showing the
+  // board. Gated on the route actually being 'board' at least once — but NOT
+  // torn down on nav away, because that would re-fetch the (~24 MB, ~0.9 MB
+  // gzipped) static-demo clip on every trip back to #board. connectedRef makes
+  // the connect fire exactly once per App lifetime; the disposer is parked in a
+  // ref and only invoked by the unmount-only effect below.
+  // ponytail: two refs + two effects instead of one — the ceiling here is "the
+  // one lazy-connect-once case", not a general connection-lifecycle manager.
+  const connectedRef = useRef(false);
+  const disconnectRef = useRef<() => void>(() => {});
+  const routeName = parseHash(hash).route;
   useEffect(() => {
+    if (connectedRef.current || routeName !== 'board') return;
+    connectedRef.current = true;
     const onState = (s: RaceState) => {
       latestRef.current = s;
       if (!frozenRef.current) setState(s);
@@ -119,8 +132,9 @@ export default function App() {
       retryRef.current = retry ?? null;
       setStatus(s);
     };
-    return (STATIC_DEMO ? connectStaticReplay : connectRace)(onState, onStatus);
-  }, []);
+    disconnectRef.current = (STATIC_DEMO ? connectStaticReplay : connectRace)(onState, onStatus);
+  }, [routeName]);
+  useEffect(() => () => disconnectRef.current(), []);
 
   useEffect(() => {
     const onHash = () => setHash(location.hash);

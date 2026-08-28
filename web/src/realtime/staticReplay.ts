@@ -1,13 +1,8 @@
 // The static-demo data source: paces a baked NDJSON clip through the same reducer the
 // live socket feeds.
 
-import { applyMessage, emptyState, parseMsg, type RaceState } from '../state/race';
+import { applyMessage, emptyState, parseMsg, type Msg, type RaceState } from '../state/race';
 import type { ConnStatus } from './socket';
-
-// race.ts's Msg union isn't exported (it's an internal detail of parseMsg's
-// return type) — alias it here once so every use below refers to the same
-// name instead of repeating the ReturnType<typeof parseMsg> gymnastics.
-type Msg = NonNullable<ReturnType<typeof parseMsg>>;
 
 const DEFAULT_CLIP_URL = `${import.meta.env.BASE_URL}static-demo/monza-2024-race.ndjson`;
 

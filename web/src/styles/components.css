@@ -429,7 +429,7 @@
   letter-spacing: 0.02em;
 }
 
-/* --onair is the brand red but only 3.4:1 as text over its own wash. The wash
+/* --onair-rgb is the brand red but only 3.4:1 as text over its own wash. The wash
    stays (it carries the brand); the label uses --bad, which measures 4.9:1
    over this exact composite. */
 .chip-live {
@@ -654,11 +654,15 @@ select.btn {
 /* nowrap because these are timing values: a sector cell that wrapped its delta
    superscript onto a second line doubled every row's height (measured 25px → 47px
    across all twenty) while still not fitting. Wrapping never helps here — the
-   column drops below are the mechanism for not fitting. */
+   column drops below are the mechanism for not fitting. Vertical padding one step
+   up from --sp-0 and a hairline below each row (same --edge the card layout
+   already uses at narrow widths) give the tower a little breathing room between
+   rows without giving up density. */
 .tt-table th,
 .tt-table td {
-  padding: var(--sp-0) var(--sp-1);
+  padding: var(--sp-1) var(--sp-1);
   white-space: nowrap;
+  border-bottom: 1px solid var(--edge);
 }
 
 .tt-table th {

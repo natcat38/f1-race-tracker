@@ -73,7 +73,7 @@ interface FrameData {
   rev: number; timeMs: number; cars?: Car[]; messages?: RaceControlMessage[]; weather?: Weather;
   radio?: RadioMessage[]; // live lane only — accumulated onto state.radio (ADR-0008)
 }
-type Msg =
+export type Msg =
   | { type: 'snapshot'; data: SnapshotData }
   | { type: 'frame'; data: FrameData };
 
