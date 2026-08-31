@@ -11,12 +11,24 @@ const MIN_SPARK_POINTS = 4;
 // both bars being green made a full-brake trace look like a full-throttle one
 // at a glance.
 function Bar({ label, value, tone }: { label: string; value: number; tone: 'good' | 'bad' }) {
+  const pct = Math.max(0, Math.min(100, value));
   return (
     <div className="tele-row">
       <span className="tele-label">{label}</span>
-      <div style={{ flex: 1, height: 8, background: 'var(--edge)', borderRadius: 'var(--radius)' }}>
+      {/* role="meter" (WIG best practice, not a WCAG conformance gap — label and
+          value are both real visible text already) ties the bar, its value and
+          its label into one readable unit for assistive tech instead of three
+          disconnected nodes. */}
+      <div
+        role="meter"
+        aria-label={`${label} ${value}%`}
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        style={{ flex: 1, height: 8, background: 'var(--edge)', borderRadius: 'var(--radius)' }}
+      >
         <div style={{
-          width: `${Math.max(0, Math.min(100, value))}%`, height: '100%',
+          width: `${pct}%`, height: '100%',
           background: tone === 'good' ? 'var(--good)' : 'var(--bad)', borderRadius: 'var(--radius)',
         }} />
       </div>
@@ -34,17 +46,30 @@ const BAR_W = 15;
 // green = faster — the stint-degradation squint test. Reused for the gap
 // trend too, where the same colouring reads as "closing" (green) vs
 // "opening" (red).
+// The visual trend (up/down per bar, colour-coded) reduced to words: which way
+// the series moved overall, and the value a sighted reader reads off the last
+// bar — the two things the graphic conveys that the adjacent latest-value span
+// (WCAG 1.1.1) does not, since that span only ever shows the final point.
+function trendSummary(known: number[]) {
+  if (known.length < 2) return '';
+  const first = known[0], last = known[known.length - 1];
+  const direction = last > first ? 'rising' : last < first ? 'falling' : 'flat';
+  const min = Math.min(...known), max = Math.max(...known);
+  return `, ${direction} over the last ${known.length} laps, ranging ${min} to ${max}`;
+}
+
 function Sparkline({ values, label }: { values: (number | undefined)[]; label: string }) {
   const known = values.filter((v): v is number => v != null);
   if (known.length === 0) return null;
   const min = Math.min(...known), max = Math.max(...known);
   const span = max - min || 1;
+  const fullLabel = `${label}${trendSummary(known)}`;
   return (
     // minWidth reserves the full 8-lap span so the row does not reflow one bar at
     // a time as history accumulates. Not flex-pinned: the panel is already tight
     // when a rival card is open, and a hard floor there would push it wider still.
     <svg
-      width={values.length * 15} height={24} role="img" aria-label={label}
+      width={values.length * 15} height={24} role="img" aria-label={fullLabel}
       style={{ minWidth: MAX_SPARK_BARS * BAR_W }}
     >
       {values.map((v, i) => {

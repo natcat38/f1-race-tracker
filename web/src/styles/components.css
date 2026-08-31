@@ -757,6 +757,13 @@ select.btn {
 
 /* The real control: an unstyled button that looks exactly like the driver code it
    replaced, but is a focusable, named, pressable thing to a screen reader. */
+/* WCAG 2.2 SC 2.5.8 Target Size (Minimum), AA: the unpadded button was the 13px
+   text's own line box (~16-19px) — under the 24x24 CSS-px floor at pointer:fine,
+   and the row itself isn't an accessible fallback target (no role/tabIndex). The
+   min box is grown with negative margins rather than padding, so the enlarged
+   hit area doesn't widen the column or push neighbouring cell content — same
+   inward-compensation idea as the focus ring below, applied to layout instead
+   of paint. */
 .tt-select {
   appearance: none;
   border: 0;
@@ -767,6 +774,11 @@ select.btn {
   font: inherit;
   cursor: pointer;
   touch-action: manipulation;
+  min-width: 24px;
+  min-height: 24px;
+  margin-block: -3px;
+  display: inline-flex;
+  align-items: center;
 }
 
 /* Drawn inside the row's own bounds: .panel is overflow:hidden and .tt-scroll is
