@@ -40,6 +40,11 @@ const CATEGORY: Record<string, { label: string; colour: string }> = {
 // RaceControl is a passive feed of the most recent race-control messages
 // (flags, safety car, investigations), newest first.
 export function RaceControl({ state, selected }: { state: RaceState; selected?: number | null }) {
+  // "No incidents." asserted a fact about the session before any snapshot had
+  // arrived — indistinguishable from a quiet race (ui-ux item 8, Nielsen #1).
+  // state.rev === 0 is the same warming-up discriminator App.tsx and
+  // StatusBadge already use.
+  if (state.rev === 0) return <div className="empty">⏳ Warming up the timing feed…</div>;
   if (state.messages.length === 0) return <div className="empty">No incidents.</div>;
   const recent = state.messages.slice(-MAX_SHOWN).reverse();
 

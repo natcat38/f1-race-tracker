@@ -196,6 +196,12 @@ export function TelemetryPanel({
           {/* "vs" said nothing about what the control does; the empty option said
               what the state IS rather than offering the action. */}
           Compare with
+          {/* `rival` here is already the caller's *effective* rival (App.tsx
+              collapses it to null when it matches the primary selection) — so
+              this reflects the same value the card below is keyed on. Without
+              that collapse the select would keep showing a rival the card no
+              longer renders, a control disagreeing with the view (ui-ux 14b).
+              onRivalChange still writes the raw, un-collapsed rival state. */}
           <select
             value={rival ?? ''}
             onChange={(e) => onRivalChange(e.target.value ? Number(e.target.value) : null)}

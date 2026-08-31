@@ -32,14 +32,28 @@ const LOOP_NOTICE_MS = 8000;
 // the rest of the board is showing: an unrecoverable static-demo load failure,
 // a live socket that has spent its reconnect budget, a session streaming fine
 // but without a track outline, or nothing yet at all.
-function SkeletonMap({ failed, offline, trackless }: {
-  failed?: boolean; offline?: boolean; trackless?: boolean;
+function SkeletonMap({ failed, offline, trackless, onReconnect }: {
+  failed?: boolean; offline?: boolean; trackless?: boolean; onReconnect?: () => void;
 }) {
+  // Reconnect used to live only in the status rail, so the copy pointed the
+  // reader away from the panel that is actually reporting the failure (ui-ux
+  // item 7 — Nielsen #6 / Gestalt proximity). The action now sits right beside
+  // the notice that names it.
+  if (offline) {
+    return (
+      <div className="track-skeleton">
+        Connection lost.
+        {onReconnect && (
+          <button type="button" className="btn chip-action" onClick={onReconnect}>
+            Reconnect
+          </button>
+        )}
+      </div>
+    );
+  }
   const copy = failed
     ? 'The demo replay could not be loaded. Refresh the page to retry.'
-    : offline
-      ? 'Connection lost. Use Reconnect in the status rail above to try again.'
-      : trackless
+    : trackless
       ? 'No track outline for this session — timing still works.'
       : 'Warming up the timing feed…';
   return <div className="track-skeleton">{copy}</div>;
@@ -283,7 +297,19 @@ export default function App() {
             <span role="status" aria-live="polite">
               {frozen && <span className="chip chip-replay">⏸ FROZEN</span>}
               {justLooped && (
-                <span className="chip chip-loop">↻ CLIP LOOPED — the recording restarted</span>
+                <span className="chip chip-loop">
+                  ↻ CLIP LOOPED — the recording restarted
+                  {/* Auto-clears after LOOP_NOTICE_MS, but a fixed-duration
+                      notice with no way to dismiss it early is still stuck on
+                      screen for the full 8s (ui-ux item 14a, Nielsen #3). */}
+                  <button
+                    type="button"
+                    className="btn btn-icon"
+                    style={{ border: 'none' }}
+                    onClick={() => setJustLooped(false)}
+                    aria-label="Dismiss clip looped notice"
+                  >✕</button>
+                </span>
               )}
             </span>
           }
@@ -298,7 +324,14 @@ export default function App() {
               <div className="chip chip-reconnect" style={{
                 position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
               }}>
-                {status === 'offline' ? '⚠ Connection lost' : '↺ Reconnecting…'}
+                {status === 'offline' ? (
+                  <>
+                    ⚠ Connection lost
+                    <button type="button" className="btn chip-action" onClick={reconnect}>
+                      Reconnect
+                    </button>
+                  </>
+                ) : '↺ Reconnecting…'}
               </div>
             </div>
           )}
@@ -310,6 +343,7 @@ export default function App() {
               failed={status === 'failed'}
               offline={status === 'offline'}
               trackless={trackless}
+              onReconnect={reconnect}
             />
           )}
         </Panel>
