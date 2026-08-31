@@ -133,8 +133,10 @@
    region) — this hairline plus extra gap is what says the standalone button after
    them does not belong to that group. Scoped to the bare .btn that follows the
    segmented control's wrapper, so a route with no lane control (nothing to
-   separate from) is unaffected. */
-.rail-controls > .rail-segmented ~ .btn {
+   separate from) is unaffected. Applied directly to the Freeze/Resume button
+   rather than matched structurally, so the rule fires only where that button
+   actually sits, not wherever a `.btn` happens to follow a `.rail-segmented`. */
+.rail-divided {
   margin-left: var(--sp-1);
   padding-left: calc(var(--sp-2) + var(--sp-1));
   border-left: 1px solid var(--edge);
@@ -823,6 +825,14 @@ select.btn {
 }
 
 .tt-note {
+  font-size: var(--fs-sm);
+  margin-top: var(--sp-1);
+}
+
+/* The ghost-overlay pointer below the tower. It rendered identically to
+   .tt-note (same size, same top margin) but isn't one of the tower's own
+   notes, so it gets its own class rather than borrowing that one. */
+.tt-overlay-link {
   font-size: var(--fs-sm);
   margin-top: var(--sp-1);
 }

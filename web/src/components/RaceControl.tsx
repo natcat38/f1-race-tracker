@@ -1,7 +1,7 @@
 // The race-control log: the most recent marshalling messages, announced politely as
 // they arrive.
 
-import type { RaceControlMessage, RaceState } from '../state/race';
+import { isWarmingUp, type RaceControlMessage, type RaceState } from '../state/race';
 import { fmtClock, needsDriverTag, splitWallClock } from './timingHelpers';
 
 const MAX_SHOWN = 8;
@@ -44,7 +44,7 @@ export function RaceControl({ state, selected }: { state: RaceState; selected?: 
   // arrived — indistinguishable from a quiet race (ui-ux item 8, Nielsen #1).
   // state.rev === 0 is the same warming-up discriminator App.tsx and
   // StatusBadge already use.
-  if (state.rev === 0) return <div className="empty">⏳ Warming up the timing feed…</div>;
+  if (isWarmingUp(state)) return <div className="empty">⏳ Warming up the timing feed…</div>;
   if (state.messages.length === 0) return <div className="empty">No incidents.</div>;
   const recent = state.messages.slice(-MAX_SHOWN).reverse();
 

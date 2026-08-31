@@ -393,7 +393,7 @@ export function TimingTower({
     {/* The ghost overlay was reachable only from the OVERLAY rail tab, with no
         pointer from the board itself (ui-ux item 2, Nielsen #6). One line, next
         to the reference-car hint it complements rather than a coach mark. */}
-    <div className="empty tt-note">
+    <div className="empty tt-overlay-link">
       <a className="demo-notice-link" href="#ghost">Compare laps in the overlay →</a>
     </div>
     </div>

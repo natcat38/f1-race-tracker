@@ -1,5 +1,6 @@
 // The selected car's telemetry readout: speed, gear, pedal bars and lap/gap sparklines.
 
+import { memo } from 'react';
 import type { Car, RaceState } from '../state/race';
 import { fmtLap, fmtGapEstimate, type LapHistory, type GapHistory } from './timingHelpers';
 
@@ -21,7 +22,7 @@ function Bar({ label, value, tone }: { label: string; value: number; tone: 'good
           disconnected nodes. */}
       <div
         role="meter"
-        aria-label={`${label} ${value}%`}
+        aria-label={`${label} ${pct}%`}
         aria-valuenow={pct}
         aria-valuemin={0}
         aria-valuemax={100}
@@ -50,20 +51,25 @@ const BAR_W = 15;
 // the series moved overall, and the value a sighted reader reads off the last
 // bar — the two things the graphic conveys that the adjacent latest-value span
 // (WCAG 1.1.1) does not, since that span only ever shows the final point.
-function trendSummary(known: number[]) {
+function trendSummary(known: number[], min: number, max: number) {
   if (known.length < 2) return '';
   const first = known[0], last = known[known.length - 1];
   const direction = last > first ? 'rising' : last < first ? 'falling' : 'flat';
-  const min = Math.min(...known), max = Math.max(...known);
   return `, ${direction} over the last ${known.length} laps, ranging ${min} to ${max}`;
 }
 
-function Sparkline({ values, label }: { values: (number | undefined)[]; label: string }) {
+// React.memo with a contents comparator: `values` is rebuilt into a fresh array
+// every 10 Hz frame by the caller's lapHistory/gapHistory lookups, so identity
+// alone would defeat a plain memo — this bails out unless the label or the
+// actual numbers changed.
+const Sparkline = memo(function Sparkline(
+  { values, label }: { values: (number | undefined)[]; label: string },
+) {
   const known = values.filter((v): v is number => v != null);
   if (known.length === 0) return null;
   const min = Math.min(...known), max = Math.max(...known);
   const span = max - min || 1;
-  const fullLabel = `${label}${trendSummary(known)}`;
+  const fullLabel = `${label}${trendSummary(known, min, max)}`;
   return (
     // minWidth reserves the full 8-lap span so the row does not reflow one bar at
     // a time as history accumulates. Not flex-pinned: the panel is already tight
@@ -93,7 +99,10 @@ function Sparkline({ values, label }: { values: (number | undefined)[]; label: s
       })}
     </svg>
   );
-}
+}, (prev, next) =>
+  prev.label === next.label
+  && prev.values.length === next.values.length
+  && prev.values.every((v, i) => v === next.values[i]));
 
 // One shared hatch pattern for every Sparkline on the page.
 function SparkHatch() {
