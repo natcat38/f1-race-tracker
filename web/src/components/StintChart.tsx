@@ -3,7 +3,7 @@
 
 import { memo } from 'react';
 import type { RaceState } from '../state/race';
-import { axisTicks, leaderLapOf, orderCars, sameRunningOrder, TYRE_COLOUR } from './timingHelpers';
+import { axisTicks, leaderLapOf, orderCars, sameRunningOrder, TYRE_COLOUR, TYRE_LEGEND } from './timingHelpers';
 
 // StintChart is the full-race strategy timeline: one row per car (running
 // order), each stint drawn as a coloured segment on a 0..totalLaps axis, with
@@ -100,10 +100,13 @@ function StintChartInner({ state, selected, rival }: {
       </div>
       {/* The tyre key lived in the Timing panel, several hundred pixels away and
           in a different container — and on touch there is no hover to recover the
-          compound from. It costs one line to repeat it where the colours are. */}
+          compound from. It costs one line to repeat it where the colours are.
+          TYRE_LEGEND (shared with TimingTower) is what keeps the two in sync
+          instead of formatting the same five compounds two different ways
+          (ui-ux item 12) — this row used to have no leading glyph at all. */}
       <div className="empty tt-legend" style={{ fontSize: 'var(--fs-sm)' }}>
-        {(['SOFT', 'MEDIUM', 'HARD', 'INTERMEDIATE', 'WET'] as const).map((t) => (
-          <span key={t} style={{ color: TYRE_COLOUR[t] }}>{t[0]}{t.slice(1).toLowerCase()}</span>
+        {TYRE_LEGEND.map(([t, label]) => (
+          <span key={t} style={{ color: TYRE_COLOUR[t] }}>{label}</span>
         ))}
       </div>
       <div className="empty" style={{ fontSize: 'var(--fs-sm)', marginTop: 'var(--sp-0)' }}>

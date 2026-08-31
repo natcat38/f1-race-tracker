@@ -226,6 +226,7 @@ Presentational components — map, timing tower, telemetry, comms, race control,
 | --- | --- |
 | `Comms.render.test.tsx` | Render tests for the Comms panel's radio on/off control. |
 | `Comms.tsx` | The team-radio layer: a now-playing banner over a short replayable history. |
+| `CopyButton.tsx` | Shared "copy to clipboard" control: the success/failure live-region feedback pattern that used to live only in Settings.tsx's Cmd (ui-ux item 9b), now reused by the board's and overlay's "Copy link" buttons (ui-ux item 6) instead of a second copy of the same catch/live-region logic. |
 | `Ghost.render.test.tsx` | Render tests for the overlay: both comparison scenarios, per-side team colours, and the states where there is nothing to compare. |
 | `Ghost.tsx` | The overlay route: two reference laps animated against each other on one track map, across two seasons or two drivers in the same race. |
 | `Map.interaction.test.tsx` | Interaction coverage for the track map: the animation loop and the marker updates that static rendering never exercises. |
@@ -510,4 +511,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-46 directories, 184 files listed, 0 without a declared purpose.
+46 directories, 185 files listed, 0 without a declared purpose.

@@ -6,12 +6,13 @@ import type { RaceState } from '../state/race';
 import {
   fmtLap, fmtSec, fmtGap, gapLabel, intLabel,
   orderCars, bestSectors, updatePersonalBests, personalBestOf, sectorColour, sectorDelta,
-  TYRE_COLOUR, tyreLabel, statusLabel, sectorDeltaVs, fmtSigned, sectorMark,
+  TYRE_COLOUR, TYRE_LEGEND, tyreLabel, statusLabel, sectorDeltaVs, fmtSigned, sectorMark,
   updateGapSmoothing, displayGaps, hasNoData, holdOrder,
 } from './timingHelpers';
 import type { Bests, GapSmoothing } from './timingHelpers';
 import { teamColour } from './teamColours';
 import { SegmentedControl } from './SegmentedControl';
+import { CopyButton } from './CopyButton';
 
 const GAP_UNIT_OPTIONS = [
   { key: 'laps', label: 'Laps' },
@@ -364,20 +365,36 @@ export function TimingTower({
             Clear reference car
           </button>
           <span className="tt-hint-key"> (or press Esc)</span>
+          {' '}
+          {/* Deep links (?car=) had no UI at all (ui-ux item 6) — App.tsx already
+              keeps the URL in sync with the reference car via replaceState, so the
+              current href is always the shareable link the moment a car is set. */}
+          <CopyButton
+            getText={() => location.href}
+            label="Copy link"
+            copiedLabel="✓ link copied"
+            className="btn tt-clear"
+            ariaLabel={`Copy link to ${refCar.code}`}
+          />
         </>
       ) : (
         'Choose a driver row to set the reference car — sector deltas then compare against it.'
       )}
     </div>
     <div className="empty tt-note tt-legend">
-      {([['SOFT', 'S Soft'], ['MEDIUM', 'M Medium'], ['HARD', 'H Hard'],
-         ['INTERMEDIATE', 'I Inter'], ['WET', 'W Wet']] as const).map(([t, label]) => (
+      {TYRE_LEGEND.map(([t, label]) => (
         <span key={t} style={{ color: TYRE_COLOUR[t] }}>{label}</span>
       ))}
       {/* The S/P glyph is the colour-blind-safe half of the sector-best signal,
           but its meaning used to live only in a title attribute on a superscript
           — unreachable on touch. It gets a visible legend like the compounds do. */}
       <span>S = session best · P = personal best</span>
+    </div>
+    {/* The ghost overlay was reachable only from the OVERLAY rail tab, with no
+        pointer from the board itself (ui-ux item 2, Nielsen #6). One line, next
+        to the reference-car hint it complements rather than a coach mark. */}
+    <div className="empty tt-overlay-link">
+      <a className="demo-notice-link" href="#ghost">Compare laps in the overlay →</a>
     </div>
     </div>
   );

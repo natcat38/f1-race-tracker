@@ -8,7 +8,11 @@ import { SegmentedControl } from './SegmentedControl';
 const SOURCES = [
   { key: 'replay', label: '▶ Replay', caveat: undefined },
   {
-    key: 'live', label: '● Live',
+    // Visible label says "demo" up front (ui-ux review item 3): on the board's
+    // healthy path StatusBadge stands down (laneNamedElsewhere), so this segment
+    // is the only on-screen naming of the lane — the honest word cannot be left
+    // to the hover/visually-hidden caveat alone.
+    key: 'live', label: '● Live (demo)',
     caveat: 'Demo lane streaming a second replay clip — real live ingestion not yet verified',
   },
 ] as const;

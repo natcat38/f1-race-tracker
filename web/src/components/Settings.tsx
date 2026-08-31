@@ -7,6 +7,7 @@ import { StatusRail } from './StatusRail';
 import { Route } from './Route';
 import { parseAuthStatus, relativeExpiry, type AuthStatus } from '../state/f1auth';
 import { StaticDemoNotice } from './StaticDemoNotice';
+import { CopyButton } from './CopyButton';
 import { REPO_URL, STACK_LINE, STATIC_DEMO } from '../staticDemo';
 
 const POLL_MS = 5000;
@@ -15,25 +16,24 @@ const LINK_CMD = 'python ingest/f1tv_link.py';
 
 // The one control a setup page owes its reader, and the one it did not have: the
 // three commands here are meant to be run somewhere else, and selecting mono text
-// out of a wrapped paragraph by hand is the whole friction. Falls back to saying
-// so if the Clipboard API is unavailable (it needs a secure context).
+// out of a wrapped paragraph by hand is the whole friction. The copy button (and
+// its success/failure live-region feedback, ui-ux item 9b) is CopyButton — shared
+// now with the board's and overlay's "Copy link" buttons (ui-ux item 6) instead of
+// a second copy of the same logic.
+// children: string (not ReactNode) is load-bearing — it is what lets the
+// aria-label below interpolate the command text directly. Widening this to
+// ReactNode would make `Copy: ${children}` render "[object Object]" at every
+// call site (ui-ux item 9c) with no compile-time warning.
 function Cmd({ children }: { children: string }) {
-  const [copied, setCopied] = useState(false);
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(children);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setCopied(false);
-    }
-  }
   return (
     <span className="cmd">
       <code>{children}</code>
-      <button type="button" className="btn cmd-copy" onClick={copy} aria-label={`Copy: ${children}`}>
-        {copied ? '✓ copied' : 'copy'}
-      </button>
+      <CopyButton
+        getText={() => children}
+        label="copy"
+        className="btn cmd-copy"
+        ariaLabel={`Copy: ${children}`}
+      />
     </span>
   );
 }
@@ -131,6 +131,43 @@ function About() {
   );
 }
 
+// The four-step onboarding + the check/forget commands, factored out so it can
+// render either inline (not yet linked) or inside a <details> (already linked).
+function SigningInSteps() {
+  return (
+    <>
+      <ol>
+        <li>
+          Have a free F1 account — <Url href="https://account.formula1.com" />
+        </li>
+        <li>
+          Install the f1login browser extension —{' '}
+          <Url href="https://f1login.fastf1.dev" /> (this is FastF1’s own
+          extension; it is what hands the sign-in to this machine)
+        </li>
+        <li>
+          Install the Python dependencies:
+          <br />
+          <Cmd>pip install -r ingest/requirements.txt -r ingest/requirements-live.txt</Cmd>
+          <br />
+          <Cmd>pip install --no-deps -r ingest/requirements-live-nodeps.txt</Cmd>
+        </li>
+        <li>
+          Run <Cmd>{LINK_CMD}</Cmd>, then open the URL it prints and sign in.
+          It will say <em>“requires an active F1TV Access/Pro/Premium
+          subscription”</em> before the URL — that line is expected, not a
+          rejection; a free account signs in fine.
+        </li>
+      </ol>
+
+      <p>
+        To check without signing in again: <code>{LINK_CMD} --status</code>.
+        To forget the sign-in: <code>{LINK_CMD} --unlink</code>.
+      </p>
+    </>
+  );
+}
+
 // Settings is the #settings route: the operator's view of the beta F1TV link.
 // It only ever reads status — linking itself is a host command, because fastf1's
 // browser login POSTs to host loopback and a container cannot receive that
@@ -223,35 +260,22 @@ export function Settings() {
               </p>
             )}
 
-            <h3>Signing in</h3>
-            <ol>
-              <li>
-                Have a free F1 account — <Url href="https://account.formula1.com" />
-              </li>
-              <li>
-                Install the f1login browser extension —{' '}
-                <Url href="https://f1login.fastf1.dev" /> (this is FastF1’s own
-                extension; it is what hands the sign-in to this machine)
-              </li>
-              <li>
-                Install the Python dependencies:
-                <br />
-                <Cmd>pip install -r ingest/requirements.txt -r ingest/requirements-live.txt</Cmd>
-                <br />
-                <Cmd>pip install --no-deps -r ingest/requirements-live-nodeps.txt</Cmd>
-              </li>
-              <li>
-                Run <Cmd>{LINK_CMD}</Cmd>, then open the URL it prints and sign in.
-                It will say <em>“requires an active F1TV Access/Pro/Premium
-                subscription”</em> before the URL — that line is expected, not a
-                rejection; a free account signs in fine.
-              </li>
-            </ol>
-
-            <p>
-              To check without signing in again: <code>{LINK_CMD} --status</code>.
-              To forget the sign-in: <code>{LINK_CMD} --unlink</code>.
-            </p>
+            {/* A linked operator has nothing left to do here — NextStep already
+                says so — but used to scroll past the full four-step onboarding
+                and its commands regardless (ui-ux item 9a, Nielsen #8). <details>
+                keeps the steps one click away instead of removing them, since
+                the sign-in does lapse and the same operator will need them again. */}
+            {auth.state === 'linked' ? (
+              <details>
+                <summary>Signing in (already linked)</summary>
+                <SigningInSteps />
+              </details>
+            ) : (
+              <>
+                <h3>Signing in</h3>
+                <SigningInSteps />
+              </>
+            )}
 
             <p>
               Sign-in runs on this machine rather than in a container, because the

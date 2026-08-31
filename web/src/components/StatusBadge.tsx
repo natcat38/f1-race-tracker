@@ -1,7 +1,7 @@
 // The connection/staleness badge: what the socket is doing and how old the data is.
 
 import type { ConnStatus } from '../realtime/socket';
-import type { RaceState } from '../state/race';
+import { isWarmingUp, type RaceState } from '../state/race';
 
 interface Props {
   status: ConnStatus;
@@ -50,7 +50,7 @@ function Chip({ status, state, staleSec, onReconnect, laneNamedElsewhere }: Prop
   if (status === 'reconnecting') {
     return <span className="chip chip-reconnect">↺ Reconnecting…</span>;
   }
-  if (state.rev === 0) {
+  if (isWarmingUp(state)) {
     return <span className="chip chip-warm">⏳ Warming up the timing feed…</span>;
   }
   if ((staleSec ?? 0) >= STALE_THRESHOLD_SEC) {

@@ -15,6 +15,7 @@ import { useLane } from '../hooks/useLane';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { StatusRail } from './StatusRail';
 import { Route } from './Route';
+import { CopyButton } from './CopyButton';
 import { buildHash, type OverlaySide } from '../routing';
 import { STATIC_DEMO, REPO_URL } from '../staticDemo';
 
@@ -370,6 +371,9 @@ function OverlayLive({ initialA, initialB }: { initialA: SideSel; initialB: Side
             style={{ flex: 1, minWidth: 160 }}
           />
           <span className="rail-clock">{fmtElapsed(tMs)}</span>
+          {/* The ?a=/?b= pair had no UI (ui-ux item 6) despite the effect above
+              already keeping the URL in sync with both sides via replaceState. */}
+          <CopyButton getText={() => location.href} label="Copy link" copiedLabel="✓ link copied" />
         </div>
       </Panel>
       <Panel label="Track">

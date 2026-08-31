@@ -50,6 +50,13 @@ export interface RaceState {
   loopSeq: number;
 }
 
+// True before the first snapshot has arrived — the "nothing to show yet" state
+// several panels (App, StatusBadge, RaceControl, useComms) each tested for
+// separately as a raw `rev === 0` comparison.
+export function isWarmingUp(s: RaceState): boolean {
+  return s.rev === 0;
+}
+
 export function emptyState(): RaceState {
   return {
     session: '', mode: '', label: '', track: [], cars: {}, timeMs: 0, rev: 0,

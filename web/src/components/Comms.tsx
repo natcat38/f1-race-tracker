@@ -1,5 +1,6 @@
 // The team-radio layer: a now-playing banner over a short replayable history.
 
+import type { CSSProperties } from 'react';
 import type { RaceState } from '../state/race';
 import { useComms } from '../hooks/useComms';
 import { teamColour } from './teamColours';
@@ -21,6 +22,14 @@ export function Comms({ state }: { state: RaceState }) {
   }
   function colourFor(driverNum: number) {
     return teamColour[state.cars[driverNum]?.team ?? ''] ?? 'var(--slate)';
+  }
+  // Team colour as a border accent, not the text fill (WCAG 1.4.3) — shared by
+  // the now-playing banner and every history row so the two sites can't drift.
+  function accentStyle(driverNum: number): CSSProperties {
+    return {
+      color: 'var(--chalk)', fontWeight: 700, borderLeft: `3px solid ${colourFor(driverNum)}`,
+      paddingLeft: 'var(--sp-1)',
+    };
   }
 
   return (
@@ -44,7 +53,12 @@ export function Comms({ state }: { state: RaceState }) {
           display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', padding: 'var(--sp-2) var(--sp-3)',
           background: 'var(--asphalt)', borderRadius: 'var(--radius)', fontSize: 'var(--fs-md)',
         }}>
-          <span style={{ color: colourFor(nowPlaying.driverNum), fontWeight: 700 }}>
+          {/* Team colour as a border accent, not the text fill (WCAG 1.4.3): the
+              AlphaTauri hex measured 1.97:1 on --asphalt / 1.82:1 on --carbon, both
+              well under the 4.5:1 floor for this text size. Same pattern as the
+              tower's constructor rule (components.css ~724-728) — colour identifies
+              the team, --chalk keeps the code itself readable. */}
+          <span style={accentStyle(nowPlaying.driverNum)}>
             {codeFor(nowPlaying.driverNum)}
           </span>
           <span style={{ color: 'var(--slate)' }}>radio</span>
@@ -76,7 +90,7 @@ export function Comms({ state }: { state: RaceState }) {
               className={enabled ? 'comms-row' : 'comms-row comms-row-resting'}
             >
               <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtClock(m.timeMs)}</span>
-              <span style={{ color: colourFor(m.driverNum), fontWeight: 700 }}>{codeFor(m.driverNum)}</span>
+              <span style={accentStyle(m.driverNum)}>{codeFor(m.driverNum)}</span>
               {/* No play button while comms is off. The clips are real and the
                   list is the substance of the resting state, but the one control
                   offered there has to be the toggle above — two ways to start

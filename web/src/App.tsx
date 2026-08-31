@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { connectRace, type ConnStatus } from './realtime/socket';
 import { connectStaticReplay } from './realtime/staticReplay';
-import { emptyState, type RaceState } from './state/race';
+import { emptyState, isWarmingUp, type RaceState } from './state/race';
 import { Map } from './components/Map';
 import { TimingTower } from './components/TimingTower';
 import { TelemetryPanel } from './components/TelemetryPanel';
@@ -32,17 +32,39 @@ const LOOP_NOTICE_MS = 8000;
 // the rest of the board is showing: an unrecoverable static-demo load failure,
 // a live socket that has spent its reconnect budget, a session streaming fine
 // but without a track outline, or nothing yet at all.
-function SkeletonMap({ failed, offline, trackless }: {
-  failed?: boolean; offline?: boolean; trackless?: boolean;
+// The "Connection lost" + Reconnect unit, shared between the skeleton and the
+// rail's own reconnect chip — same button, wording free to differ per site.
+function OfflineReconnect({ message, onReconnect }: { message: string; onReconnect: () => void }) {
+  return (
+    <>
+      {message}
+      <button type="button" className="btn chip-action" onClick={onReconnect}>
+        Reconnect
+      </button>
+    </>
+  );
+}
+
+function SkeletonMap({ failed, offline, trackless, onReconnect }: {
+  failed?: boolean; offline?: boolean; trackless?: boolean; onReconnect: () => void;
 }) {
-  const copy = failed
-    ? 'The demo replay could not be loaded. Refresh the page to retry.'
-    : offline
-      ? 'Connection lost. Use Reconnect in the status rail above to try again.'
-      : trackless
-      ? 'No track outline for this session — timing still works.'
-      : 'Warming up the timing feed…';
-  return <div className="track-skeleton">{copy}</div>;
+  // Reconnect used to live only in the status rail, so the copy pointed the
+  // reader away from the panel that is actually reporting the failure (ui-ux
+  // item 7 — Nielsen #6 / Gestalt proximity). The action now sits right beside
+  // the notice that names it.
+  return (
+    <div className="track-skeleton">
+      {offline ? (
+        <OfflineReconnect message="Connection lost." onReconnect={onReconnect} />
+      ) : failed ? (
+        'The demo replay could not be loaded. Refresh the page to retry.'
+      ) : trackless ? (
+        'No track outline for this session — timing still works.'
+      ) : (
+        'Warming up the timing feed…'
+      )}
+    </div>
+  );
 }
 
 export default function App() {
@@ -241,8 +263,8 @@ export default function App() {
   // A snapshot without a track outline would render an invisible map, so stand
   // in for it — but say which of the two cases it is, because "warming up" is a
   // lie once frames are arriving and the timing tower is already populated.
-  const trackless = state.rev > 0 && state.track.length === 0;
-  const showSkeleton = state.rev === 0 || trackless;
+  const trackless = !isWarmingUp(state) && state.track.length === 0;
+  const showSkeleton = isWarmingUp(state) || trackless;
 
   return (
     <Route
@@ -271,7 +293,7 @@ export default function App() {
                   Play/Pause: a transport control names the action it will take. The
                   resulting state is carried by the chip, in a region that is present
                   before it fills so the transition is actually announced. */}
-              <button type="button" className="btn" onClick={toggleFrozen}>
+              <button type="button" className="btn rail-divided" onClick={toggleFrozen}>
                 {frozen ? '▶ Resume' : '⏸ Freeze'}
               </button>
             </>
@@ -280,12 +302,32 @@ export default function App() {
           // state, not controls, and they belong in the reserved slot so the rail
           // does not change shape for eight seconds every time the clip wraps.
           stateChips={
-            <span role="status" aria-live="polite">
-              {frozen && <span className="chip chip-replay">⏸ FROZEN</span>}
+            <>
+              {/* The live region announces the text only — its dismiss button lives
+                  outside it as a sibling, so the button unmounting (on dismiss or
+                  the auto-clear timeout) is never itself announced as a change to
+                  the region's content. */}
+              <span role="status" aria-live="polite">
+                {frozen && <span className="chip chip-replay">⏸ FROZEN</span>}
+                {justLooped && (
+                  <span className="chip chip-loop">
+                    ↻ CLIP LOOPED — the recording restarted
+                  </span>
+                )}
+              </span>
+              {/* Auto-clears after LOOP_NOTICE_MS, but a fixed-duration notice with
+                  no way to dismiss it early is still stuck on screen for the full
+                  8s (ui-ux item 14a, Nielsen #3). */}
               {justLooped && (
-                <span className="chip chip-loop">↻ CLIP LOOPED — the recording restarted</span>
+                <button
+                  type="button"
+                  className="btn btn-icon"
+                  style={{ border: 'none' }}
+                  onClick={() => setJustLooped(false)}
+                  aria-label="Dismiss clip looped notice"
+                >✕</button>
               )}
-            </span>
+            </>
           }
         />
       }
@@ -298,7 +340,9 @@ export default function App() {
               <div className="chip chip-reconnect" style={{
                 position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
               }}>
-                {status === 'offline' ? '⚠ Connection lost' : '↺ Reconnecting…'}
+                {status === 'offline' ? (
+                  <OfflineReconnect message="⚠ Connection lost" onReconnect={reconnect} />
+                ) : '↺ Reconnecting…'}
               </div>
             </div>
           )}
@@ -310,6 +354,7 @@ export default function App() {
               failed={status === 'failed'}
               offline={status === 'offline'}
               trackless={trackless}
+              onReconnect={reconnect}
             />
           )}
         </Panel>

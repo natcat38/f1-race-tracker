@@ -1,5 +1,10 @@
 // Shared formatting and ordering helpers for the timing views: lap/gap/sector
 // rendering, running order, personal bests.
+//
+// Broadcast timing (m:ss.SSS, +s.SSS, …) is a fixed, locale-invariant wire
+// format, not a number the reader's own locale should reformat — so this file
+// hand-formats with padStart/toFixed throughout and deliberately never reaches
+// for Intl (ui-ux item 14d).
 
 import type { RaceState, Car } from '../state/race';
 
@@ -121,6 +126,16 @@ export const TYRE_COLOUR: Record<string, string> = {
   INTERMEDIATE: 'var(--tyre-inter)',
   WET: 'var(--tyre-wet)',
 };
+
+// TYRE_LEGEND: compound key -> glyph-prefixed legend label ("S Soft"), shared by
+// TimingTower's and StintChart's tyre-colour keys. The two used to format this
+// independently and drifted (ui-ux item 12): StintChart's own list carried no
+// leading glyph, which is exactly the non-colour signal 1.4.1 needs once the
+// swatch itself is the only other cue.
+export const TYRE_LEGEND: readonly (readonly [string, string])[] = [
+  ['SOFT', 'S Soft'], ['MEDIUM', 'M Medium'], ['HARD', 'H Hard'],
+  ['INTERMEDIATE', 'I Inter'], ['WET', 'W Wet'],
+];
 
 // tyreLabel is the single compact tyre readout shared by TimingTower and
 // Standings (previously formatted inconsistently between the two: "S 5" vs "S5").

@@ -2,7 +2,7 @@
 // short history.
 
 import { useEffect, useRef, useState } from 'react';
-import type { RaceState, RadioMessage } from '../state/race';
+import { isWarmingUp, type RaceState, type RadioMessage } from '../state/race';
 import { stepComms, liveArrivals, isStale, isAllowedClip, type CommsCursor } from '../state/comms';
 
 const HISTORY_MAX = 6;
@@ -75,7 +75,7 @@ export function useComms(state: RaceState) {
   // snapshotSeq (not "have we ever seen a rev yet") so a mid-session reconnect is
   // caught too, not just the very first snapshot after mount.
   useEffect(() => {
-    if (state.rev === 0) return;
+    if (isWarmingUp(state)) return;
     clockRef.current = state.timeMs;
     const isSnapshot = lastSnapshotSeqRef.current !== state.snapshotSeq;
     lastSnapshotSeqRef.current = state.snapshotSeq;
