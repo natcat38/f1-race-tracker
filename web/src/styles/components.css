@@ -127,6 +127,19 @@
 .rail-tabs { order: 5; }
 .rail-exits { order: 6; gap: var(--sp-0); }
 
+/* Zone D holds two objects, not one: the lane pick (a persistent-state radiogroup)
+   and the transport verb (a momentary .btn). The scope label and the segments'
+   shared border already say "these two abut" (ui-ux item 10, Gestalt common
+   region) — this hairline plus extra gap is what says the standalone button after
+   them does not belong to that group. Scoped to the bare .btn that follows the
+   segmented control's wrapper, so a route with no lane control (nothing to
+   separate from) is unaffected. */
+.rail-controls > .rail-segmented ~ .btn {
+  margin-left: var(--sp-1);
+  padding-left: calc(var(--sp-2) + var(--sp-1));
+  border-left: 1px solid var(--edge);
+}
+
 /* STATE. A reserved slot: min-width rather than a fixed width, so the stall,
    FROZEN and CLIP-LOOPED chips arriving and leaving never reflow the rail, but
    the eight-second loop notice — the one chip that MUST be readable in the

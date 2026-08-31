@@ -7,6 +7,7 @@ import { StatusRail } from './StatusRail';
 import { Route } from './Route';
 import { parseAuthStatus, relativeExpiry, type AuthStatus } from '../state/f1auth';
 import { StaticDemoNotice } from './StaticDemoNotice';
+import { CopyButton } from './CopyButton';
 import { REPO_URL, STACK_LINE, STATIC_DEMO } from '../staticDemo';
 
 const POLL_MS = 5000;
@@ -15,41 +16,24 @@ const LINK_CMD = 'python ingest/f1tv_link.py';
 
 // The one control a setup page owes its reader, and the one it did not have: the
 // three commands here are meant to be run somewhere else, and selecting mono text
-// out of a wrapped paragraph by hand is the whole friction. Falls back to saying
-// so if the Clipboard API is unavailable (it needs a secure context).
+// out of a wrapped paragraph by hand is the whole friction. The copy button (and
+// its success/failure live-region feedback, ui-ux item 9b) is CopyButton — shared
+// now with the board's and overlay's "Copy link" buttons (ui-ux item 6) instead of
+// a second copy of the same logic.
 // children: string (not ReactNode) is load-bearing — it is what lets the
 // aria-label below interpolate the command text directly. Widening this to
 // ReactNode would make `Copy: ${children}` render "[object Object]" at every
 // call site (ui-ux item 9c) with no compile-time warning.
 function Cmd({ children }: { children: string }) {
-  const [copied, setCopied] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(children);
-      setError(null);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Used to fail silently (ui-ux item 9b) — the button just sat there
-      // saying "copy" again with no explanation. Surfaced the same way
-      // Comms.tsx reports a blocked clip: an inline role="status" message.
-      setCopied(false);
-      setError('Copy failed — select the text and copy it manually.');
-    }
-  }
   return (
     <span className="cmd">
       <code>{children}</code>
-      <button type="button" className="btn cmd-copy" onClick={copy} aria-label={`Copy: ${children}`}>
-        {copied ? '✓ copied' : 'copy'}
-      </button>
-      {/* Announces both the "✓ copied" success and the failure message — the
-          success label change used to sit in no live region at all. */}
-      <span role="status" aria-live="polite">
-        {copied && <span className="visually-hidden">Copied</span>}
-        {error && <span className="src-error">{error}</span>}
-      </span>
+      <CopyButton
+        getText={() => children}
+        label="copy"
+        className="btn cmd-copy"
+        ariaLabel={`Copy: ${children}`}
+      />
     </span>
   );
 }

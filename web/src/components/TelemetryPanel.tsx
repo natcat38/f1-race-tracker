@@ -202,10 +202,13 @@ export function TelemetryPanel({
               that collapse the select would keep showing a rival the card no
               longer renders, a control disagreeing with the view (ui-ux 14b).
               onRivalChange still writes the raw, un-collapsed rival state. */}
+          {/* .overlay-select, not .btn: .btn is transparent-background and left
+              this the only select on the board styled that way — one idiom for
+              a select, shared with the overlay's pickers (ui-ux item 11). */}
           <select
             value={rival ?? ''}
             onChange={(e) => onRivalChange(e.target.value ? Number(e.target.value) : null)}
-            className="btn"
+            className="overlay-select"
             style={{ fontSize: 'var(--fs-xs)' }}
           >
             <option value="">— pick a rival —</option>
