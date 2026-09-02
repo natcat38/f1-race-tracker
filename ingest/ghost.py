@@ -72,7 +72,7 @@ def build_pedal_trace(sample_ts, sample_xy, track_xy, throttle_vals, brake_vals,
     reached = [None] * n
     # ponytail: same brute-force nearest-point search as build_lap_trace, run once
     # per driver per clip bake — see that function's comment for the cost analysis.
-    for ts, (sx, sy), th, br, gr in zip(
+    for _ts, (sx, sy), th, br, gr in zip(
         sample_ts, sample_xy, throttle_vals, brake_vals, gear_vals, strict=True
     ):
         bi, bd = 0, None
