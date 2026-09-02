@@ -61,12 +61,14 @@ func run(clipPath, outPath, session string) error {
 func bake(src *replay.Source, session string, w *bufio.Writer) error {
 	snap := model.NewSnapshot(session, src.Mode(), src.Label())
 	snap.Track = src.Track()
+	snap.Corners = src.Corners()
 	snap.Radio = src.Radio()
 	snap.LapTrace = src.LapTrace()
 	snap.TotalLaps = src.TotalLaps()
 	snap.Stints = src.Stints()
 	snap.PitStops = src.PitStops()
 	snap.PedalTraces = src.PedalTraces()
+	snap.SectorDominance = src.SectorDominance()
 
 	sb, err := ws.EncodeSnapshot(snap)
 	if err != nil {

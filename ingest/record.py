@@ -5,11 +5,13 @@ Bakes a real F1 session into the contract read by the Go replay player.
 
 CONTRACT (must match internal/model/model.go + web/src/state/race.ts):
   Header line: {"track":[{"x":float,"y":float},...], "label":"...", "maxRev":int,
+                "corners":[{"number":int,"x":float,"y":float},...],
                 "radio":[{"timeMs":int,"driverNum":int,"clip":"https://..."}],
                 "lapTrace":{"<num>":[ms,...]},
                 "stints":{"<num>":[{"compound":"SOFT","startLap":int,"endLap":int}]},
                 "pitStops":{"<num>":[{"lap":int,"durationS":float}]},
-                "pedalTraces":{"<num>":{"throttle":[int,...],"brake":[int,...],"gear":[int,...]}}}
+                "pedalTraces":{"<num>":{"throttle":[int,...],"brake":[int,...],"gear":[int,...]}},
+                "sectorDominance":[driverNum,...]}  # one per fixed-size minisector of "track"
   Frame lines: {"timeMs":int, "frame":{"rev":int,"timeMs":int,"cars":[
                  {"driverNum":int,"code":"VER","team":"Red Bull","pos":int,
                   "p":{"x":float,"y":float},"status":"OnTrack"}],
@@ -35,6 +37,7 @@ import fastf1
 import numpy as np
 import pandas as pd
 import json
+import math
 import sys
 import os
 import argparse
@@ -42,7 +45,7 @@ from pathlib import Path
 from fastf1 import _api
 from radio import extract_radio
 from race_control import extract_race_control
-from ghost import build_lap_trace, build_pedal_trace
+from ghost import build_lap_trace, build_pedal_trace, compute_sector_dominance
 from resample import nearest_index, step_value, in_window_ms, reconcile_positions, UNKNOWN_POS, normalise_point
 from live_parsers import TEAM_MAP
 from geometry import (
@@ -72,6 +75,11 @@ GP_LABEL = _args.label or f"{_args.gp} {_args.year} · Race"
 
 HZ = 10          # target sample rate (frames per second)
 TRACK_POINTS = 150  # number of track outline points
+# Minisector bin size for the sector-dominance heatmap (item 5): TRACK_POINTS / this
+# many minisectors. Mirrored in web/src/components/geometry.ts's MINISECTOR_SIZE —
+# both sides must bin the outline identically for sectorDominance[i] to line up
+# with the frontend's i'th outline segment.
+MINISECTOR_SIZE = 10
 
 # Window: 7.5-min green-flag mid-race window (widened from 2.5 min in Phase 3 so the
 # comms layer has enough team radio to feel alive — see ADR-0003 / Phase 3 spec).
@@ -274,6 +282,25 @@ track_points = [
 print(f"Track outline: {len(track_points)} points")
 
 # ---------------------------------------------------------------------------
+# Track furniture (item 4): corner numbers, baked once from FastF1's circuit
+# info. Start/finish is track_points[0] by convention (the outline's own lap
+# starts at lap_start_t) — no separate field needed.
+# ponytail: DRS zones and a safety-car marker are dropped from this slice
+# (reviews/plans/verify/04-05-map-features.md) — DRS has no session-derived
+# source, and SC needs a track-status field the contract doesn't carry yet.
+# ---------------------------------------------------------------------------
+print("\nFetching circuit info (corners)...")
+corners = []
+try:
+    circuit_info = session.get_circuit_info()
+    for _, row in circuit_info.corners.iterrows():
+        cx, cy = normalise(row['X'], row['Y'])
+        corners.append({"number": int(row['Number']), "x": cx, "y": cy})
+    print(f"Corners: {len(corners)}")
+except Exception as e:
+    print(f"  Warning: circuit info fetch failed ({type(e).__name__}: {e}); clip will have no corners")
+
+# ---------------------------------------------------------------------------
 # Lap traces (Phase 4): per-driver pace curve over the fastest accurate lap.
 # Cumulative ms at each track-outline index, for the cross-year ghost overlay.
 # ---------------------------------------------------------------------------
@@ -323,6 +350,14 @@ for num in session.drivers:
 
 print(f"Lap traces baked for {len(lap_traces)} drivers")
 print(f"Pedal traces baked for {len(pedal_traces)} drivers")
+
+# ---------------------------------------------------------------------------
+# Sector dominance (item 5): fastest driver per fixed-size minisector, reusing
+# the lap_traces already built above (cumulative ms per driver at each outline
+# index) — no extra projection needed.
+# ---------------------------------------------------------------------------
+sector_dominance = compute_sector_dominance(lap_traces, len(track_points), MINISECTOR_SIZE) if lap_traces else []
+print(f"Sector dominance: {len(sector_dominance)} minisectors")
 
 # ---------------------------------------------------------------------------
 # Derive running order from laps data
@@ -724,6 +759,7 @@ with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
     # --- Header ---
     header = {
         "track": track_points,
+        "corners": corners,
         "label": GP_LABEL,
         "maxRev": max_rev,
         "radio": radio_clips,
@@ -732,6 +768,7 @@ with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
         "stints": stints,
         "pitStops": pit_stops,
         "pedalTraces": pedal_traces,
+        "sectorDominance": sector_dominance,
     }
     f.write(json.dumps(header, separators=(',', ':')) + '\n')
 
@@ -925,7 +962,15 @@ try:
         assert {'throttle', 'brake', 'gear'} <= set(pt.keys()), f"pedal trace missing fields: {pt}"
         assert len(pt['throttle']) == len(hdr['track']) == len(pt['brake']) == len(pt['gear']), \
             f"pedal trace length {len(pt['throttle'])} != track length {len(hdr['track'])}"
-    print(f"  Header OK: {len(hdr['track'])} track points, maxRev={hdr['maxRev']}, {len(hdr['radio'])} radio clips, totalLaps={hdr['totalLaps']}, stints for {len(hdr['stints'])} drivers, pitStops for {len(hdr['pitStops'])} drivers, pedalTraces for {len(hdr['pedalTraces'])} drivers")
+    assert 'corners' in hdr, "header missing 'corners'"
+    for c in hdr['corners']:
+        assert {'number', 'x', 'y'} <= set(c.keys()), f"corner missing fields: {c}"
+        assert 0 <= c['x'] <= 1 and 0 <= c['y'] <= 1, f"corner out of [0,1]: {c}"
+    assert 'sectorDominance' in hdr, "header missing 'sectorDominance'"
+    expected_bins = math.ceil(len(hdr['track']) / MINISECTOR_SIZE) if hdr['track'] else 0
+    assert len(hdr['sectorDominance']) == expected_bins, \
+        f"sectorDominance length {len(hdr['sectorDominance'])} != expected {expected_bins} bins"
+    print(f"  Header OK: {len(hdr['track'])} track points, maxRev={hdr['maxRev']}, {len(hdr['radio'])} radio clips, totalLaps={hdr['totalLaps']}, stints for {len(hdr['stints'])} drivers, pitStops for {len(hdr['pitStops'])} drivers, pedalTraces for {len(hdr['pedalTraces'])} drivers, {len(hdr['corners'])} corners, {len(hdr['sectorDominance'])} minisectors")
 except AssertionError as e:
     print(f"  HEADER ERROR: {e}")
     errors += 1

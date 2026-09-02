@@ -91,3 +91,30 @@ def build_pedal_trace(sample_ts, sample_xy, track_xy, throttle_vals, brake_vals,
         brake.append(last[1])
         gear.append(last[2])
     return {"throttle": throttle, "brake": brake, "gear": gear}
+
+
+def compute_sector_dominance(lap_traces, n_points, bin_size):
+    """Fastest driver's number through each fixed-size minisector of the outline.
+
+    lap_traces: {driver_num: [cum_ms,...]} of length n_points, as built by
+    build_lap_trace (cumulative elapsed ms at each track-outline index, over
+    that driver's own fastest lap). Bins are [start, min(start+bin_size, n-1)]
+    windows, matching web/src/components/geometry.ts's trackSegmentPaths so
+    segment i lines up with sectorDominance[i] on both sides of the contract.
+
+    Returns one driver number per bin — the driver with the least elapsed time
+    across that bin's window — or 0 when no driver has a positive time delta
+    there (e.g. too few points, or no lap trace data at all).
+    """
+    out = []
+    for start in range(0, n_points, bin_size):
+        end = min(start + bin_size, n_points - 1)
+        best_driver, best_delta = 0, None
+        for dnum, trace in lap_traces.items():
+            delta = trace[end] - trace[start]
+            if delta <= 0:
+                continue
+            if best_delta is None or delta < best_delta:
+                best_delta, best_driver = delta, dnum
+        out.append(best_driver)
+    return out

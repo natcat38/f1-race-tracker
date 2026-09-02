@@ -1,11 +1,12 @@
 // The track map: cars drawn as smoothed dots on the baked track outline, with the
 // board's selection highlighted.
 
+import { useMemo } from 'react';
 import type { RaceState } from '../state/race';
 import { TrackPath } from './TrackPath';
 import { useSmoothedCars } from '../hooks/useSmoothedCars';
 import { teamColour } from './teamColours';
-import { SIZE, fitViewBox, trackPathD } from './geometry';
+import { SIZE, fitViewBox, trackPathD, trackSegmentPaths } from './geometry';
 
 // selected / rival are the board's one selection, reaching the map at last: the
 // click-a-row interaction used to change the tower row and the telemetry panel and
@@ -17,12 +18,52 @@ export function Map({ state, paused, selected, rival }: {
   const cars = useSmoothedCars(state, paused);
   const trackPath = trackPathD(state.track);
   const anySelection = selected != null || rival != null;
+  // Sector-dominance heatmap (item 5): one coloured segment per minisector,
+  // by the fastest driver's team colour. Always on rather than a toggle — the
+  // plain outline is what renders whenever a clip carries no sectorDominance
+  // (older clips, or a bake with too little lap-trace data).
+  const segments = useMemo(() => {
+    if (!state.sectorDominance.length) return undefined;
+    const paths = trackSegmentPaths(state.track);
+    return paths.map((d, i) => {
+      const dnum = state.sectorDominance[i];
+      const team = dnum ? state.cars[dnum]?.team : undefined;
+      return { d, colour: team ? (teamColour[team] ?? 'var(--track-fill)') : 'var(--track-fill)' };
+    });
+  }, [state.track, state.sectorDominance, state.cars]);
   return (
     // Fitted to the outline's own bounds rather than the full unit square: the
     // baked outline is letterboxed inside it, and the empty margin was ~38% of
     // the panel. Markers keep their SIZE-space coordinates — see fitViewBox.
     <svg viewBox={fitViewBox(state.track)} className="track-svg" role="img" aria-label={anySelection ? 'Track map with live car positions; the reference car is ringed' : 'Track map with live car positions'}>
-      <TrackPath d={trackPath} />
+      <TrackPath d={trackPath} segments={segments} />
+      {/* Start/finish: track[0] by convention (ingest/record.py's outline starts
+          at lap_start_t) — drawn as a short perpendicular tick using its
+          neighbour point for direction. */}
+      {state.track.length > 1 && (() => {
+        const p0 = state.track[0], p1 = state.track[1];
+        const dx = p1.x - p0.x, dy = p1.y - p0.y;
+        const len = Math.hypot(dx, dy) || 1;
+        // Perpendicular unit vector, scaled to a short tick either side of track[0].
+        const nx = (-dy / len) * 0.012, ny = (dx / len) * 0.012;
+        const cx = p0.x * SIZE, cy = p0.y * SIZE;
+        return (
+          <line
+            x1={cx - nx * SIZE} y1={cy - ny * SIZE} x2={cx + nx * SIZE} y2={cy + ny * SIZE}
+            stroke="var(--chalk)" strokeWidth={2}
+          />
+        );
+      })()}
+      {state.corners.map((c) => (
+        <text
+          key={c.number}
+          className="map-label"
+          x={c.x * SIZE} y={c.y * SIZE}
+          fill="var(--track-label)"
+          fontSize="var(--fs-xs)"
+          textAnchor="middle"
+        >{c.number}</text>
+      ))}
       {cars.map((c) => {
         const isSel = selected != null && c.driverNum === selected;
         const isRival = rival != null && c.driverNum === rival;

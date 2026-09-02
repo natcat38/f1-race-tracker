@@ -88,6 +88,17 @@ type PedalTrace struct {
 	Gear     []int `json:"gear"`
 }
 
+// Corner is one circuit-corner label, baked once from FastF1's circuit info
+// (session-constant, like Track; same normalised [0,1] space).
+// ponytail: DRS zones and a safety-car marker are deliberately dropped from
+// this "track furniture" slice (reviews/plans/verify/04-05-map-features.md) —
+// DRS zones have no session-derived source, and SC needs a track-status field
+// that doesn't exist on the contract today.
+type Corner struct {
+	Number int `json:"number"`
+	Point
+}
+
 // Weather is a low-rate sample (~1/min at bake). Rides on a frame when it
 // changes; folded into the snapshot by Apply.
 type Weather struct {
@@ -109,7 +120,8 @@ type Snapshot struct {
 	Mode        Mode                 `json:"mode"`
 	Label       string               `json:"label"` // "Synthetic · Demo"
 	Track       []Point              `json:"track,omitempty"`
-	Cars        map[int]CarState     `json:"cars"` // marshals with string keys (JSON has no int keys); see web/src/state/race.ts's mirroring Record<number, Car>
+	Corners     []Corner             `json:"corners,omitempty"` // session-constant, like Track
+	Cars        map[int]CarState     `json:"cars"`              // marshals with string keys (JSON has no int keys); see web/src/state/race.ts's mirroring Record<number, Car>
 	Messages    []RaceControlMessage `json:"messages,omitempty"`
 	Radio       []RadioMessage       `json:"radio,omitempty"`
 	LapTrace    map[int][]int        `json:"lapTrace,omitempty"`
@@ -117,9 +129,14 @@ type Snapshot struct {
 	Stints      map[int][]Stint      `json:"stints,omitempty"`      // session-constant, like LapTrace
 	PitStops    map[int][]PitStop    `json:"pitStops,omitempty"`    // session-constant, like Stints
 	PedalTraces map[int]PedalTrace   `json:"pedalTraces,omitempty"` // session-constant, like LapTrace
-	Weather     *Weather             `json:"weather,omitempty"`
-	TimeMs      int64                `json:"timeMs"`
-	Rev         int64                `json:"rev"`
+	// SectorDominance is the fastest driver's number through each fixed-size
+	// minisector of Track (bin size mirrored in ingest/ghost.py and
+	// web/src/components/geometry.ts's MINISECTOR_SIZE); 0 means no driver had
+	// positive time recorded for that bin. Session-constant, like Track.
+	SectorDominance []int    `json:"sectorDominance,omitempty"`
+	Weather         *Weather `json:"weather,omitempty"`
+	TimeMs          int64    `json:"timeMs"`
+	Rev             int64    `json:"rev"`
 }
 
 type Frame struct {

@@ -15,6 +15,7 @@ export interface Car {
   gapMs?: number; gapLaps?: number; intMs?: number;
   speed?: number; gear?: number; throttle?: number; brake?: number; drs?: boolean;
 }
+export interface Corner { number: number; x: number; y: number }
 export interface RadioMessage { timeMs: number; driverNum: number; clip: string }
 export interface Stint { compound: string; startLap: number; endLap: number }
 export interface PitStop { lap: number; durationS: number }
@@ -34,13 +35,17 @@ const LOOP_REWIND_MS = 5000;
 // Number() before comparing, as ghost.ts's commonDrivers does.
 export interface RaceState {
   session: string; mode: string; label: string;
-  track: Point[]; cars: Record<number, Car>; timeMs: number; rev: number;
+  track: Point[]; corners: Corner[]; cars: Record<number, Car>; timeMs: number; rev: number;
   radio: RadioMessage[];
   lapTrace: Record<number, number[]>;
   totalLaps: number;
   stints: Record<number, Stint[]>;
   pitStops: Record<number, PitStop[]>;
   pedalTraces: Record<number, PedalTrace>;
+  // One dominant driver number per fixed-size minisector of `track` (see
+  // web/src/components/geometry.ts's MINISECTOR_SIZE, mirrored in
+  // ingest/ghost.py); 0 means no driver had a positive time recorded there.
+  sectorDominance: number[];
   weather?: Weather;
   messages: RaceControlMessage[];
   // Bumped on every snapshot (never on a frame) — lets a consumer (useComms) tell
@@ -63,8 +68,9 @@ export function isWarmingUp(s: RaceState): boolean {
 
 export function emptyState(): RaceState {
   return {
-    session: '', mode: '', label: '', track: [], cars: {}, timeMs: 0, rev: 0,
-    radio: [], lapTrace: {}, totalLaps: 0, stints: {}, pitStops: {}, pedalTraces: {}, messages: [], snapshotSeq: 0,
+    session: '', mode: '', label: '', track: [], corners: [], cars: {}, timeMs: 0, rev: 0,
+    radio: [], lapTrace: {}, totalLaps: 0, stints: {}, pitStops: {}, pedalTraces: {}, sectorDominance: [],
+    messages: [], snapshotSeq: 0,
     loopSeq: 0,
   };
 }
@@ -72,13 +78,14 @@ export function emptyState(): RaceState {
 // Wire payloads from the gateway, mirroring internal/model (Snapshot, Frame).
 interface SnapshotData {
   session: string; mode: string; label: string;
-  track?: Point[]; cars: Record<number, Car>; timeMs: number; rev: number;
+  track?: Point[]; corners?: Corner[]; cars: Record<number, Car>; timeMs: number; rev: number;
   radio?: RadioMessage[];
   lapTrace?: Record<number, number[]>;
   totalLaps?: number;
   stints?: Record<number, Stint[]>;
   pitStops?: Record<number, PitStop[]>;
   pedalTraces?: Record<number, PedalTrace>;
+  sectorDominance?: number[];
   weather?: Weather;
   messages?: RaceControlMessage[];
 }
@@ -125,10 +132,12 @@ export function parseMsg(raw: unknown): Msg | null {
     if (data.messages !== undefined && !Array.isArray(data.messages)) return null;
     if (data.radio !== undefined && !isRadioRefs(data.radio)) return null;
     if (data.track !== undefined && !Array.isArray(data.track)) return null;
+    if (data.corners !== undefined && !Array.isArray(data.corners)) return null;
     // stints/pitStops/weather are objects, not arrays — reject an array (would spread wrong).
     if (data.stints !== undefined && (typeof data.stints !== 'object' || data.stints === null || Array.isArray(data.stints))) return null;
     if (data.pitStops !== undefined && (typeof data.pitStops !== 'object' || data.pitStops === null || Array.isArray(data.pitStops))) return null;
     if (data.pedalTraces !== undefined && (typeof data.pedalTraces !== 'object' || data.pedalTraces === null || Array.isArray(data.pedalTraces))) return null;
+    if (data.sectorDominance !== undefined && !Array.isArray(data.sectorDominance)) return null;
     if (data.weather !== undefined && (typeof data.weather !== 'object' || data.weather === null || Array.isArray(data.weather))) return null;
     return { type: 'snapshot', data: data as unknown as SnapshotData };
   }
@@ -151,9 +160,10 @@ export function applyMessage(s: RaceState, msg: Msg): RaceState {
     const d = msg.data;
     return {
       session: d.session, mode: d.mode, label: d.label,
-      track: d.track ?? [], cars: { ...d.cars }, timeMs: d.timeMs, rev: d.rev,
+      track: d.track ?? [], corners: d.corners ?? [], cars: { ...d.cars }, timeMs: d.timeMs, rev: d.rev,
       radio: d.radio ?? [], lapTrace: d.lapTrace ?? {}, totalLaps: d.totalLaps ?? 0,
-      stints: d.stints ?? {}, pitStops: d.pitStops ?? {}, pedalTraces: d.pedalTraces ?? {}, weather: d.weather,
+      stints: d.stints ?? {}, pitStops: d.pitStops ?? {}, pedalTraces: d.pedalTraces ?? {},
+      sectorDominance: d.sectorDominance ?? [], weather: d.weather,
       messages: d.messages ?? [],
       snapshotSeq: s.snapshotSeq + 1,
       // A snapshot is a fresh baseline, not a wrap: keep the counter so a

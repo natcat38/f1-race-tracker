@@ -3,6 +3,7 @@
   "mode": "replay",
   "label": "Contract Fixture",
   "track": [{"x": 0.1, "y": 0.2}, {"x": 0.9, "y": 0.8}],
+  "corners": [{"number": 1, "x": 0.1, "y": 0.2}],
   "cars": {
     "1": {
       "driverNum": 1, "code": "VER", "team": "Red Bull", "pos": 1, "lap": 12,
@@ -43,6 +44,7 @@
       "gear": [1, 3, 7, 7]
     }
   },
+  "sectorDominance": [1],
   "weather": {"airTempC": 28.5, "trackTempC": 41.2, "rainfall": false},
   "timeMs": 3300000,
   "rev": 42,

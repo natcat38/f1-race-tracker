@@ -16,12 +16,14 @@ import (
 type Source interface {
 	Events(ctx context.Context) (<-chan model.Frame, error)
 	Track() []model.Point
+	Corners() []model.Corner
 	Radio() []model.RadioMessage
 	LapTrace() map[int][]int
 	TotalLaps() int
 	Stints() map[int][]model.Stint
 	PitStops() map[int][]model.PitStop
 	PedalTraces() map[int]model.PedalTrace
+	SectorDominance() []int
 	Label() string
 	Mode() string
 }
@@ -58,12 +60,14 @@ func (wr *Writer) Run(ctx context.Context, session string) error {
 	}
 	snap := model.NewSnapshot(session, wr.src.Mode(), wr.src.Label())
 	snap.Track = wr.src.Track()
+	snap.Corners = wr.src.Corners()
 	snap.Radio = wr.src.Radio()
 	snap.LapTrace = wr.src.LapTrace()
 	snap.TotalLaps = wr.src.TotalLaps()
 	snap.Stints = wr.src.Stints()
 	snap.PitStops = wr.src.PitStops()
 	snap.PedalTraces = wr.src.PedalTraces()
+	snap.SectorDominance = wr.src.SectorDominance()
 	snap.Rev = base
 	rev := base
 	for {

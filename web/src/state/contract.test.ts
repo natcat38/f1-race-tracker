@@ -24,6 +24,8 @@ describe('golden snapshot contract', () => {
     expect(s.totalLaps).toBe(53);
     expect(s.track).toHaveLength(2);
     expect(s.track[1]).toEqual({ x: 0.9, y: 0.8 });
+    expect(s.corners).toHaveLength(1);
+    expect(s.corners[0]).toEqual({ number: 1, x: 0.1, y: 0.2 });
 
     expect(Object.keys(s.cars)).toHaveLength(2);
     expect(s.cars[1].driverNum).toBe(1);
@@ -50,6 +52,7 @@ describe('golden snapshot contract', () => {
     expect(s.pedalTraces[1].throttle).toEqual([0, 40, 100, 100]);
     expect(s.pedalTraces[1].brake).toEqual([0, 60, 0, 0]);
     expect(s.pedalTraces[1].gear).toEqual([1, 3, 7, 7]);
+    expect(s.sectorDominance).toEqual([1]);
     expect(s.weather?.trackTempC).toBe(41.2);
     expect(s.weather?.airTempC).toBe(28.5);
     expect(s.weather?.rainfall).toBe(false);
