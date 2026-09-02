@@ -36,6 +36,9 @@ func TestGoldenSnapshotContract(t *testing.T) {
 	if len(s.Track) != 2 || s.Track[1].X != 0.9 {
 		t.Fatalf("track mismatched: %+v", s.Track)
 	}
+	if len(s.Corners) != 1 || s.Corners[0].Number != 1 || s.Corners[0].X != 0.1 || s.Corners[0].Y != 0.2 || s.Corners[0].Letter != "A" {
+		t.Fatalf("corners mismatched: %+v", s.Corners)
+	}
 
 	if len(s.Cars) != 2 {
 		t.Fatalf("want 2 cars, got %d: %+v", len(s.Cars), s.Cars)
@@ -69,6 +72,16 @@ func TestGoldenSnapshotContract(t *testing.T) {
 
 	if len(s.Stints[1]) != 2 || s.Stints[1][1].Compound != "HARD" || s.Stints[1][1].StartLap != 15 {
 		t.Fatalf("stints mismatched: %+v", s.Stints)
+	}
+	if len(s.PitStops[1]) != 1 || s.PitStops[1][0].Lap != 14 || s.PitStops[1][0].DurationS != 23.4 {
+		t.Fatalf("pitStops mismatched: %+v", s.PitStops)
+	}
+	pt := s.PedalTraces[1]
+	if len(pt.Throttle) != 4 || pt.Throttle[2] != 100 || len(pt.Brake) != 4 || pt.Brake[1] != 60 || len(pt.Gear) != 4 || pt.Gear[3] != 7 {
+		t.Fatalf("pedalTraces mismatched: %+v", pt)
+	}
+	if len(s.SectorDominance) != 1 || s.SectorDominance[0] != 1 {
+		t.Fatalf("sectorDominance mismatched: %+v", s.SectorDominance)
 	}
 	if s.Weather == nil || s.Weather.TrackTempC != 41.2 || s.Weather.AirTempC != 28.5 || s.Weather.Rainfall {
 		t.Fatalf("weather mismatched: %+v", s.Weather)

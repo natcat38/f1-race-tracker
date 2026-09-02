@@ -275,3 +275,54 @@ it read-only; the settings page polls it.
 
 - _Use_ "linked" / "the link" for the account state; not "logged in" or "signed in"
   (there is no user session here) and never "account" alone.
+
+## Pit stop
+
+One baked, dated entry for a driver's real visit to the pits — the lap it started on
+and its stationary/pit-lane duration. Derived from FastF1's `PitInTime`/`PitOutTime`
+lap columns, like the pit window below, but only when a real `PitInTime` exists —
+a car that starts the race from the pit lane backdates a synthetic pit-in edge purely
+to flag the pit window correctly, and that backdated edge must never produce a pit
+stop entry (a pit-lane start is not a stop).
+
+This is distinct from the pit window: the pit window is the `(pit_in, pit_out)` time
+range used only to flag a car's Pit/Out status on track (position data's own status
+field is not reliable for this — verified empty), and it can include the pit-lane-start
+window with no corresponding stop. A pit stop is the strategy-facing record shown on
+the timeline.
+
+- _Use_ "pit stop" for the strategy-timeline entry (lap + duration); "pit window" for
+  the on-track Pit/Out flagging range; never conflate the two — a car can have a pit
+  window with no pit stop.
+
+## Pedal trace
+
+The baked per-driver throttle/brake/gear samples, indexed by the same track-outline
+position as the **lap trace**, for the telemetry overlay. Best-effort, like **gap**,
+and baked once at record time — not windowed to the replay clip.
+
+- _Use_ "pedal trace"; not "telemetry" alone (too broad) or "car data" (the raw
+  FastF1 source, not the baked/indexed form).
+
+## Corner / track furniture
+
+A labelled circuit corner — number and normalised `[0,1]` position, with an optional
+letter distinguishing sub-corners that share a number (e.g. "10A"/"10B"). Baked once
+from FastF1's circuit info, session-constant like the track outline. "Track furniture"
+is the umbrella term for baked, non-car map annotations; corners are the only kind
+baked today (DRS zones and a safety-car marker are deliberately out of scope — see the
+ponytail note beside the corner-baking code).
+
+- _Use_ "corner" for one labelled point; "track furniture" only when speaking of the
+  category as a whole.
+
+## Sector dominance / minisector
+
+A per-driver-color coding of which driver was fastest through each fixed-size chunk
+("minisector") of the track outline, shown on the map. Baked once per session,
+independent of the replay window, at a fixed minisector size (points of track
+outline per bin).
+
+- _Use_ "sector dominance" for the feature/overlay; "minisector" for one fixed-size
+  chunk of track outline it's computed over — not "sector" alone, which in F1 usually
+  means one of the three timing sectors, a much coarser division.

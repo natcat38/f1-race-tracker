@@ -30,9 +30,20 @@ export function useSmoothedCars(state: RaceState, paused = false): Car[] {
   // When a new frame/snapshot arrives (rev changes), snapshot from→to.
   useEffect(() => {
     const now = performance.now();
-    from.current = { ...to.current };
+    const prevTo = to.current;
     const next: Record<number, Point> = {};
     for (const c of Object.values(state.cars)) next[c.driverNum] = c.p;
+    // ponytail: a scrub or loop restart moves a car far more than one 10Hz frame
+    // ever could (normal frame-to-frame motion on this track is well under this
+    // in track-space units) — snap instead of gliding across the map.
+    const TELEPORT_THRESHOLD = 50;
+    const snapped: Record<number, Point> = {};
+    for (const [id, p] of Object.entries(next)) {
+      const prev = prevTo[Number(id)];
+      const dist = prev ? Math.hypot(p.x - prev.x, p.y - prev.y) : 0;
+      snapped[Number(id)] = prev && dist <= TELEPORT_THRESHOLD ? prev : p;
+    }
+    from.current = snapped;
     to.current = next;
     tFrom.current = tTo.current || now;
     tTo.current = now;

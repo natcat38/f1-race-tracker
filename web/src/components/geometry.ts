@@ -16,6 +16,30 @@ export function trackPathD(track: Pt[]): string {
   return 'M ' + track.map((p) => `${p.x * SIZE},${p.y * SIZE}`).join(' L ') + ' Z';
 }
 
+// Minisector bin size for the sector-dominance heatmap: mirrors
+// ingest/record.py's MINISECTOR_SIZE / ingest/ghost.py's compute_sector_dominance
+// exactly, so segment i here lines up with RaceState.sectorDominance[i].
+export const MINISECTOR_SIZE = 10;
+
+// trackSegmentPaths splits the outline into fixed-size, non-closed sub-paths
+// (one per minisector) for the sector-dominance heatmap, using the same
+// [start, min(start+binSize, n-1)] windows as the backend's binning so the
+// segment at index i corresponds to sectorDominance[i].
+export function trackSegmentPaths(track: Pt[], binSize: number = MINISECTOR_SIZE): string[] {
+  const n = track.length;
+  if (n === 0) return [];
+  const paths: string[] = [];
+  for (let start = 0; start < n; start += binSize) {
+    const end = Math.min(start + binSize, n - 1);
+    // Degenerate bin (start === end, only possible when n is tiny relative to
+    // binSize): emit a zero-length path rather than skip it, so this array's
+    // length always matches the backend's one-entry-per-bin sectorDominance.
+    const pts = track.slice(start, end + 1);
+    paths.push('M ' + pts.map((p) => `${p.x * SIZE},${p.y * SIZE}`).join(' L '));
+  }
+  return paths;
+}
+
 // The outline is baked into the unit box with its aspect ratio preserved
 // (ingest/record.py's normalise() scales both axes by the LARGER range and
 // centres), so the narrow axis is letterboxed: Monza measures 372×599 inside the

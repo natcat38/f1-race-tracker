@@ -4,7 +4,8 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { connectRace, type ConnStatus } from './realtime/socket';
-import { connectStaticReplay } from './realtime/staticReplay';
+import { connectStaticReplay, type StaticReplayHandle } from './realtime/staticReplay';
+import { fmtElapsed } from './components/timingHelpers';
 import { emptyState, isWarmingUp, type RaceState } from './state/race';
 import { Map } from './components/Map';
 import { TimingTower } from './components/TimingTower';
@@ -142,6 +143,13 @@ export default function App() {
   // one lazy-connect-once case", not a general connection-lifecycle manager.
   const connectedRef = useRef(false);
   const disconnectRef = useRef<() => void>(() => {});
+  // Only meaningful on the static demo (STATIC_DEMO): the handle's pause/resume/
+  // scrub, used by the replay transport below. Left null on the live/replay-lane
+  // WebSocket path, which has no such control surface (see verify/03-06's item 3
+  // — the live lane needs its own writer-side protocol, out of scope here).
+  const replayRef = useRef<StaticReplayHandle | null>(null);
+  const [replayDuration, setReplayDuration] = useState(0);
+  const [replayPaused, setReplayPaused] = useState(false);
   const routeName = parseHash(hash).route;
   useEffect(() => {
     if (connectedRef.current || routeName !== 'board') return;
@@ -154,7 +162,13 @@ export default function App() {
       retryRef.current = retry ?? null;
       setStatus(s);
     };
-    disconnectRef.current = (STATIC_DEMO ? connectStaticReplay : connectRace)(onState, onStatus);
+    if (STATIC_DEMO) {
+      const handle = connectStaticReplay(onState, onStatus, setReplayDuration);
+      replayRef.current = handle;
+      disconnectRef.current = handle;
+    } else {
+      disconnectRef.current = connectRace(onState, onStatus);
+    }
   }, [routeName]);
   // Clearing connectedRef alongside the disposer is what makes a remount
   // reconnect. Refs survive unmount, so without the reset the connect effect
@@ -174,6 +188,41 @@ export default function App() {
     frozenRef.current = next;
     setFrozen(next);
     if (!next) setState(latestRef.current);
+  }
+
+  // The static-demo scrub slider's own clock — same rAF-driven local-clock
+  // pattern as Ghost.tsx's tMs, kept independent of `state` because it tracks
+  // position within one baked lap (0..replayDuration), not the race's own
+  // timeMs. tMsRef mirrors tMs so pause/scrub can re-anchor without a stale
+  // closure.
+  const [replayTMs, setReplayTMs] = useState(0);
+  const replayTMsRef = useRef(0);
+  const replayRafRef = useRef<number | undefined>(undefined);
+  const replayStartRef = useRef(0);
+  useEffect(() => {
+    if (!STATIC_DEMO || !replayDuration || replayPaused || routeName !== 'board') return;
+    replayStartRef.current = performance.now() - replayTMsRef.current;
+    const tick = (now: number) => {
+      const v = (now - replayStartRef.current) % replayDuration;
+      replayTMsRef.current = v;
+      setReplayTMs(v);
+      replayRafRef.current = requestAnimationFrame(tick);
+    };
+    replayRafRef.current = requestAnimationFrame(tick);
+    return () => { if (replayRafRef.current) cancelAnimationFrame(replayRafRef.current); };
+  }, [replayDuration, replayPaused, routeName]);
+
+  function toggleReplayPaused() {
+    const next = !replayPaused;
+    setReplayPaused(next);
+    if (next) replayRef.current?.pause(); else replayRef.current?.resume();
+  }
+
+  function scrubReplay(v: number) {
+    replayTMsRef.current = v;
+    replayStartRef.current = performance.now() - v;
+    setReplayTMs(v);
+    replayRef.current?.scrub(v);
   }
 
   // A rival only makes sense alongside a primary selection, and never as the
@@ -277,7 +326,7 @@ export default function App() {
           // Frozen means "we are choosing not to apply frames", not "the feed has
           // stopped" — so the staleness chip must not start claiming an outage the
           // moment a user pauses to read a row.
-          staleSec={frozen ? 0 : staleSec}
+          staleSec={frozen || replayPaused ? 0 : staleSec}
           onReconnect={reconnect}
           // The board is the one route that carries a Replay/Live control, so
           // the rail's healthy lane chip would only repeat it (ui-ux m8). On the
@@ -289,13 +338,38 @@ export default function App() {
           controls={
             <>
               {!STATIC_DEMO && <SourceToggle state={state} />}
-              {/* Label swap rather than aria-pressed, matching the overlay's existing
-                  Play/Pause: a transport control names the action it will take. The
-                  resulting state is carried by the chip, in a region that is present
-                  before it fills so the transition is actually announced. */}
-              <button type="button" className="btn rail-divided" onClick={toggleFrozen}>
-                {frozen ? '▶ Resume' : '⏸ Freeze'}
-              </button>
+              {/* The static demo paces itself client-side (staticReplay.ts), so unlike
+                  the live/replay-lane WebSocket it can actually honor pause and scrub —
+                  real transport controls instead of the render-only Freeze toggle below.
+                  ponytail: live-lane pause/scrub deferred, needs a writer-side protocol
+                  change (verify/03-06-playback-and-readme.md item 3). */}
+              {STATIC_DEMO && replayDuration > 0 ? (
+                <>
+                  <button type="button" className="btn rail-divided" onClick={toggleReplayPaused}>
+                    {replayPaused ? '▶ Play' : '⏸ Pause'}
+                  </button>
+                  <input
+                    type="range"
+                    min={0}
+                    max={Math.max(0, replayDuration - 1)}
+                    step={100}
+                    value={Math.floor(replayTMs)}
+                    onChange={(e) => scrubReplay(Number(e.target.value))}
+                    aria-label="Replay position"
+                    aria-valuetext={fmtElapsed(replayTMs)}
+                    style={{ width: 120 }}
+                  />
+                  <span className="rail-clock">{fmtElapsed(replayTMs)}</span>
+                </>
+              ) : (
+                /* Label swap rather than aria-pressed, matching the overlay's existing
+                   Play/Pause: a transport control names the action it will take. The
+                   resulting state is carried by the chip, in a region that is present
+                   before it fills so the transition is actually announced. */
+                <button type="button" className="btn rail-divided" onClick={toggleFrozen}>
+                  {frozen ? '▶ Resume' : '⏸ Freeze'}
+                </button>
+              )}
             </>
           }
           // Zone C, beside the connection chip: these are readouts of transport
@@ -309,6 +383,7 @@ export default function App() {
                   the region's content. */}
               <span role="status" aria-live="polite">
                 {frozen && <span className="chip chip-replay">⏸ FROZEN</span>}
+                {replayPaused && <span className="chip chip-replay">⏸ PAUSED</span>}
                 {justLooped && (
                   <span className="chip chip-loop">
                     ↻ CLIP LOOPED — the recording restarted
@@ -336,7 +411,7 @@ export default function App() {
         <Panel label="Track">
           {(status === 'reconnecting' || status === 'offline') && !showSkeleton && (
             <div style={{ position: 'relative', display: 'inline-block' }}>
-              <Map state={state} paused={frozen} selected={selected} rival={effectiveRival} />
+              <Map state={state} paused={frozen || replayPaused} selected={selected} rival={effectiveRival} />
               <div className="chip chip-reconnect" style={{
                 position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
               }}>
@@ -347,7 +422,7 @@ export default function App() {
             </div>
           )}
           {!showSkeleton && status !== 'reconnecting' && status !== 'offline' && (
-            <Map state={state} paused={frozen} selected={selected} rival={effectiveRival} />
+            <Map state={state} paused={frozen || replayPaused} selected={selected} rival={effectiveRival} />
           )}
           {showSkeleton && (
             <SkeletonMap

@@ -5,9 +5,13 @@ Bakes a real F1 session into the contract read by the Go replay player.
 
 CONTRACT (must match internal/model/model.go + web/src/state/race.ts):
   Header line: {"track":[{"x":float,"y":float},...], "label":"...", "maxRev":int,
+                "corners":[{"number":int,"x":float,"y":float,"letter":"..."},...],
                 "radio":[{"timeMs":int,"driverNum":int,"clip":"https://..."}],
                 "lapTrace":{"<num>":[ms,...]},
-                "stints":{"<num>":[{"compound":"SOFT","startLap":int,"endLap":int}]}}
+                "stints":{"<num>":[{"compound":"SOFT","startLap":int,"endLap":int}]},
+                "pitStops":{"<num>":[{"lap":int,"durationS":float}]},
+                "pedalTraces":{"<num>":{"throttle":[int,...],"brake":[int,...],"gear":[int,...]}},
+                "sectorDominance":[driverNum,...]}  # one per fixed-size minisector of "track"
   Frame lines: {"timeMs":int, "frame":{"rev":int,"timeMs":int,"cars":[
                  {"driverNum":int,"code":"VER","team":"Red Bull","pos":int,
                   "p":{"x":float,"y":float},"status":"OnTrack"}],
@@ -33,6 +37,7 @@ import fastf1
 import numpy as np
 import pandas as pd
 import json
+import math
 import sys
 import os
 import argparse
@@ -40,12 +45,13 @@ from pathlib import Path
 from fastf1 import _api
 from radio import extract_radio
 from race_control import extract_race_control
-from ghost import build_lap_trace
+from ghost import build_lap_trace, build_pedal_trace, compute_sector_dominance
 from resample import nearest_index, step_value, in_window_ms, reconcile_positions, UNKNOWN_POS, normalise_point
 from live_parsers import TEAM_MAP
 from geometry import (
     resample_closed_loop, project_to_arc, wrap_counts, invert_distance_curve, lap_deficit,
 )
+from pit import build_pit_data
 
 # ---------------------------------------------------------------------------
 # Args
@@ -70,6 +76,11 @@ GP_LABEL = _args.label or f"{_args.gp} {_args.year} · Race"
 
 HZ = 10          # target sample rate (frames per second)
 TRACK_POINTS = 150  # number of track outline points
+# Minisector bin size for the sector-dominance heatmap (item 5): TRACK_POINTS / this
+# many minisectors. Mirrored in web/src/components/geometry.ts's MINISECTOR_SIZE —
+# both sides must bin the outline identically for sectorDominance[i] to line up
+# with the frontend's i'th outline segment.
+MINISECTOR_SIZE = 10
 
 # Window: 7.5-min green-flag mid-race window (widened from 2.5 min in Phase 3 so the
 # comms layer has enough team radio to feel alive — see ADR-0003 / Phase 3 spec).
@@ -272,11 +283,53 @@ track_points = [
 print(f"Track outline: {len(track_points)} points")
 
 # ---------------------------------------------------------------------------
+# Track furniture (item 4): corner numbers, baked once from FastF1's circuit
+# info. Start/finish is track_points[0] by convention (the outline's own lap
+# starts at lap_start_t) — no separate field needed.
+# ponytail: DRS zones and a safety-car marker are dropped from this slice
+# (reviews/plans/verify/04-05-map-features.md) — DRS has no session-derived
+# source, and SC needs a track-status field the contract doesn't carry yet.
+# ---------------------------------------------------------------------------
+print("\nFetching circuit info (corners)...")
+corners = []
+try:
+    circuit_info = session.get_circuit_info()
+    _skipped_corners = 0
+    _margin = 1e-6
+    for _, row in circuit_info.corners.iterrows():
+        cx, cy = normalise(row['X'], row['Y'])
+        if not (-_margin <= cx <= 1 + _margin and -_margin <= cy <= 1 + _margin):
+            # Corner coords are derived from the circuit's own reference frame,
+            # which can fall slightly outside the sampled lap's bounding box
+            # (a different lap, a slow out-lap, etc.). One stray corner should
+            # not abort the whole bake — skip it rather than clamp, since a
+            # clamped corner would render at a dishonest position.
+            _skipped_corners += 1
+            continue
+        letter = row['Letter'] if 'Letter' in row and not pd.isna(row['Letter']) else ""
+        corners.append({
+            "number": int(row['Number']),
+            "x": min(max(cx, 0.0), 1.0),
+            "y": min(max(cy, 0.0), 1.0),
+            "letter": str(letter),
+        })
+    if _skipped_corners:
+        print(f"  Warning: skipped {_skipped_corners} corner(s) outside normalised track bounds")
+    print(f"Corners: {len(corners)}")
+except Exception as e:
+    print(f"  Warning: circuit info fetch failed ({type(e).__name__}: {e}); clip will have no corners")
+
+# ---------------------------------------------------------------------------
 # Lap traces (Phase 4): per-driver pace curve over the fastest accurate lap.
 # Cumulative ms at each track-outline index, for the cross-year ghost overlay.
 # ---------------------------------------------------------------------------
 _outline_xy = [(p['x'], p['y']) for p in track_points]
 lap_traces = {}
+# pedal_traces: driver_num -> {"throttle":[...],"brake":[...],"gear":[...]}, indexed
+# by the same track-outline position as lap_traces (see PedalTrace in model.go).
+# ponytail: RPM omitted (reviews/plans/verify/01-telemetry-overlay.md) — FastF1's
+# car_data isn't sampled for it anywhere else in this file either.
+pedal_traces = {}
 for num in session.drivers:
     inum = int(num)
     if inum not in driver_info:
@@ -297,10 +350,33 @@ for num in session.drivers:
         sample_ts = driver_lap_pos['SessionTime'].dt.total_seconds().tolist()
         sample_xy = [normalise(row['X'], row['Y']) for _, row in driver_lap_pos.iterrows()]
         lap_traces[inum] = build_lap_trace(sample_ts, sample_xy, _outline_xy)
+        try:
+            cd = session.car_data[num]
+            cd_lap = cd[(cd['SessionTime'] >= lap_start) & (cd['SessionTime'] < lap_end)]
+            if len(cd_lap) >= 2:
+                cd_t = cd_lap['SessionTime'].dt.total_seconds().values
+                idx = np.array([nearest_index(cd_t, q) for q in sample_ts])
+                throttle_vals = cd_lap['Throttle'].values[idx].astype(int)
+                brake_vals = (cd_lap['Brake'].values[idx].astype(float) > 0).astype(int) * 100
+                gear_vals = cd_lap['nGear'].values[idx].astype(int)
+                pedal_traces[inum] = build_pedal_trace(
+                    sample_ts, sample_xy, _outline_xy, throttle_vals, brake_vals, gear_vals
+                )
+        except Exception as e:
+            print(f"  Warning: no pedal trace for {num}: {type(e).__name__}: {e}")
     except Exception as e:
         print(f"  Warning: no lap trace for {num}: {type(e).__name__}: {e}")
 
 print(f"Lap traces baked for {len(lap_traces)} drivers")
+print(f"Pedal traces baked for {len(pedal_traces)} drivers")
+
+# ---------------------------------------------------------------------------
+# Sector dominance (item 5): fastest driver per fixed-size minisector, reusing
+# the lap_traces already built above (cumulative ms per driver at each outline
+# index) — no extra projection needed.
+# ---------------------------------------------------------------------------
+sector_dominance = compute_sector_dominance(lap_traces, len(track_points), MINISECTOR_SIZE) if lap_traces else []
+print(f"Sector dominance: {len(sector_dominance)} minisectors")
 
 # ---------------------------------------------------------------------------
 # Derive running order from laps data
@@ -421,6 +497,10 @@ def get_timing(driver_num, t_s):
 lapnum_lookup = {}  # driver_num -> (times, lap_numbers), parallel lists ascending by time
 stints = {}
 pit_windows = {}  # driver_num -> [(pit_in_s, pit_out_s), ...]
+pit_stops = {}  # driver_num -> [{"lap": int, "durationS": float}, ...] — duration only;
+# ponytail: positions-gained/lost and stationary time are out of scope for this
+# slice (reviews/plans/verify/02-pit-stops.md) — would need a running-order-at-time
+# derivation and per-driver car_data telemetry respectively, neither of which exist yet.
 for num in session.drivers:
     inum = int(num)
     if inum not in driver_info:
@@ -446,24 +526,10 @@ for num in session.drivers:
     if out:
         stints[inum] = out
 
-    windows = []
-    pit_in = None
-    for _, lap in drv.sort_values('LapNumber').iterrows():
-        if not pd.isna(lap['PitInTime']):
-            pit_in = lap['PitInTime'].total_seconds()
-        if not pd.isna(lap['PitOutTime']):
-            if pit_in is None and not pd.isna(lap['LapStartTime']):
-                # No PitInTime seen before this PitOutTime — e.g. the car
-                # started the race from the pit lane. Treat the lap's own
-                # start as the pit-in edge so the car is still correctly
-                # flagged as in the pits up to PitOutTime.
-                pit_in = lap['LapStartTime'].total_seconds()
-            if pit_in is not None:
-                windows.append((pit_in, lap['PitOutTime'].total_seconds()))
-                pit_in = None
-    if pit_in is not None:
-        windows.append((pit_in, pit_in + 30))  # no recorded out-lap; assume a typical stop
+    windows, stops = build_pit_data(drv)
     pit_windows[inum] = windows
+    if stops:
+        pit_stops[inum] = stops
 print(f"Stints baked for {len(stints)} drivers")
 
 def _lap_number(driver_num, t_s):
@@ -685,12 +751,16 @@ with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
     # --- Header ---
     header = {
         "track": track_points,
+        "corners": corners,
         "label": GP_LABEL,
         "maxRev": max_rev,
         "radio": radio_clips,
         "lapTrace": lap_traces,
         "totalLaps": TOTAL_LAPS,
         "stints": stints,
+        "pitStops": pit_stops,
+        "pedalTraces": pedal_traces,
+        "sectorDominance": sector_dominance,
     }
     f.write(json.dumps(header, separators=(',', ':')) + '\n')
 
@@ -875,7 +945,24 @@ try:
     for _dn, stint_list in hdr['stints'].items():
         for st in stint_list:
             assert {'compound', 'startLap', 'endLap'} <= set(st.keys()), f"stint missing fields: {st}"
-    print(f"  Header OK: {len(hdr['track'])} track points, maxRev={hdr['maxRev']}, {len(hdr['radio'])} radio clips, totalLaps={hdr['totalLaps']}, stints for {len(hdr['stints'])} drivers")
+    assert 'pitStops' in hdr, "header missing 'pitStops'"
+    for _dn, stop_list in hdr['pitStops'].items():
+        for ps in stop_list:
+            assert {'lap', 'durationS'} <= set(ps.keys()), f"pit stop missing fields: {ps}"
+    assert 'pedalTraces' in hdr, "header missing 'pedalTraces'"
+    for _dn, pt in hdr['pedalTraces'].items():
+        assert {'throttle', 'brake', 'gear'} <= set(pt.keys()), f"pedal trace missing fields: {pt}"
+        assert len(pt['throttle']) == len(hdr['track']) == len(pt['brake']) == len(pt['gear']), \
+            f"pedal trace length {len(pt['throttle'])} != track length {len(hdr['track'])}"
+    assert 'corners' in hdr, "header missing 'corners'"
+    for c in hdr['corners']:
+        assert {'number', 'x', 'y', 'letter'} <= set(c.keys()), f"corner missing fields: {c}"
+        assert 0 <= c['x'] <= 1 and 0 <= c['y'] <= 1, f"corner out of [0,1]: {c}"
+    assert 'sectorDominance' in hdr, "header missing 'sectorDominance'"
+    expected_bins = math.ceil(len(hdr['track']) / MINISECTOR_SIZE) if hdr['track'] else 0
+    assert len(hdr['sectorDominance']) == expected_bins, \
+        f"sectorDominance length {len(hdr['sectorDominance'])} != expected {expected_bins} bins"
+    print(f"  Header OK: {len(hdr['track'])} track points, maxRev={hdr['maxRev']}, {len(hdr['radio'])} radio clips, totalLaps={hdr['totalLaps']}, stints for {len(hdr['stints'])} drivers, pitStops for {len(hdr['pitStops'])} drivers, pedalTraces for {len(hdr['pedalTraces'])} drivers, {len(hdr['corners'])} corners, {len(hdr['sectorDominance'])} minisectors")
 except AssertionError as e:
     print(f"  HEADER ERROR: {e}")
     errors += 1
