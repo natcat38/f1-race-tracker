@@ -483,7 +483,7 @@ Portable cross-session agent memory: one fact per file, indexed by memory/MEMORY
 
 | File | Purpose |
 | --- | --- |
-| `MEMORY.md` | ﻿<!-- Index of the repo's portable agent memory: one line per memory file, plus the convention for adding one. |
+| `MEMORY.md` | Index of the repo's portable agent memory: one line per memory file, plus the convention for adding one. |
 | `code-review-level.md` | "Default /code-review effort is `high --fix`; `max` only when the user explicitly asks for it" |
 | `f1-build-gotchas.md` | F1 tracker build/verify gotchas — vite wipes web/dist/.gitkeep; bench artifacts are canonical; no cgo locally so go test -race only works in CI; live SignalR feed needs F1TV auth; running the static demo locally needs a bake plus a temporary web/.env.local |
 | `f1-tracker-direction.md` | "F1 Race Tracker: Phases 1-5 shipped, WS5 merged, signalrcore blocker resolved; 2026-08-28 improvement survey in reviews/{backlog-still-open,tech-debt-scan,peer-comparison}.md" |
