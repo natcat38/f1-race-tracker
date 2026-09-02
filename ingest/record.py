@@ -5,7 +5,7 @@ Bakes a real F1 session into the contract read by the Go replay player.
 
 CONTRACT (must match internal/model/model.go + web/src/state/race.ts):
   Header line: {"track":[{"x":float,"y":float},...], "label":"...", "maxRev":int,
-                "corners":[{"number":int,"x":float,"y":float},...],
+                "corners":[{"number":int,"x":float,"y":float,"letter":"..."},...],
                 "radio":[{"timeMs":int,"driverNum":int,"clip":"https://..."}],
                 "lapTrace":{"<num>":[ms,...]},
                 "stints":{"<num>":[{"compound":"SOFT","startLap":int,"endLap":int}]},
@@ -51,6 +51,7 @@ from live_parsers import TEAM_MAP
 from geometry import (
     resample_closed_loop, project_to_arc, wrap_counts, invert_distance_curve, lap_deficit,
 )
+from pit import build_pit_data
 
 # ---------------------------------------------------------------------------
 # Args
@@ -293,9 +294,27 @@ print("\nFetching circuit info (corners)...")
 corners = []
 try:
     circuit_info = session.get_circuit_info()
+    _skipped_corners = 0
+    _margin = 1e-6
     for _, row in circuit_info.corners.iterrows():
         cx, cy = normalise(row['X'], row['Y'])
-        corners.append({"number": int(row['Number']), "x": cx, "y": cy})
+        if not (-_margin <= cx <= 1 + _margin and -_margin <= cy <= 1 + _margin):
+            # Corner coords are derived from the circuit's own reference frame,
+            # which can fall slightly outside the sampled lap's bounding box
+            # (a different lap, a slow out-lap, etc.). One stray corner should
+            # not abort the whole bake — skip it rather than clamp, since a
+            # clamped corner would render at a dishonest position.
+            _skipped_corners += 1
+            continue
+        letter = row['Letter'] if 'Letter' in row and not pd.isna(row['Letter']) else ""
+        corners.append({
+            "number": int(row['Number']),
+            "x": min(max(cx, 0.0), 1.0),
+            "y": min(max(cy, 0.0), 1.0),
+            "letter": str(letter),
+        })
+    if _skipped_corners:
+        print(f"  Warning: skipped {_skipped_corners} corner(s) outside normalised track bounds")
     print(f"Corners: {len(corners)}")
 except Exception as e:
     print(f"  Warning: circuit info fetch failed ({type(e).__name__}: {e}); clip will have no corners")
@@ -507,34 +526,7 @@ for num in session.drivers:
     if out:
         stints[inum] = out
 
-    windows = []
-    stops = []
-    pit_in = None
-    pit_in_lap = None
-    for _, lap in drv.sort_values('LapNumber').iterrows():
-        if not pd.isna(lap['PitInTime']):
-            pit_in = lap['PitInTime'].total_seconds()
-            pit_in_lap = None if pd.isna(lap['LapNumber']) else int(lap['LapNumber'])
-        if not pd.isna(lap['PitOutTime']):
-            if pit_in is None and not pd.isna(lap['LapStartTime']):
-                # No PitInTime seen before this PitOutTime — e.g. the car
-                # started the race from the pit lane. Treat the lap's own
-                # start as the pit-in edge so the car is still correctly
-                # flagged as in the pits up to PitOutTime.
-                pit_in = lap['LapStartTime'].total_seconds()
-                pit_in_lap = None if pd.isna(lap['LapNumber']) else int(lap['LapNumber'])
-            if pit_in is not None:
-                pit_out = lap['PitOutTime'].total_seconds()
-                windows.append((pit_in, pit_out))
-                if pit_in_lap is not None:
-                    stops.append({"lap": pit_in_lap, "durationS": round(pit_out - pit_in, 1)})
-                pit_in = None
-                pit_in_lap = None
-    if pit_in is not None:
-        pit_out = pit_in + 30  # no recorded out-lap; assume a typical stop
-        windows.append((pit_in, pit_out))
-        if pit_in_lap is not None:
-            stops.append({"lap": pit_in_lap, "durationS": round(pit_out - pit_in, 1)})
+    windows, stops = build_pit_data(drv)
     pit_windows[inum] = windows
     if stops:
         pit_stops[inum] = stops
@@ -964,7 +956,7 @@ try:
             f"pedal trace length {len(pt['throttle'])} != track length {len(hdr['track'])}"
     assert 'corners' in hdr, "header missing 'corners'"
     for c in hdr['corners']:
-        assert {'number', 'x', 'y'} <= set(c.keys()), f"corner missing fields: {c}"
+        assert {'number', 'x', 'y', 'letter'} <= set(c.keys()), f"corner missing fields: {c}"
         assert 0 <= c['x'] <= 1 and 0 <= c['y'] <= 1, f"corner out of [0,1]: {c}"
     assert 'sectorDominance' in hdr, "header missing 'sectorDominance'"
     expected_bins = math.ceil(len(hdr['track']) / MINISECTOR_SIZE) if hdr['track'] else 0

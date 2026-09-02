@@ -326,7 +326,7 @@ export default function App() {
           // Frozen means "we are choosing not to apply frames", not "the feed has
           // stopped" — so the staleness chip must not start claiming an outage the
           // moment a user pauses to read a row.
-          staleSec={frozen ? 0 : staleSec}
+          staleSec={frozen || replayPaused ? 0 : staleSec}
           onReconnect={reconnect}
           // The board is the one route that carries a Replay/Live control, so
           // the rail's healthy lane chip would only repeat it (ui-ux m8). On the
@@ -383,6 +383,7 @@ export default function App() {
                   the region's content. */}
               <span role="status" aria-live="polite">
                 {frozen && <span className="chip chip-replay">⏸ FROZEN</span>}
+                {replayPaused && <span className="chip chip-replay">⏸ PAUSED</span>}
                 {justLooped && (
                   <span className="chip chip-loop">
                     ↻ CLIP LOOPED — the recording restarted
@@ -410,7 +411,7 @@ export default function App() {
         <Panel label="Track">
           {(status === 'reconnecting' || status === 'offline') && !showSkeleton && (
             <div style={{ position: 'relative', display: 'inline-block' }}>
-              <Map state={state} paused={frozen} selected={selected} rival={effectiveRival} />
+              <Map state={state} paused={frozen || replayPaused} selected={selected} rival={effectiveRival} />
               <div className="chip chip-reconnect" style={{
                 position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
               }}>
@@ -421,7 +422,7 @@ export default function App() {
             </div>
           )}
           {!showSkeleton && status !== 'reconnecting' && status !== 'offline' && (
-            <Map state={state} paused={frozen} selected={selected} rival={effectiveRival} />
+            <Map state={state} paused={frozen || replayPaused} selected={selected} rival={effectiveRival} />
           )}
           {showSkeleton && (
             <SkeletonMap

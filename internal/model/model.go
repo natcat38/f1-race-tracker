@@ -97,6 +97,10 @@ type PedalTrace struct {
 type Corner struct {
 	Number int `json:"number"`
 	Point
+	// Letter distinguishes sub-corners sharing a number (e.g. "10A"/"10B"),
+	// baked from FastF1's circuit_info Letter column. Empty when FastF1 has
+	// no letter for this corner.
+	Letter string `json:"letter,omitempty"`
 }
 
 // Weather is a low-rate sample (~1/min at bake). Rides on a frame when it

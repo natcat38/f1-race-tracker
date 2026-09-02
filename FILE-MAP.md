@@ -58,6 +58,7 @@ The Python side: records FastF1 sessions to JSONL clips and runs the true-live S
 | `live.py` | Live ingester — publishes normalized race frames to Redis using the SAME contract |
 | `live_parsers.py` | Pure parsers for the live SignalR feed, extracted from live_signalr.py. |
 | `live_signalr.py` | True-live FastF1 SignalR ingest mode (exploratory, session-only). |
+| `pit.py` | Pure pit-window / pit-stop derivation, split out of record.py for testability. |
 | `pytest.ini` | Pytest configuration for the ingest suite: which files count as tests, and where collection starts. |
 | `race_control.py` | Pure helper for baking race-control messages into clip frames. |
 | `radio.py` | Pure helpers for baking team radio into a clip header. |
@@ -74,6 +75,7 @@ The Python side: records FastF1 sessions to JSONL clips and runs the true-live S
 | `test_ghost.py` | Self-check for ingest/ghost.build_lap_trace (no fastf1/numpy/network needed). |
 | `test_live_parsers.py` | Direct self-check for live_parsers.py's pure feed parsers (no fastf1/network). |
 | `test_live_publish.py` | Unit tests for live_signalr.py's two publish paths, without fastf1 or Redis. |
+| `test_pit.py` | Unit tests for the pure pit-window / pit-stop derivation in ingest/pit.py. |
 | `test_race_control.py` | Self-check for ingest/race_control.extract_race_control (no fastf1/network needed). |
 | `test_radio.py` | Self-check for ingest/radio.extract_radio (no fastf1/network needed). |
 | `test_resample.py` | Tests for the resampler's nearest-neighbour grid lookup and windowing helpers. |
@@ -511,4 +513,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-46 directories, 185 files listed, 0 without a declared purpose.
+46 directories, 187 files listed, 0 without a declared purpose.

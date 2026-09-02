@@ -25,7 +25,7 @@ describe('golden snapshot contract', () => {
     expect(s.track).toHaveLength(2);
     expect(s.track[1]).toEqual({ x: 0.9, y: 0.8 });
     expect(s.corners).toHaveLength(1);
-    expect(s.corners[0]).toEqual({ number: 1, x: 0.1, y: 0.2 });
+    expect(s.corners[0]).toEqual({ number: 1, x: 0.1, y: 0.2, letter: "A" });
 
     expect(Object.keys(s.cars)).toHaveLength(2);
     expect(s.cars[1].driverNum).toBe(1);

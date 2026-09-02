@@ -1,6 +1,6 @@
 // The selected car's telemetry readout: speed, gear, pedal bars and lap/gap sparklines.
 
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import type { Car, PedalTrace, RaceState } from '../state/race';
 import { fmtLap, fmtGapEstimate, type LapHistory, type GapHistory } from './timingHelpers';
 
@@ -132,7 +132,9 @@ const MAX_TRACE_POINTS = 200;
 
 function toPolyline(values: number[], max: number): string {
   const n = values.length;
-  if (n === 0) return '';
+  // n===1 would divide by (n-1)===0 below, producing NaN coordinates — bail
+  // out the same as the empty case rather than drawing a broken point.
+  if (n < 2) return '';
   const step = Math.max(1, Math.ceil(n / MAX_TRACE_POINTS));
   const pts: string[] = [];
   for (let i = 0; i < n; i += step) {
@@ -148,11 +150,19 @@ function toPolyline(values: number[], max: number): string {
 // axes — the corner-by-corner telemetry compare. x is track-outline position
 // (same index space as LapTrace), not literal metres; see PedalTrace in
 // internal/model/model.go.
-function DistanceTraceRow({ label, max, car, rival, pick }: {
+const DistanceTraceRow = memo(function DistanceTraceRow({ label, max, car, rival, pick }: {
   label: string; max: number;
   car: PedalTrace; rival?: PedalTrace;
   pick: (t: PedalTrace) => number[];
 }) {
+  // Keyed on the trace arrays themselves (not e.g. car.driverNum), since a
+  // 10 Hz frame with an unchanged pedalTrace shouldn't re-walk MAX_TRACE_POINTS
+  // just because the enclosing car object was rebuilt.
+  const carPoints = useMemo(() => toPolyline(pick(car), max), [car, max, pick]);
+  const rivalPoints = useMemo(
+    () => (rival ? toPolyline(pick(rival), max) : ''),
+    [rival, max, pick],
+  );
   return (
     <div className="tele-row" style={{ alignItems: 'center' }}>
       <span className="tele-label">{label}</span>
@@ -161,28 +171,34 @@ function DistanceTraceRow({ label, max, car, rival, pick }: {
         style={{ flex: 1, height: TRACE_H, width: '100%' }}
         role="img" aria-label={`${label} over lap distance`}
       >
-        <polyline points={toPolyline(pick(car), max)} fill="none" stroke="var(--good)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+        <polyline points={carPoints} fill="none" stroke="var(--good)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
         {rival && (
-          <polyline points={toPolyline(pick(rival), max)} fill="none" stroke="var(--slate)" strokeWidth={1.5} strokeDasharray="3 2" vectorEffect="non-scaling-stroke" />
+          <polyline points={rivalPoints} fill="none" stroke="var(--slate)" strokeWidth={1.5} strokeDasharray="3 2" vectorEffect="non-scaling-stroke" />
         )}
       </svg>
     </div>
   );
-}
+});
 
-function DistanceTrace({ car, rival }: { car: PedalTrace; rival?: PedalTrace }) {
+// Stable identities: an inline arrow prop would be a fresh function every
+// render, defeating DistanceTraceRow's useMemo(..., [pick]) above.
+const pickThrottle = (t: PedalTrace) => t.throttle;
+const pickBrake = (t: PedalTrace) => t.brake;
+const pickGear = (t: PedalTrace) => t.gear;
+
+const DistanceTrace = memo(function DistanceTrace({ car, rival }: { car: PedalTrace; rival?: PedalTrace }) {
   return (
     <div style={{ display: 'grid', gap: 'var(--sp-1)' }}>
       <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--slate)' }}>
         Throttle / brake / gear over lap distance
         {rival && ' — solid = reference, dashed = rival'}
       </div>
-      <DistanceTraceRow label="Throttle" max={100} car={car} rival={rival} pick={(t) => t.throttle} />
-      <DistanceTraceRow label="Brake" max={100} car={car} rival={rival} pick={(t) => t.brake} />
-      <DistanceTraceRow label="Gear" max={MAX_GEAR} car={car} rival={rival} pick={(t) => t.gear} />
+      <DistanceTraceRow label="Throttle" max={100} car={car} rival={rival} pick={pickThrottle} />
+      <DistanceTraceRow label="Brake" max={100} car={car} rival={rival} pick={pickBrake} />
+      <DistanceTraceRow label="Gear" max={MAX_GEAR} car={car} rival={rival} pick={pickGear} />
     </div>
   );
-}
+});
 
 function CarTelemetry({ car, history, gapHistory, role }: {
   car: Car; history?: number[]; gapHistory?: (number | undefined)[];

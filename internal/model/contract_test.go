@@ -36,7 +36,7 @@ func TestGoldenSnapshotContract(t *testing.T) {
 	if len(s.Track) != 2 || s.Track[1].X != 0.9 {
 		t.Fatalf("track mismatched: %+v", s.Track)
 	}
-	if len(s.Corners) != 1 || s.Corners[0].Number != 1 || s.Corners[0].X != 0.1 || s.Corners[0].Y != 0.2 {
+	if len(s.Corners) != 1 || s.Corners[0].Number != 1 || s.Corners[0].X != 0.1 || s.Corners[0].Y != 0.2 || s.Corners[0].Letter != "A" {
 		t.Fatalf("corners mismatched: %+v", s.Corners)
 	}
 

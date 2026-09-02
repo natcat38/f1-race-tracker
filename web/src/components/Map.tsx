@@ -18,19 +18,49 @@ export function Map({ state, paused, selected, rival }: {
   const cars = useSmoothedCars(state, paused);
   const trackPath = trackPathD(state.track);
   const anySelection = selected != null || rival != null;
+  // Driver -> team, as a single stable string keyed only on the pairs that
+  // actually matter for colouring (not on the `cars` object itself, which
+  // race.ts rebuilds every 10 Hz frame regardless of whether any team changed).
+  const driverTeamKey = Object.values(state.cars)
+    .map((c) => `${c.driverNum}:${c.team}`)
+    .join('|');
+  // A plain object, not the built-in Map class: this module's own component
+  // is named `Map`, which shadows the global `Map` constructor in this scope.
+  const driverTeam = useMemo(() => {
+    const byDriver: Record<number, string> = {};
+    for (const c of Object.values(state.cars)) byDriver[c.driverNum] = c.team;
+    return byDriver;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- driverTeamKey is the real dep
+  }, [driverTeamKey]);
   // Sector-dominance heatmap (item 5): one coloured segment per minisector,
   // by the fastest driver's team colour. Always on rather than a toggle — the
   // plain outline is what renders whenever a clip carries no sectorDominance
-  // (older clips, or a bake with too little lap-trace data).
+  // (older clips, or a bake with too little lap-trace data). Memoized on
+  // state.track + state.sectorDominance only — NOT state.cars, which race.ts
+  // rebuilds every frame — with team colour resolved via driverTeam instead.
   const segments = useMemo(() => {
     if (!state.sectorDominance.length) return undefined;
     const paths = trackSegmentPaths(state.track);
     return paths.map((d, i) => {
       const dnum = state.sectorDominance[i];
-      const team = dnum ? state.cars[dnum]?.team : undefined;
+      const team = dnum ? driverTeam[dnum] : undefined;
       return { d, colour: team ? (teamColour[team] ?? 'var(--track-fill)') : 'var(--track-fill)' };
     });
-  }, [state.track, state.sectorDominance, state.cars]);
+  }, [state.track, state.sectorDominance, driverTeam]);
+  // Start/finish tick: track[0] by convention (ingest/record.py's outline
+  // starts at lap_start_t) — a short perpendicular tick using its neighbour
+  // point for direction. Keyed on state.track only, so it isn't recomputed
+  // every 10 Hz frame alongside cars/positions.
+  const startFinishTick = useMemo(() => {
+    if (state.track.length <= 1) return undefined;
+    const p0 = state.track[0], p1 = state.track[1];
+    const dx = p1.x - p0.x, dy = p1.y - p0.y;
+    const len = Math.hypot(dx, dy) || 1;
+    // Perpendicular unit vector, scaled to a short tick either side of track[0].
+    const nx = (-dy / len) * 0.012, ny = (dx / len) * 0.012;
+    const cx = p0.x * SIZE, cy = p0.y * SIZE;
+    return { x1: cx - nx * SIZE, y1: cy - ny * SIZE, x2: cx + nx * SIZE, y2: cy + ny * SIZE };
+  }, [state.track]);
   return (
     // Fitted to the outline's own bounds rather than the full unit square: the
     // baked outline is letterboxed inside it, and the empty margin was ~38% of
@@ -40,29 +70,22 @@ export function Map({ state, paused, selected, rival }: {
       {/* Start/finish: track[0] by convention (ingest/record.py's outline starts
           at lap_start_t) — drawn as a short perpendicular tick using its
           neighbour point for direction. */}
-      {state.track.length > 1 && (() => {
-        const p0 = state.track[0], p1 = state.track[1];
-        const dx = p1.x - p0.x, dy = p1.y - p0.y;
-        const len = Math.hypot(dx, dy) || 1;
-        // Perpendicular unit vector, scaled to a short tick either side of track[0].
-        const nx = (-dy / len) * 0.012, ny = (dx / len) * 0.012;
-        const cx = p0.x * SIZE, cy = p0.y * SIZE;
-        return (
-          <line
-            x1={cx - nx * SIZE} y1={cy - ny * SIZE} x2={cx + nx * SIZE} y2={cy + ny * SIZE}
-            stroke="var(--chalk)" strokeWidth={2}
-          />
-        );
-      })()}
+      {startFinishTick && (
+        <line
+          x1={startFinishTick.x1} y1={startFinishTick.y1}
+          x2={startFinishTick.x2} y2={startFinishTick.y2}
+          stroke="var(--chalk)" strokeWidth={2}
+        />
+      )}
       {state.corners.map((c) => (
         <text
-          key={c.number}
+          key={`${c.number}${c.letter ?? ''}`}
           className="map-label"
           x={c.x * SIZE} y={c.y * SIZE}
           fill="var(--track-label)"
           fontSize="var(--fs-xs)"
           textAnchor="middle"
-        >{c.number}</text>
+        >{c.number}{c.letter ?? ''}</text>
       ))}
       {cars.map((c) => {
         const isSel = selected != null && c.driverNum === selected;

@@ -15,7 +15,7 @@ export interface Car {
   gapMs?: number; gapLaps?: number; intMs?: number;
   speed?: number; gear?: number; throttle?: number; brake?: number; drs?: boolean;
 }
-export interface Corner { number: number; x: number; y: number }
+export interface Corner { number: number; x: number; y: number; letter?: string }
 export interface RadioMessage { timeMs: number; driverNum: number; clip: string }
 export interface Stint { compound: string; startLap: number; endLap: number }
 export interface PitStop { lap: number; durationS: number }
