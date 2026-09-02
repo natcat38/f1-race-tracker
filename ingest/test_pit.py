@@ -1,7 +1,13 @@
-"""Unit tests for the pure pit-window / pit-stop derivation in ingest/pit.py."""
-import pandas as pd
+"""Unit tests for the pure pit-window / pit-stop derivation in ingest/pit.py.
 
-from pit import build_pit_data
+Needs pandas (to build laps-like DataFrames), which CI's fastf1-free contract
+job doesn't install — skip cleanly there, run for real wherever pandas exists.
+"""
+import pytest
+
+pd = pytest.importorskip("pandas", reason="needs pandas for laps DataFrames; not installed in the fastf1-free contract job")
+
+from pit import build_pit_data  # noqa: E402
 
 
 def _laps(rows):
