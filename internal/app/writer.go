@@ -20,6 +20,7 @@ type Source interface {
 	LapTrace() map[int][]int
 	TotalLaps() int
 	Stints() map[int][]model.Stint
+	PitStops() map[int][]model.PitStop
 	Label() string
 	Mode() string
 }
@@ -60,6 +61,7 @@ func (wr *Writer) Run(ctx context.Context, session string) error {
 	snap.LapTrace = wr.src.LapTrace()
 	snap.TotalLaps = wr.src.TotalLaps()
 	snap.Stints = wr.src.Stints()
+	snap.PitStops = wr.src.PitStops()
 	snap.Rev = base
 	rev := base
 	for {

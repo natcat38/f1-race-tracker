@@ -65,6 +65,7 @@ func bake(src *replay.Source, session string, w *bufio.Writer) error {
 	snap.LapTrace = src.LapTrace()
 	snap.TotalLaps = src.TotalLaps()
 	snap.Stints = src.Stints()
+	snap.PitStops = src.PitStops()
 
 	sb, err := ws.EncodeSnapshot(snap)
 	if err != nil {

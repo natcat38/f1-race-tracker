@@ -31,6 +31,11 @@
       {"compound": "HARD", "startLap": 15, "endLap": 53}
     ]
   },
+  "pitStops": {
+    "1": [
+      {"lap": 14, "durationS": 23.4}
+    ]
+  },
   "weather": {"airTempC": 28.5, "trackTempC": 41.2, "rainfall": false},
   "timeMs": 3300000,
   "rev": 42,

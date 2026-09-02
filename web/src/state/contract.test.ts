@@ -44,6 +44,9 @@ describe('golden snapshot contract', () => {
     expect(s.stints[1]).toHaveLength(2);
     expect(s.stints[1][1].compound).toBe('HARD');
     expect(s.stints[1][1].startLap).toBe(15);
+    expect(s.pitStops[1]).toHaveLength(1);
+    expect(s.pitStops[1][0].lap).toBe(14);
+    expect(s.pitStops[1][0].durationS).toBe(23.4);
     expect(s.weather?.trackTempC).toBe(41.2);
     expect(s.weather?.airTempC).toBe(28.5);
     expect(s.weather?.rainfall).toBe(false);

@@ -7,7 +7,8 @@ CONTRACT (must match internal/model/model.go + web/src/state/race.ts):
   Header line: {"track":[{"x":float,"y":float},...], "label":"...", "maxRev":int,
                 "radio":[{"timeMs":int,"driverNum":int,"clip":"https://..."}],
                 "lapTrace":{"<num>":[ms,...]},
-                "stints":{"<num>":[{"compound":"SOFT","startLap":int,"endLap":int}]}}
+                "stints":{"<num>":[{"compound":"SOFT","startLap":int,"endLap":int}]},
+                "pitStops":{"<num>":[{"lap":int,"durationS":float}]}}
   Frame lines: {"timeMs":int, "frame":{"rev":int,"timeMs":int,"cars":[
                  {"driverNum":int,"code":"VER","team":"Red Bull","pos":int,
                   "p":{"x":float,"y":float},"status":"OnTrack"}],
@@ -421,6 +422,10 @@ def get_timing(driver_num, t_s):
 lapnum_lookup = {}  # driver_num -> (times, lap_numbers), parallel lists ascending by time
 stints = {}
 pit_windows = {}  # driver_num -> [(pit_in_s, pit_out_s), ...]
+pit_stops = {}  # driver_num -> [{"lap": int, "durationS": float}, ...] — duration only;
+# ponytail: positions-gained/lost and stationary time are out of scope for this
+# slice (reviews/plans/verify/02-pit-stops.md) — would need a running-order-at-time
+# derivation and per-driver car_data telemetry respectively, neither of which exist yet.
 for num in session.drivers:
     inum = int(num)
     if inum not in driver_info:
@@ -447,10 +452,13 @@ for num in session.drivers:
         stints[inum] = out
 
     windows = []
+    stops = []
     pit_in = None
+    pit_in_lap = None
     for _, lap in drv.sort_values('LapNumber').iterrows():
         if not pd.isna(lap['PitInTime']):
             pit_in = lap['PitInTime'].total_seconds()
+            pit_in_lap = None if pd.isna(lap['LapNumber']) else int(lap['LapNumber'])
         if not pd.isna(lap['PitOutTime']):
             if pit_in is None and not pd.isna(lap['LapStartTime']):
                 # No PitInTime seen before this PitOutTime — e.g. the car
@@ -458,12 +466,22 @@ for num in session.drivers:
                 # start as the pit-in edge so the car is still correctly
                 # flagged as in the pits up to PitOutTime.
                 pit_in = lap['LapStartTime'].total_seconds()
+                pit_in_lap = None if pd.isna(lap['LapNumber']) else int(lap['LapNumber'])
             if pit_in is not None:
-                windows.append((pit_in, lap['PitOutTime'].total_seconds()))
+                pit_out = lap['PitOutTime'].total_seconds()
+                windows.append((pit_in, pit_out))
+                if pit_in_lap is not None:
+                    stops.append({"lap": pit_in_lap, "durationS": round(pit_out - pit_in, 1)})
                 pit_in = None
+                pit_in_lap = None
     if pit_in is not None:
-        windows.append((pit_in, pit_in + 30))  # no recorded out-lap; assume a typical stop
+        pit_out = pit_in + 30  # no recorded out-lap; assume a typical stop
+        windows.append((pit_in, pit_out))
+        if pit_in_lap is not None:
+            stops.append({"lap": pit_in_lap, "durationS": round(pit_out - pit_in, 1)})
     pit_windows[inum] = windows
+    if stops:
+        pit_stops[inum] = stops
 print(f"Stints baked for {len(stints)} drivers")
 
 def _lap_number(driver_num, t_s):
@@ -691,6 +709,7 @@ with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
         "lapTrace": lap_traces,
         "totalLaps": TOTAL_LAPS,
         "stints": stints,
+        "pitStops": pit_stops,
     }
     f.write(json.dumps(header, separators=(',', ':')) + '\n')
 
@@ -875,7 +894,11 @@ try:
     for _dn, stint_list in hdr['stints'].items():
         for st in stint_list:
             assert {'compound', 'startLap', 'endLap'} <= set(st.keys()), f"stint missing fields: {st}"
-    print(f"  Header OK: {len(hdr['track'])} track points, maxRev={hdr['maxRev']}, {len(hdr['radio'])} radio clips, totalLaps={hdr['totalLaps']}, stints for {len(hdr['stints'])} drivers")
+    assert 'pitStops' in hdr, "header missing 'pitStops'"
+    for _dn, stop_list in hdr['pitStops'].items():
+        for ps in stop_list:
+            assert {'lap', 'durationS'} <= set(ps.keys()), f"pit stop missing fields: {ps}"
+    print(f"  Header OK: {len(hdr['track'])} track points, maxRev={hdr['maxRev']}, {len(hdr['radio'])} radio clips, totalLaps={hdr['totalLaps']}, stints for {len(hdr['stints'])} drivers, pitStops for {len(hdr['pitStops'])} drivers")
 except AssertionError as e:
     print(f"  HEADER ERROR: {e}")
     errors += 1

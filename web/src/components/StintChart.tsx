@@ -63,6 +63,27 @@ function StintChartInner({ state, selected, rival }: {
                 }}
               />
             ))}
+            {/* Pit-stop duration ticks: one short marker per stop at the lap it
+                happened, title/aria-label carrying the pit-lane duration. Duration
+                only — positions gained/lost and stationary time are out of scope
+                for this slice (reviews/plans/verify/02-pit-stops.md).
+                # ponytail: no visual distinction between stops yet (e.g. drive-through
+                vs stop-go) — not derivable from the current data, deferred. */}
+            {(state.pitStops[c.driverNum] ?? []).map((p, i) => (
+              <div
+                key={`pit-${i}`}
+                title={`Pit stop: ${p.durationS.toFixed(1)}s (lap ${p.lap})`}
+                role="img"
+                aria-label={`${c.code}: pit stop on lap ${p.lap}, ${p.durationS.toFixed(1)} seconds`}
+                style={{
+                  position: 'absolute',
+                  left: `${((p.lap - 1) / total) * 100}%`,
+                  top: -2, bottom: -2,
+                  width: 2,
+                  background: 'var(--amber, orange)',
+                }}
+              />
+            ))}
             {/* != null, not truthiness: lap 0 is a real value on the wire, and
                 `!!leaderLap` silently skipped the marker on the opening lap. */}
             {leaderLap != null && (

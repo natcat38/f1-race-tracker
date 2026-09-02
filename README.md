@@ -110,6 +110,8 @@ Each lane writes to its own Redis keys (`snapshot:<session>` and `frames:<sessio
 
 **Monotonic Rev.** Both the Go writer and the Python ingester read the stored snapshot's `rev` at startup and emit strictly above it. A restart or a source swap therefore never re-emits a Rev the gateway and clients already passed (which would silently freeze the board).
 
+The replay writer feeds the same Redis contract and seam as the live ingester — same snapshot shape, same frame schema, same monotonic Rev — making the replay lane indistinguishable from live at the gateway. The repo ships this **simulated-live feed** intentionally: to test dashboard clients without waiting for a race weekend, using the same gateway and source-switching infrastructure that live ingestion would use.
+
 ## Control endpoint
 
 Switch the active source at runtime:

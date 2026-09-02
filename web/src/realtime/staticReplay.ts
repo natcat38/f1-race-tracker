@@ -6,6 +6,18 @@ import type { ConnStatus } from './socket';
 
 const DEFAULT_CLIP_URL = `${import.meta.env.BASE_URL}static-demo/monza-2024-race.ndjson`;
 
+// The control surface handed back to callers: closing the connection, plus the
+// board's pause/resume/scrub transport (reviews/plans/verify/03-06-playback-and-readme.md
+// item 3 — client-side static-demo scrub only, mirroring Ghost.tsx's local clock).
+// A plain function (call it to close) with these three attached, so the existing
+// `disconnectRef.current()` call sites over in App.tsx/lanes.ts need no change.
+export interface StaticReplayHandle {
+  (): void;
+  pause: () => void;
+  resume: () => void;
+  scrub: (ms: number) => void;
+}
+
 // connectStaticReplay mirrors connectRace's interface (onState/onStatus/close-fn)
 // but reads a baked NDJSON file (produced by cmd/bake-static) instead of opening
 // a WebSocket, pacing playback on each frame's own relative timeMs offset and
@@ -15,12 +27,20 @@ const DEFAULT_CLIP_URL = `${import.meta.env.BASE_URL}static-demo/monza-2024-race
 export function connectStaticReplay(
   onState: (s: RaceState) => void,
   onStatus?: (status: ConnStatus) => void,
+  // Fired once, when the clip has loaded, with the length of one lap of the
+  // baked clip in ms — the range a scrub slider needs and has no other way
+  // to know ahead of time.
+  onDuration?: (ms: number) => void,
   clipUrl: string = DEFAULT_CLIP_URL,
-): () => void {
+): StaticReplayHandle {
   let state = emptyState();
   let closed = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let live = false;
+  let paused = false;
+  // Set once messages are loaded (schedulePlayback), read by pause/resume/scrub,
+  // which are otherwise no-ops before the clip has finished fetching.
+  let control: { pause: () => void; resume: () => void; scrub: (ms: number) => void } | null = null;
 
   onStatus?.('connecting');
 
@@ -67,6 +87,7 @@ export function connectStaticReplay(
     const frameStartIndex = messages.findIndex((m) => m.type === 'frame');
     const frameBase = frameStartIndex >= 0 ? messages[frameStartIndex].data.timeMs : 0;
     const offsets = messages.map((m) => (m.type === 'frame' ? m.data.timeMs - frameBase : 0));
+    onDuration?.(Math.max(...offsets, 0));
     // Where a loop restart resumes: the first FRAME, not index 0. The synthetic
     // baked snapshot (empty cars, the pre-playback baseline) plays exactly once,
     // on the very first pass — re-emitting it every lap would flash the map back
@@ -85,14 +106,24 @@ export function connectStaticReplay(
     // keeps climbing forever, exactly like the real writer does across a loop.
     const maxRev = messages.reduce((max, m) => (m.type === 'frame' ? Math.max(max, m.data.rev) : max), 0);
     let lapsCompleted = 0;
+    // The next frame due to play, and the offset it was last (re)anchored
+    // against — both read by pause/resume/scrub below, which otherwise have no
+    // way to know where a paused clip currently sits.
+    let nextIndex = 0;
+    let lastOffset = 0;
+
+    const bump = (msg: Msg): Msg => (msg.type === 'frame' && lapsCompleted > 0
+      ? { ...msg, data: { ...msg.data, rev: msg.data.rev + lapsCompleted * maxRev } }
+      : msg);
 
     let loopStart = Date.now();
 
     const playFrom = (i: number) => {
-      if (closed) return;
+      if (closed || paused) return;
       if (i >= messages.length) {
         lapsCompleted++;
         loopStart = Date.now();
+        nextIndex = loopRestartIndex;
         timer = setTimeout(() => playFrom(loopRestartIndex), 0);
         return;
       }
@@ -113,12 +144,10 @@ export function connectStaticReplay(
       const now = Date.now();
       if (now - loopStart > offsets[i]) loopStart = now - offsets[i];
       const wait = Math.max(0, offsets[i] - (now - loopStart));
+      nextIndex = i;
       timer = setTimeout(() => {
-        const msg = messages[i];
-        const bumped: Msg = msg.type === 'frame' && lapsCompleted > 0
-          ? { ...msg, data: { ...msg.data, rev: msg.data.rev + lapsCompleted * maxRev } }
-          : msg;
-        state = applyMessage(state, bumped);
+        state = applyMessage(state, bump(messages[i]));
+        lastOffset = offsets[i];
         if (!live) { live = true; onStatus?.('live'); }
         onState(state);
         playFrom(i + 1);
@@ -126,10 +155,55 @@ export function connectStaticReplay(
     };
 
     playFrom(0);
+
+    control = {
+      pause: () => {
+        if (paused) return;
+        paused = true;
+        if (timer) clearTimeout(timer);
+      },
+      resume: () => {
+        if (!paused) return;
+        paused = false;
+        // Re-anchor loopStart against the offset already reached, exactly as a
+        // fresh lap does above — otherwise the clock treats the paused wall time
+        // as elapsed playback and bursts through however many frames it covers.
+        loopStart = Date.now() - lastOffset;
+        playFrom(nextIndex);
+      },
+      // Jumps to the nearest frame at or after `ms` and rebuilds state by
+      // replaying from the top of the current lap — the reducer folds each
+      // frame into the last (CONTEXT.md: state is cumulative), so there is no
+      // cheaper way to land on an arbitrary offset than replaying up to it.
+      // ponytail: O(n) replay on every scrub, fine for a single baked clip's
+      // few thousand frames; scrubbing across a loop boundary (into the next
+      // lap's Rev range) is out of scope for this slice.
+      scrub: (ms: number) => {
+        if (timer) clearTimeout(timer);
+        const target = messages.findIndex((_, idx) => idx >= loopRestartIndex && offsets[idx] >= ms);
+        const end = target >= 0 ? target : messages.length - 1;
+        let replayed = emptyState();
+        for (let j = 0; j <= end; j++) {
+          replayed = applyMessage(replayed, bump(messages[j]));
+        }
+        state = replayed;
+        lastOffset = offsets[end];
+        nextIndex = end + 1;
+        onState(state);
+        loopStart = Date.now() - lastOffset;
+        if (!paused) playFrom(nextIndex);
+      },
+    };
   }
 
-  return () => {
+  const close = (() => {
     closed = true;
     if (timer) clearTimeout(timer);
-  };
+  }) as StaticReplayHandle;
+  // Before the clip has loaded there is nothing to pause/scrub yet; no-ops
+  // until `control` is set at the end of schedulePlayback.
+  close.pause = () => control?.pause();
+  close.resume = () => control?.resume();
+  close.scrub = (ms: number) => control?.scrub(ms);
+  return close;
 }

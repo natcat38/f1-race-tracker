@@ -67,6 +67,15 @@ type Stint struct {
 	EndLap   int    `json:"endLap"`
 }
 
+// PitStop is one pit-lane stop, duration-only for now (session-constant, like Stint).
+// ponytail: positions-gained/lost and stationary time are out of scope for this
+// slice (reviews/plans/verify/02-pit-stops.md) — a fast-follow can add fields here
+// once the running-order-at-time helper exists.
+type PitStop struct {
+	Lap       int     `json:"lap"`
+	DurationS float64 `json:"durationS"`
+}
+
 // Weather is a low-rate sample (~1/min at bake). Rides on a frame when it
 // changes; folded into the snapshot by Apply.
 type Weather struct {
@@ -94,6 +103,7 @@ type Snapshot struct {
 	LapTrace   map[int][]int        `json:"lapTrace,omitempty"`
 	TotalLaps  int                  `json:"totalLaps,omitempty"` // session-constant race distance
 	Stints     map[int][]Stint      `json:"stints,omitempty"`    // session-constant, like LapTrace
+	PitStops   map[int][]PitStop    `json:"pitStops,omitempty"`  // session-constant, like Stints
 	Weather    *Weather             `json:"weather,omitempty"`
 	TimeMs     int64                `json:"timeMs"`
 	Rev        int64                `json:"rev"`
