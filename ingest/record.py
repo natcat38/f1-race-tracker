@@ -8,7 +8,8 @@ CONTRACT (must match internal/model/model.go + web/src/state/race.ts):
                 "radio":[{"timeMs":int,"driverNum":int,"clip":"https://..."}],
                 "lapTrace":{"<num>":[ms,...]},
                 "stints":{"<num>":[{"compound":"SOFT","startLap":int,"endLap":int}]},
-                "pitStops":{"<num>":[{"lap":int,"durationS":float}]}}
+                "pitStops":{"<num>":[{"lap":int,"durationS":float}]},
+                "pedalTraces":{"<num>":{"throttle":[int,...],"brake":[int,...],"gear":[int,...]}}}
   Frame lines: {"timeMs":int, "frame":{"rev":int,"timeMs":int,"cars":[
                  {"driverNum":int,"code":"VER","team":"Red Bull","pos":int,
                   "p":{"x":float,"y":float},"status":"OnTrack"}],
@@ -41,7 +42,7 @@ from pathlib import Path
 from fastf1 import _api
 from radio import extract_radio
 from race_control import extract_race_control
-from ghost import build_lap_trace
+from ghost import build_lap_trace, build_pedal_trace
 from resample import nearest_index, step_value, in_window_ms, reconcile_positions, UNKNOWN_POS, normalise_point
 from live_parsers import TEAM_MAP
 from geometry import (
@@ -278,6 +279,11 @@ print(f"Track outline: {len(track_points)} points")
 # ---------------------------------------------------------------------------
 _outline_xy = [(p['x'], p['y']) for p in track_points]
 lap_traces = {}
+# pedal_traces: driver_num -> {"throttle":[...],"brake":[...],"gear":[...]}, indexed
+# by the same track-outline position as lap_traces (see PedalTrace in model.go).
+# ponytail: RPM omitted (reviews/plans/verify/01-telemetry-overlay.md) — FastF1's
+# car_data isn't sampled for it anywhere else in this file either.
+pedal_traces = {}
 for num in session.drivers:
     inum = int(num)
     if inum not in driver_info:
@@ -298,10 +304,25 @@ for num in session.drivers:
         sample_ts = driver_lap_pos['SessionTime'].dt.total_seconds().tolist()
         sample_xy = [normalise(row['X'], row['Y']) for _, row in driver_lap_pos.iterrows()]
         lap_traces[inum] = build_lap_trace(sample_ts, sample_xy, _outline_xy)
+        try:
+            cd = session.car_data[num]
+            cd_lap = cd[(cd['SessionTime'] >= lap_start) & (cd['SessionTime'] < lap_end)]
+            if len(cd_lap) >= 2:
+                cd_t = cd_lap['SessionTime'].dt.total_seconds().values
+                idx = np.array([nearest_index(cd_t, q) for q in sample_ts])
+                throttle_vals = cd_lap['Throttle'].values[idx].astype(int)
+                brake_vals = (cd_lap['Brake'].values[idx].astype(float) > 0).astype(int) * 100
+                gear_vals = cd_lap['nGear'].values[idx].astype(int)
+                pedal_traces[inum] = build_pedal_trace(
+                    sample_ts, sample_xy, _outline_xy, throttle_vals, brake_vals, gear_vals
+                )
+        except Exception as e:
+            print(f"  Warning: no pedal trace for {num}: {type(e).__name__}: {e}")
     except Exception as e:
         print(f"  Warning: no lap trace for {num}: {type(e).__name__}: {e}")
 
 print(f"Lap traces baked for {len(lap_traces)} drivers")
+print(f"Pedal traces baked for {len(pedal_traces)} drivers")
 
 # ---------------------------------------------------------------------------
 # Derive running order from laps data
@@ -710,6 +731,7 @@ with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
         "totalLaps": TOTAL_LAPS,
         "stints": stints,
         "pitStops": pit_stops,
+        "pedalTraces": pedal_traces,
     }
     f.write(json.dumps(header, separators=(',', ':')) + '\n')
 
@@ -898,7 +920,12 @@ try:
     for _dn, stop_list in hdr['pitStops'].items():
         for ps in stop_list:
             assert {'lap', 'durationS'} <= set(ps.keys()), f"pit stop missing fields: {ps}"
-    print(f"  Header OK: {len(hdr['track'])} track points, maxRev={hdr['maxRev']}, {len(hdr['radio'])} radio clips, totalLaps={hdr['totalLaps']}, stints for {len(hdr['stints'])} drivers, pitStops for {len(hdr['pitStops'])} drivers")
+    assert 'pedalTraces' in hdr, "header missing 'pedalTraces'"
+    for _dn, pt in hdr['pedalTraces'].items():
+        assert {'throttle', 'brake', 'gear'} <= set(pt.keys()), f"pedal trace missing fields: {pt}"
+        assert len(pt['throttle']) == len(hdr['track']) == len(pt['brake']) == len(pt['gear']), \
+            f"pedal trace length {len(pt['throttle'])} != track length {len(hdr['track'])}"
+    print(f"  Header OK: {len(hdr['track'])} track points, maxRev={hdr['maxRev']}, {len(hdr['radio'])} radio clips, totalLaps={hdr['totalLaps']}, stints for {len(hdr['stints'])} drivers, pitStops for {len(hdr['pitStops'])} drivers, pedalTraces for {len(hdr['pedalTraces'])} drivers")
 except AssertionError as e:
     print(f"  HEADER ERROR: {e}")
     errors += 1

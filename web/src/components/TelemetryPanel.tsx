@@ -1,7 +1,7 @@
 // The selected car's telemetry readout: speed, gear, pedal bars and lap/gap sparklines.
 
 import { memo } from 'react';
-import type { Car, RaceState } from '../state/race';
+import type { Car, PedalTrace, RaceState } from '../state/race';
 import { fmtLap, fmtGapEstimate, type LapHistory, type GapHistory } from './timingHelpers';
 
 // Below this many points a sparkline is decoration: two bars with no axis convey
@@ -116,6 +116,71 @@ function SparkHatch() {
         </pattern>
       </defs>
     </svg>
+  );
+}
+
+// ponytail: fixed max gear of 8 (no F1 car has run higher in the hybrid era) —
+// good enough for a y-axis scale without reading it out of the data per lap.
+const MAX_GEAR = 8;
+const TRACE_H = 28;
+
+// Downsample a pedal-trace channel to at most this many points before drawing —
+// the full array is one point per track-outline point (TRACK_POINTS in
+// ingest/record.py, currently ~150), which is already fine to draw directly, but
+// this caps the SVG's point count if that resolution ever grows.
+const MAX_TRACE_POINTS = 200;
+
+function toPolyline(values: number[], max: number): string {
+  const n = values.length;
+  if (n === 0) return '';
+  const step = Math.max(1, Math.ceil(n / MAX_TRACE_POINTS));
+  const pts: string[] = [];
+  for (let i = 0; i < n; i += step) {
+    const x = (i / (n - 1)) * 100;
+    const y = TRACE_H - (Math.max(0, Math.min(max, values[i])) / max) * TRACE_H;
+    pts.push(`${x.toFixed(2)},${y.toFixed(2)}`);
+  }
+  return pts.join(' ');
+}
+
+// DistanceTrace: throttle/brake/gear over lap distance (0-100%), for the
+// reference car (solid) and an optional rival (dashed) overlaid on the same
+// axes — the corner-by-corner telemetry compare. x is track-outline position
+// (same index space as LapTrace), not literal metres; see PedalTrace in
+// internal/model/model.go.
+function DistanceTraceRow({ label, max, car, rival, pick }: {
+  label: string; max: number;
+  car: PedalTrace; rival?: PedalTrace;
+  pick: (t: PedalTrace) => number[];
+}) {
+  return (
+    <div className="tele-row" style={{ alignItems: 'center' }}>
+      <span className="tele-label">{label}</span>
+      <svg
+        viewBox={`0 0 100 ${TRACE_H}`} preserveAspectRatio="none"
+        style={{ flex: 1, height: TRACE_H, width: '100%' }}
+        role="img" aria-label={`${label} over lap distance`}
+      >
+        <polyline points={toPolyline(pick(car), max)} fill="none" stroke="var(--good)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+        {rival && (
+          <polyline points={toPolyline(pick(rival), max)} fill="none" stroke="var(--slate)" strokeWidth={1.5} strokeDasharray="3 2" vectorEffect="non-scaling-stroke" />
+        )}
+      </svg>
+    </div>
+  );
+}
+
+function DistanceTrace({ car, rival }: { car: PedalTrace; rival?: PedalTrace }) {
+  return (
+    <div style={{ display: 'grid', gap: 'var(--sp-1)' }}>
+      <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--slate)' }}>
+        Throttle / brake / gear over lap distance
+        {rival && ' — solid = reference, dashed = rival'}
+      </div>
+      <DistanceTraceRow label="Throttle" max={100} car={car} rival={rival} pick={(t) => t.throttle} />
+      <DistanceTraceRow label="Brake" max={100} car={car} rival={rival} pick={(t) => t.brake} />
+      <DistanceTraceRow label="Gear" max={MAX_GEAR} car={car} rival={rival} pick={(t) => t.gear} />
+    </div>
   );
 }
 
@@ -244,6 +309,12 @@ export function TelemetryPanel({
           />
         )}
       </div>
+      {state.pedalTraces[car.driverNum] && (
+        <DistanceTrace
+          car={state.pedalTraces[car.driverNum]}
+          rival={rivalCar ? state.pedalTraces[rivalCar.driverNum] : undefined}
+        />
+      )}
     </div>
   );
 }

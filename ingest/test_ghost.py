@@ -4,7 +4,7 @@ Collectable by pytest (`pytest ingest`) AND runnable directly
 (`python ingest/test_ghost.py`) for the CI contract job.
 """
 import sys
-from ghost import build_lap_trace
+from ghost import build_lap_trace, build_pedal_trace
 
 
 def test_build_lap_trace_basic():
@@ -52,10 +52,43 @@ def test_build_lap_trace_anchors_index_zero_even_when_reached_late():
     assert all(trace3[i] >= trace3[i - 1] for i in range(1, len(trace3))), trace3
 
 
+def test_build_pedal_trace_basic():
+    track = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]
+    ts = [10.0, 11.0, 12.0, 13.0]
+    xy = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]
+    throttle = [10, 100, 100, 0]
+    brake = [0, 0, 0, 100]
+    gear = [1, 5, 6, 2]
+
+    trace = build_pedal_trace(ts, xy, track, throttle, brake, gear)
+
+    assert trace["throttle"] == [10, 100, 100, 0], trace
+    assert trace["brake"] == [0, 0, 0, 100], trace
+    assert trace["gear"] == [1, 5, 6, 2], trace
+
+
+def test_build_pedal_trace_empty_input():
+    track = [(0.0, 0.0), (1.0, 0.0)]
+    trace = build_pedal_trace([], [], track, [], [], [])
+    assert trace == {"throttle": [0, 0], "brake": [0, 0], "gear": [0, 0]}, trace
+
+
+def test_build_pedal_trace_carries_unvisited_index_forward():
+    track = [(0.0, 0.0), (0.5, 0.0), (1.0, 0.0)]
+    ts = [0.0, 2.0]
+    xy = [(0.0, 0.0), (1.0, 0.0)]  # midpoint never nearest
+    trace = build_pedal_trace(ts, xy, track, [20, 90], [0, 0], [1, 4])
+    assert trace["throttle"] == [20, 20, 90], trace
+    assert trace["gear"] == [1, 1, 4], trace
+
+
 if __name__ == "__main__":
     test_build_lap_trace_basic()
     test_build_lap_trace_empty_input()
     test_build_lap_trace_carries_unvisited_index_forward()
     test_build_lap_trace_anchors_index_zero_even_when_reached_late()
-    print("ghost.build_lap_trace self-check PASSED")
+    test_build_pedal_trace_basic()
+    test_build_pedal_trace_empty_input()
+    test_build_pedal_trace_carries_unvisited_index_forward()
+    print("ghost.build_lap_trace / build_pedal_trace self-check PASSED")
     sys.exit(0)

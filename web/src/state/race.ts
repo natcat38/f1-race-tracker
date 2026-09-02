@@ -18,6 +18,7 @@ export interface Car {
 export interface RadioMessage { timeMs: number; driverNum: number; clip: string }
 export interface Stint { compound: string; startLap: number; endLap: number }
 export interface PitStop { lap: number; durationS: number }
+export interface PedalTrace { throttle: number[]; brake: number[]; gear: number[] }
 export interface Weather { airTempC: number; trackTempC: number; rainfall: boolean }
 export interface RaceControlMessage {
   rev: number; t: number; category: string; message: string; driver?: number;
@@ -39,6 +40,7 @@ export interface RaceState {
   totalLaps: number;
   stints: Record<number, Stint[]>;
   pitStops: Record<number, PitStop[]>;
+  pedalTraces: Record<number, PedalTrace>;
   weather?: Weather;
   messages: RaceControlMessage[];
   // Bumped on every snapshot (never on a frame) — lets a consumer (useComms) tell
@@ -62,7 +64,7 @@ export function isWarmingUp(s: RaceState): boolean {
 export function emptyState(): RaceState {
   return {
     session: '', mode: '', label: '', track: [], cars: {}, timeMs: 0, rev: 0,
-    radio: [], lapTrace: {}, totalLaps: 0, stints: {}, pitStops: {}, messages: [], snapshotSeq: 0,
+    radio: [], lapTrace: {}, totalLaps: 0, stints: {}, pitStops: {}, pedalTraces: {}, messages: [], snapshotSeq: 0,
     loopSeq: 0,
   };
 }
@@ -76,6 +78,7 @@ interface SnapshotData {
   totalLaps?: number;
   stints?: Record<number, Stint[]>;
   pitStops?: Record<number, PitStop[]>;
+  pedalTraces?: Record<number, PedalTrace>;
   weather?: Weather;
   messages?: RaceControlMessage[];
 }
@@ -125,6 +128,7 @@ export function parseMsg(raw: unknown): Msg | null {
     // stints/pitStops/weather are objects, not arrays — reject an array (would spread wrong).
     if (data.stints !== undefined && (typeof data.stints !== 'object' || data.stints === null || Array.isArray(data.stints))) return null;
     if (data.pitStops !== undefined && (typeof data.pitStops !== 'object' || data.pitStops === null || Array.isArray(data.pitStops))) return null;
+    if (data.pedalTraces !== undefined && (typeof data.pedalTraces !== 'object' || data.pedalTraces === null || Array.isArray(data.pedalTraces))) return null;
     if (data.weather !== undefined && (typeof data.weather !== 'object' || data.weather === null || Array.isArray(data.weather))) return null;
     return { type: 'snapshot', data: data as unknown as SnapshotData };
   }
@@ -149,7 +153,7 @@ export function applyMessage(s: RaceState, msg: Msg): RaceState {
       session: d.session, mode: d.mode, label: d.label,
       track: d.track ?? [], cars: { ...d.cars }, timeMs: d.timeMs, rev: d.rev,
       radio: d.radio ?? [], lapTrace: d.lapTrace ?? {}, totalLaps: d.totalLaps ?? 0,
-      stints: d.stints ?? {}, pitStops: d.pitStops ?? {}, weather: d.weather,
+      stints: d.stints ?? {}, pitStops: d.pitStops ?? {}, pedalTraces: d.pedalTraces ?? {}, weather: d.weather,
       messages: d.messages ?? [],
       snapshotSeq: s.snapshotSeq + 1,
       // A snapshot is a fresh baseline, not a wrap: keep the counter so a

@@ -76,6 +76,18 @@ type PitStop struct {
 	DurationS float64 `json:"durationS"`
 }
 
+// PedalTrace is one driver's throttle/brake/gear over a reference lap, indexed
+// by the same track-outline position used by LapTrace (session-constant, baked
+// once). Each array has length len(Snapshot.Track); index i is "at track point
+// i", giving the same distance axis LapTrace already uses — no separate
+// distance field needed. ponytail: RPM omitted (reviews/plans/verify/01-...md)
+// — not sampled by ingest today; a fast-follow can add it as a fourth array.
+type PedalTrace struct {
+	Throttle []int `json:"throttle"` // 0-100
+	Brake    []int `json:"brake"`    // 0-100
+	Gear     []int `json:"gear"`
+}
+
 // Weather is a low-rate sample (~1/min at bake). Rides on a frame when it
 // changes; folded into the snapshot by Apply.
 type Weather struct {
@@ -93,20 +105,21 @@ const (
 )
 
 type Snapshot struct {
-	SessionKey string               `json:"session"`
-	Mode       Mode                 `json:"mode"`
-	Label      string               `json:"label"` // "Synthetic · Demo"
-	Track      []Point              `json:"track,omitempty"`
-	Cars       map[int]CarState     `json:"cars"` // marshals with string keys (JSON has no int keys); see web/src/state/race.ts's mirroring Record<number, Car>
-	Messages   []RaceControlMessage `json:"messages,omitempty"`
-	Radio      []RadioMessage       `json:"radio,omitempty"`
-	LapTrace   map[int][]int        `json:"lapTrace,omitempty"`
-	TotalLaps  int                  `json:"totalLaps,omitempty"` // session-constant race distance
-	Stints     map[int][]Stint      `json:"stints,omitempty"`    // session-constant, like LapTrace
-	PitStops   map[int][]PitStop    `json:"pitStops,omitempty"`  // session-constant, like Stints
-	Weather    *Weather             `json:"weather,omitempty"`
-	TimeMs     int64                `json:"timeMs"`
-	Rev        int64                `json:"rev"`
+	SessionKey  string               `json:"session"`
+	Mode        Mode                 `json:"mode"`
+	Label       string               `json:"label"` // "Synthetic · Demo"
+	Track       []Point              `json:"track,omitempty"`
+	Cars        map[int]CarState     `json:"cars"` // marshals with string keys (JSON has no int keys); see web/src/state/race.ts's mirroring Record<number, Car>
+	Messages    []RaceControlMessage `json:"messages,omitempty"`
+	Radio       []RadioMessage       `json:"radio,omitempty"`
+	LapTrace    map[int][]int        `json:"lapTrace,omitempty"`
+	TotalLaps   int                  `json:"totalLaps,omitempty"`   // session-constant race distance
+	Stints      map[int][]Stint      `json:"stints,omitempty"`      // session-constant, like LapTrace
+	PitStops    map[int][]PitStop    `json:"pitStops,omitempty"`    // session-constant, like Stints
+	PedalTraces map[int]PedalTrace   `json:"pedalTraces,omitempty"` // session-constant, like LapTrace
+	Weather     *Weather             `json:"weather,omitempty"`
+	TimeMs      int64                `json:"timeMs"`
+	Rev         int64                `json:"rev"`
 }
 
 type Frame struct {

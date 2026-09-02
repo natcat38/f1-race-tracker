@@ -22,14 +22,15 @@ type fakeSource struct {
 	stints map[int][]model.Stint
 }
 
-func (f *fakeSource) Track() []model.Point              { return []model.Point{{X: 0, Y: 0}} }
-func (f *fakeSource) Radio() []model.RadioMessage       { return nil }
-func (f *fakeSource) LapTrace() map[int][]int           { return nil }
-func (f *fakeSource) TotalLaps() int                    { return 0 }
-func (f *fakeSource) Stints() map[int][]model.Stint     { return f.stints }
-func (f *fakeSource) PitStops() map[int][]model.PitStop { return nil }
-func (f *fakeSource) Label() string                     { return "Fake" }
-func (f *fakeSource) Mode() string                      { return "replay" }
+func (f *fakeSource) Track() []model.Point                  { return []model.Point{{X: 0, Y: 0}} }
+func (f *fakeSource) Radio() []model.RadioMessage           { return nil }
+func (f *fakeSource) LapTrace() map[int][]int               { return nil }
+func (f *fakeSource) TotalLaps() int                        { return 0 }
+func (f *fakeSource) Stints() map[int][]model.Stint         { return f.stints }
+func (f *fakeSource) PitStops() map[int][]model.PitStop     { return nil }
+func (f *fakeSource) PedalTraces() map[int]model.PedalTrace { return nil }
+func (f *fakeSource) Label() string                         { return "Fake" }
+func (f *fakeSource) Mode() string                          { return "replay" }
 func (f *fakeSource) Events(ctx context.Context) (<-chan model.Frame, error) {
 	ch := make(chan model.Frame)
 	go func() {
@@ -50,14 +51,15 @@ func (f *fakeSource) Events(ctx context.Context) (<-chan model.Frame, error) {
 // blocks on ctx after emitting) — exercising Writer.Run's frames-channel-closed branch.
 type closingSource struct{ frames []model.Frame }
 
-func (closingSource) Track() []model.Point              { return nil }
-func (closingSource) Radio() []model.RadioMessage       { return nil }
-func (closingSource) LapTrace() map[int][]int           { return nil }
-func (closingSource) TotalLaps() int                    { return 0 }
-func (closingSource) Stints() map[int][]model.Stint     { return nil }
-func (closingSource) PitStops() map[int][]model.PitStop { return nil }
-func (closingSource) Label() string                     { return "Closing" }
-func (closingSource) Mode() string                      { return "replay" }
+func (closingSource) Track() []model.Point                  { return nil }
+func (closingSource) Radio() []model.RadioMessage           { return nil }
+func (closingSource) LapTrace() map[int][]int               { return nil }
+func (closingSource) TotalLaps() int                        { return 0 }
+func (closingSource) Stints() map[int][]model.Stint         { return nil }
+func (closingSource) PitStops() map[int][]model.PitStop     { return nil }
+func (closingSource) PedalTraces() map[int]model.PedalTrace { return nil }
+func (closingSource) Label() string                         { return "Closing" }
+func (closingSource) Mode() string                          { return "replay" }
 func (s closingSource) Events(ctx context.Context) (<-chan model.Frame, error) {
 	ch := make(chan model.Frame)
 	go func() {

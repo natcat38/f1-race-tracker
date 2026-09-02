@@ -47,6 +47,9 @@ describe('golden snapshot contract', () => {
     expect(s.pitStops[1]).toHaveLength(1);
     expect(s.pitStops[1][0].lap).toBe(14);
     expect(s.pitStops[1][0].durationS).toBe(23.4);
+    expect(s.pedalTraces[1].throttle).toEqual([0, 40, 100, 100]);
+    expect(s.pedalTraces[1].brake).toEqual([0, 60, 0, 0]);
+    expect(s.pedalTraces[1].gear).toEqual([1, 3, 7, 7]);
     expect(s.weather?.trackTempC).toBe(41.2);
     expect(s.weather?.airTempC).toBe(28.5);
     expect(s.weather?.rainfall).toBe(false);

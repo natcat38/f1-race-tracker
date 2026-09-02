@@ -16,14 +16,15 @@ import (
 )
 
 type clipHeader struct {
-	Track     []model.Point           `json:"track"`
-	Label     string                  `json:"label"`
-	MaxRev    int64                   `json:"maxRev"`
-	Radio     []model.RadioMessage    `json:"radio"`
-	LapTrace  map[int][]int           `json:"lapTrace"`
-	TotalLaps int                     `json:"totalLaps"`
-	Stints    map[int][]model.Stint   `json:"stints"`
-	PitStops  map[int][]model.PitStop `json:"pitStops"`
+	Track       []model.Point            `json:"track"`
+	Label       string                   `json:"label"`
+	MaxRev      int64                    `json:"maxRev"`
+	Radio       []model.RadioMessage     `json:"radio"`
+	LapTrace    map[int][]int            `json:"lapTrace"`
+	TotalLaps   int                      `json:"totalLaps"`
+	Stints      map[int][]model.Stint    `json:"stints"`
+	PitStops    map[int][]model.PitStop  `json:"pitStops"`
+	PedalTraces map[int]model.PedalTrace `json:"pedalTraces"`
 }
 
 type clipLine struct {
@@ -32,16 +33,17 @@ type clipLine struct {
 }
 
 type Source struct {
-	track     []model.Point
-	radio     []model.RadioMessage
-	lapTrace  map[int][]int
-	totalLaps int
-	stints    map[int][]model.Stint
-	pitStops  map[int][]model.PitStop
-	label     string
-	lines     []clipLine
-	max       int64
-	speed     float64
+	track       []model.Point
+	radio       []model.RadioMessage
+	lapTrace    map[int][]int
+	totalLaps   int
+	stints      map[int][]model.Stint
+	pitStops    map[int][]model.PitStop
+	pedalTraces map[int]model.PedalTrace
+	label       string
+	lines       []clipLine
+	max         int64
+	speed       float64
 
 	phaseWallclock bool // when true, loop position is derived from the wall clock (M4 compare)
 }
@@ -92,18 +94,20 @@ func Load(path string, speed float64) (*Source, error) {
 	}
 	return &Source{
 		track: hdr.Track, radio: hdr.Radio, lapTrace: hdr.LapTrace, totalLaps: hdr.TotalLaps,
-		stints: hdr.Stints, pitStops: hdr.PitStops, label: hdr.Label, lines: lines, max: hdr.MaxRev, speed: speed,
+		stints: hdr.Stints, pitStops: hdr.PitStops, pedalTraces: hdr.PedalTraces,
+		label: hdr.Label, lines: lines, max: hdr.MaxRev, speed: speed,
 	}, nil
 }
 
-func (s *Source) Track() []model.Point              { return s.track }
-func (s *Source) Radio() []model.RadioMessage       { return s.radio }
-func (s *Source) LapTrace() map[int][]int           { return s.lapTrace }
-func (s *Source) TotalLaps() int                    { return s.totalLaps }
-func (s *Source) Stints() map[int][]model.Stint     { return s.stints }
-func (s *Source) PitStops() map[int][]model.PitStop { return s.pitStops }
-func (s *Source) Label() string                     { return s.label }
-func (s *Source) Mode() string                      { return "replay" }
+func (s *Source) Track() []model.Point                  { return s.track }
+func (s *Source) Radio() []model.RadioMessage           { return s.radio }
+func (s *Source) LapTrace() map[int][]int               { return s.lapTrace }
+func (s *Source) TotalLaps() int                        { return s.totalLaps }
+func (s *Source) Stints() map[int][]model.Stint         { return s.stints }
+func (s *Source) PitStops() map[int][]model.PitStop     { return s.pitStops }
+func (s *Source) PedalTraces() map[int]model.PedalTrace { return s.pedalTraces }
+func (s *Source) Label() string                         { return s.label }
+func (s *Source) Mode() string                          { return "replay" }
 
 // Frames returns every frame in the clip, in file order, with each frame's Rev
 // exactly as recorded in the file (advisory — a caller publishing to a fresh

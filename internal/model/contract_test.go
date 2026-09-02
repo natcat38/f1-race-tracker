@@ -73,6 +73,10 @@ func TestGoldenSnapshotContract(t *testing.T) {
 	if len(s.PitStops[1]) != 1 || s.PitStops[1][0].Lap != 14 || s.PitStops[1][0].DurationS != 23.4 {
 		t.Fatalf("pitStops mismatched: %+v", s.PitStops)
 	}
+	pt := s.PedalTraces[1]
+	if len(pt.Throttle) != 4 || pt.Throttle[2] != 100 || len(pt.Brake) != 4 || pt.Brake[1] != 60 || len(pt.Gear) != 4 || pt.Gear[3] != 7 {
+		t.Fatalf("pedalTraces mismatched: %+v", pt)
+	}
 	if s.Weather == nil || s.Weather.TrackTempC != 41.2 || s.Weather.AirTempC != 28.5 || s.Weather.Rainfall {
 		t.Fatalf("weather mismatched: %+v", s.Weather)
 	}

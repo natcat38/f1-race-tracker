@@ -52,3 +52,42 @@ def build_lap_trace(sample_ts, sample_xy, track_xy):
     if trace:
         trace[0] = 0
     return trace
+
+
+def build_pedal_trace(sample_ts, sample_xy, track_xy, throttle_vals, brake_vals, gear_vals):
+    """Throttle/brake/gear at each track-outline index, over one reference lap.
+
+    Same nearest-outline-index bucketing as build_lap_trace, but instead of
+    recording elapsed time at first-reached, records that sample's pedal/gear
+    values. Unreached indices carry the previous value forward (matches
+    build_lap_trace's fill rule) so all three arrays are always fully populated,
+    length len(track_xy).
+
+    sample_ts/sample_xy/track_xy: as build_lap_trace.
+    throttle_vals/brake_vals/gear_vals: parallel lists, same length as sample_ts.
+    """
+    n = len(track_xy)
+    if not sample_ts or n == 0:
+        return {"throttle": [0] * n, "brake": [0] * n, "gear": [0] * n}
+    reached = [None] * n
+    # ponytail: same brute-force nearest-point search as build_lap_trace, run once
+    # per driver per clip bake — see that function's comment for the cost analysis.
+    for ts, (sx, sy), th, br, gr in zip(
+        sample_ts, sample_xy, throttle_vals, brake_vals, gear_vals, strict=True
+    ):
+        bi, bd = 0, None
+        for i, (tx, ty) in enumerate(track_xy):
+            d = (tx - sx) ** 2 + (ty - sy) ** 2
+            if bd is None or d < bd:
+                bd, bi = d, i
+        if reached[bi] is None:
+            reached[bi] = (int(th), int(br), int(gr))
+    throttle, brake, gear = [], [], []
+    last = (0, 0, 0)
+    for i in range(n):
+        if reached[i] is not None:
+            last = reached[i]
+        throttle.append(last[0])
+        brake.append(last[1])
+        gear.append(last[2])
+    return {"throttle": throttle, "brake": brake, "gear": gear}
