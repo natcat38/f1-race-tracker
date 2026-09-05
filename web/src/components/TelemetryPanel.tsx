@@ -145,6 +145,20 @@ function toPolyline(values: number[], max: number): string {
   return pts.join(' ');
 }
 
+// Text alternative for a distance-trace SVG: the label alone ("Throttle over
+// lap distance") names the picture but carries none of the up-to-200 plotted
+// points (#106, WCAG 1.1.1). ponytail: a range + endpoint is the smallest
+// summary that is still correct for all three channels (throttle/brake %,
+// integer gear steps) — no per-channel phrasing ("full throttle N% of the
+// lap") since that would need a distinct rule per channel for one aria-label.
+function distanceTraceSummary(label: string, values: number[]): string {
+  const known = values.filter((v): v is number => v != null && !Number.isNaN(v));
+  if (known.length === 0) return `${label} over lap distance: no data`;
+  const min = Math.min(...known), max = Math.max(...known);
+  const last = known[known.length - 1];
+  return `${label} over lap distance: ranging ${min} to ${max}, ending at ${last}`;
+}
+
 // DistanceTrace: throttle/brake/gear over lap distance (0-100%), for the
 // reference car (solid) and an optional rival (dashed) overlaid on the same
 // axes — the corner-by-corner telemetry compare. x is track-outline position
@@ -163,13 +177,14 @@ const DistanceTraceRow = memo(function DistanceTraceRow({ label, max, car, rival
     () => (rival ? toPolyline(pick(rival), max) : ''),
     [rival, max, pick],
   );
+  const summary = useMemo(() => distanceTraceSummary(label, pick(car)), [label, car, pick]);
   return (
     <div className="tele-row" style={{ alignItems: 'center' }}>
       <span className="tele-label">{label}</span>
       <svg
         viewBox={`0 0 100 ${TRACE_H}`} preserveAspectRatio="none"
         style={{ flex: 1, height: TRACE_H, width: '100%' }}
-        role="img" aria-label={`${label} over lap distance`}
+        role="img" aria-label={summary}
       >
         <polyline points={carPoints} fill="none" stroke="var(--good)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
         {rival && (

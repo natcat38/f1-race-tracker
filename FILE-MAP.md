@@ -250,6 +250,7 @@ Presentational components — map, timing tower, telemetry, comms, race control,
 | `StintChart.render.test.tsx` | Render tests for the strategy timeline's stint segments and leader marker. |
 | `StintChart.tsx` | The full-race strategy timeline: one row per car, each stint a coloured segment on a lap axis. |
 | `TelemetryPanel.interaction.test.tsx` | Interaction coverage for the telemetry panel: picking and clearing a rival from the "Compare with" select, the one interaction it actually owns. |
+| `TelemetryPanel.trace.test.tsx` | Render tests for TelemetryPanel's distance-trace SVGs (throttle/brake/gear): covers the pickThrottle/pickBrake/pickGear + toPolyline path (#121) and the derived-summary aria-label that replaces the bare "<label> over lap distance" text alternative (#106). |
 | `TelemetryPanel.tsx` | The selected car's telemetry readout: speed, gear, pedal bars and lap/gap sparklines. |
 | `TimingTower.render.test.tsx` | Render tests for the timing tower's rows, columns and empty states. |
 | `TimingTower.test.ts` | Unit tests for the timing helpers: lap/gap/sector formatting, ordering and personal bests. |
@@ -520,4 +521,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-46 directories, 194 files listed, 0 without a declared purpose.
+46 directories, 195 files listed, 0 without a declared purpose.
