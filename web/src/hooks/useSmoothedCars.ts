@@ -5,6 +5,29 @@ import { useEffect, useRef, useState } from 'react';
 import type { Car, RaceState, Point } from '../state/race';
 import { useReducedMotion } from './useReducedMotion';
 
+// ponytail: a scrub or loop restart moves a car far more than one 10Hz frame
+// ever could (normal frame-to-frame motion on this track is well under this
+// in track-space units) — snap instead of gliding across the map.
+// CarState.P is normalised track-space in [0,1] (Map.tsx, geometry.ts scale
+// by SIZE only at render time), so the threshold must be in that same unit.
+export const TELEPORT_THRESHOLD = 0.08;
+
+// Pure helper (exported for testing without rendering the hook): for each
+// car, decides whether the animation should glide from its previous point or
+// snap by starting the "from" point at the new point itself.
+export function snapTeleports(
+  next: Record<number, Point>,
+  prevTo: Record<number, Point>,
+): Record<number, Point> {
+  const snapped: Record<number, Point> = {};
+  for (const [id, p] of Object.entries(next)) {
+    const prev = prevTo[Number(id)];
+    const dist = prev ? Math.hypot(p.x - prev.x, p.y - prev.y) : 0;
+    snapped[Number(id)] = prev && dist <= TELEPORT_THRESHOLD ? prev : p;
+  }
+  return snapped;
+}
+
 // Returns cars with positions interpolated at display refresh rate.
 // Cars glide from their previous position to their current position over one
 // frame interval (~100 ms at 10 Hz), keeping motion smooth at the display's
@@ -33,17 +56,7 @@ export function useSmoothedCars(state: RaceState, paused = false): Car[] {
     const prevTo = to.current;
     const next: Record<number, Point> = {};
     for (const c of Object.values(state.cars)) next[c.driverNum] = c.p;
-    // ponytail: a scrub or loop restart moves a car far more than one 10Hz frame
-    // ever could (normal frame-to-frame motion on this track is well under this
-    // in track-space units) — snap instead of gliding across the map.
-    const TELEPORT_THRESHOLD = 50;
-    const snapped: Record<number, Point> = {};
-    for (const [id, p] of Object.entries(next)) {
-      const prev = prevTo[Number(id)];
-      const dist = prev ? Math.hypot(p.x - prev.x, p.y - prev.y) : 0;
-      snapped[Number(id)] = prev && dist <= TELEPORT_THRESHOLD ? prev : p;
-    }
-    from.current = snapped;
+    from.current = snapTeleports(next, prevTo);
     to.current = next;
     tFrom.current = tTo.current || now;
     tTo.current = now;
