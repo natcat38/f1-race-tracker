@@ -3,7 +3,7 @@
 
 services:
   redis:
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
     # No host port: services reach Redis over the compose network (redis://redis:6379).
     # Nothing outside the compose network needs it, so it isn't exposed to the host/LAN.
 
