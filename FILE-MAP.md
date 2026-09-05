@@ -30,6 +30,8 @@ Repo root: module definition, container build, compose stack, and the top-level 
 | `CONTEXT.md` | The project glossary: the shared vocabulary every layer, issue and ADR is expected to use. |
 | `Dockerfile` | Multi-stage image for the single Go binary: builds the React SPA, embeds it, and ships the gateway/replay server. |
 | `FILE-MAP.md` | Where every directory and source file lives and why — the layout half of the repo's memory system, generated from the DIRS table and each file's own header comment. |
+| `FILE-MAP.md` | Where every directory and source file lives and why — the layout half of the repo's memory system, generated from the DIRS table and each file's own header comment. |
+| `FILE-MAP.md` | Where every directory and source file lives and why — the layout half of the repo's memory system, generated from the DIRS table and each file's own header comment. |
 | `README.md` | What this project is, what it looks like, and how to run it. |
 | `ROADMAP.md` | **Current stage: Review** |
 | `SECURITY.md` | Security posture and vulnerability-reporting policy for this self-hosted app. |
@@ -407,6 +409,7 @@ Architecture Decision Records — why the system is shaped the way it is. Read t
 | `0007-f1tv-auth-delegated-operator-link.md` | ADR-0007: beta live timing authenticates via an operator-linked F1 TV session, delegated to FastF1. |
 | `0008-live-radio-rides-frames.md` | ADR-0008: live team radio rides frames, while replay radio stays fixed in the snapshot. |
 | `0009-overlay-absorbs-compare.md` | ADR-0009: the ghost overlay absorbs the side-by-side COMPARE view and addresses each side as a (session, driver) pair. |
+| `0010-track-furniture-and-pit-pedal-data-extend-existing-patterns.md` | ADR-0010: corners, pit stops, pedal traces, and sector dominance extend the existing contract patterns rather than introducing new ones. |
 
 ### `docs/agents`
 
@@ -487,6 +490,7 @@ Portable cross-session agent memory: one fact per file, indexed by memory/MEMORY
 | `MEMORY.md` | Index of the repo's portable agent memory: one line per memory file, plus the convention for adding one. |
 | `code-review-level.md` | "Default /code-review effort (high --fix, max only when explicitly asked) is now in global ~/.claude/CLAUDE.md — this file keeps only the project-specific history" |
 | `f1-build-gotchas.md` | F1 tracker build/verify gotchas — vite wipes web/dist/.gitkeep; bench artifacts are canonical; no cgo locally so go test -race only works in CI; live SignalR feed needs F1TV auth; running the static demo locally needs a bake plus a temporary web/.env.local |
+| `f1-repo-review-2026-09-06.md` | "2026-09-06 full-repo re-review: 8 reports under reviews/2026-09-06/, ROADMAP.md added via open PR #96, findings to be filed as GitHub issues" |
 | `f1-tracker-direction.md` | "F1 Race Tracker current state (2026-09-06): Phases 1-5 + WS5 (F1TV live beta) shipped, PR #94 peer-comparison features merged, ROADMAP.md landing via open PR #96, stage Review" |
 | `no-direct-pushes.md` | Feedback memory: never push directly to main, even for chores — always go through a PR. |
 | `plain-english-preference.md` | "User prefers plain-English, low-jargon explanations of technical options" |
@@ -515,4 +519,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-46 directories, 189 files listed, 0 without a declared purpose.
+46 directories, 193 files listed, 0 without a declared purpose.
