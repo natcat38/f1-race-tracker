@@ -52,6 +52,14 @@ def test_parse_gap_str_lapped_suffix():
     assert _parse_gap_str("LAP") == (None, None)  # no digits to extract
 
 
+def test_parse_gap_str_lap_with_number_format():
+    # "LAP 12" (word, space, number) is a documented real payload shape
+    # (issue #122 / docs/adr/0007) distinct from the "1L"/"2 LAP" suffix
+    # forms already covered above.
+    # UNVERIFIED against a live session: pins current behaviour
+    assert _parse_gap_str("LAP 12") == (None, 12)
+
+
 def test_parse_laptime_str():
     cases = [
         ("1:25.633", 85633),
@@ -91,6 +99,19 @@ def test_parse_timing_line_missing_fields_returns_partial_dict():
     assert _parse_timing_line({"NumberOfLaps": "not-a-number"}) == {}
 
 
+def test_parse_timing_line_malformed_nested_fields_ignored():
+    # A driver line where the nested fields aren't the documented shape
+    # (IntervalToPositionAhead/LastLapTime as dicts, GapToLeader as a str)
+    # must degrade to a partial dict rather than raising.
+    # UNVERIFIED against a live session: pins current behaviour
+    drv_data = {
+        "GapToLeader": None,  # not a str -> ignored
+        "IntervalToPositionAhead": "0.512",  # not a dict -> ignored
+        "LastLapTime": ["1:25.633"],  # not a dict -> ignored
+    }
+    assert _parse_timing_line(drv_data) == {}
+
+
 def test_parse_tyre_line_dict_stints_picks_highest_index():
     app_data = {
         "Stints": {
@@ -110,6 +131,14 @@ def test_parse_tyre_line_no_stints_returns_empty():
     assert _parse_tyre_line({}) == {}
     assert _parse_tyre_line({"Stints": {}}) == {}
     assert _parse_tyre_line({"Stints": []}) == {}
+
+
+def test_parse_tyre_line_current_entry_not_dict_returns_empty():
+    # A malformed feed where the "current" stint entry isn't itself a dict
+    # (e.g. a bare string/number slipped into Stints) must not raise.
+    # UNVERIFIED against a live session: pins current behaviour
+    assert _parse_tyre_line({"Stints": {"0": "MEDIUM"}}) == {}
+    assert _parse_tyre_line({"Stints": [None]}) == {}
 
 
 def test_map_status():
@@ -176,13 +205,16 @@ if __name__ == "__main__":
     test_parse_gap_str_numeric()
     test_parse_gap_str_negative_clamped_to_zero()
     test_parse_gap_str_lapped_suffix()
+    test_parse_gap_str_lap_with_number_format()
     test_parse_laptime_str()
     test_parse_timing_line_full()
     test_parse_timing_line_lapped_gap()
     test_parse_timing_line_missing_fields_returns_partial_dict()
+    test_parse_timing_line_malformed_nested_fields_ignored()
     test_parse_tyre_line_dict_stints_picks_highest_index()
     test_parse_tyre_line_list_stints_picks_last()
     test_parse_tyre_line_no_stints_returns_empty()
+    test_parse_tyre_line_current_entry_not_dict_returns_empty()
     test_map_status()
     test_safe_int()
     test_decode_position_payload_dict_shapes()

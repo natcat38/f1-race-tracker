@@ -50,3 +50,21 @@ updates:
     groups:
       actions-minor-patch:
         update-types: ["minor", "patch"]
+
+  # Docker base images pinned to sha256 digests (Dockerfile, docker-compose.yml)
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+
+  # Docker base image pinned to a sha256 digest (ingest/Dockerfile.live)
+  - package-ecosystem: docker
+    directory: "/ingest"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
