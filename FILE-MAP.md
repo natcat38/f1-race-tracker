@@ -30,8 +30,6 @@ Repo root: module definition, container build, compose stack, and the top-level 
 | `CONTEXT.md` | The project glossary: the shared vocabulary every layer, issue and ADR is expected to use. |
 | `Dockerfile` | Multi-stage image for the single Go binary: builds the React SPA, embeds it, and ships the gateway/replay server. |
 | `FILE-MAP.md` | Where every directory and source file lives and why — the layout half of the repo's memory system, generated from the DIRS table and each file's own header comment. |
-| `FILE-MAP.md` | Where every directory and source file lives and why — the layout half of the repo's memory system, generated from the DIRS table and each file's own header comment. |
-| `FILE-MAP.md` | Where every directory and source file lives and why — the layout half of the repo's memory system, generated from the DIRS table and each file's own header comment. |
 | `README.md` | What this project is, what it looks like, and how to run it. |
 | `ROADMAP.md` | **Current stage: Review** |
 | `SECURITY.md` | Security posture and vulnerability-reporting policy for this self-hosted app. |
@@ -523,4 +521,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-46 directories, 197 files listed, 0 without a declared purpose.
+46 directories, 195 files listed, 0 without a declared purpose.
