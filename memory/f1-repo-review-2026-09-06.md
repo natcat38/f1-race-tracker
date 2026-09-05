@@ -17,3 +17,5 @@ lifecycle, retro-filled against existing artifacts) via **PR #96** — Current s
 fixed inline in this session — check `gh issue list` for what's already been filed before
 re-reporting the same finding. See [[f1-tracker-direction]] for the overall project state
 and [[f1-build-gotchas]] for known build/verify traps.
+
+**Update 2026-09-06 (later):** all 22 `ready-for-agent` issues (#99–#122 minus the human ones) were fixed and merged via PRs #125–#133, each code-reviewed at `high --fix` before merge (reviews found and fixed: a swallowed zlib-cap error in #125, a missing Dependabot docker ecosystem in #131; the rest were clean). Still open: #115/#123/#124 (`ready-for-human`) and #103 (`needs-info`). Lesson: agent worktrees hold the PR branch checked out, so a land script must `git worktree remove` first or its checkout fails silently; linear-history protection means every PR needs a rebase + fresh FILE-MAP + CI re-run before merge (see the landpr pattern: rebase, regen, force-push-with-lease, wait CI, squash-merge).
