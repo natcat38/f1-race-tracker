@@ -350,6 +350,7 @@ export default function App() {
                   </button>
                   <input
                     type="range"
+                    className="range-dark"
                     min={0}
                     max={Math.max(0, replayDuration - 1)}
                     step={100}
@@ -357,9 +358,9 @@ export default function App() {
                     onChange={(e) => scrubReplay(Number(e.target.value))}
                     aria-label="Replay position"
                     aria-valuetext={fmtElapsed(replayTMs)}
-                    style={{ width: 120 }}
+                    style={{ minWidth: 80, flex: '1 1 120px' }}
                   />
-                  <span className="rail-clock">{fmtElapsed(replayTMs)}</span>
+                  <span className="rail-scrub-clock">{fmtElapsed(replayTMs)}</span>
                 </>
               ) : (
                 /* Label swap rather than aria-pressed, matching the overlay's existing
