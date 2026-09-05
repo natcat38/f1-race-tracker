@@ -10,10 +10,10 @@ An F1 race tracker that puts you on the pit wall — watch the cars on circuit, 
 
 ### What you get on the pit wall
 
-- **Track-map-first design** — positions on circuit are the primary view, not an afterthought table.
-- **Pit-wall timing tower** — beside the map the board shows a live timing tower with gaps/intervals, last lap, tyres, and sector times for every car; a car in the pit lane shows `IN PIT` instead of a stale gap, and dims on the track map. Click any driver to open a per-car telemetry panel (speed, gear, throttle, brake, DRS, lap-time and gap trend sparklines) sourced from the same 10 Hz frame, with a "vs" picker for a side-by-side two-car telemetry compare.
-- **Sector and lap-pace signal** — session-best and personal-best sector shading; click a row to set it as the reference car and every other row's sector delta switches to "how much am I losing to *them*, right now" instead of your own best.
-- **Strategy timeline** — a full-race stint chart (compound + stint length per driver) baked once per session, so the pit-stop story — undercuts, tyre choice, stint length — reads at a glance instead of disappearing the moment a stop happens.
+- **Track-map-first design** — positions on circuit are the primary view, not an afterthought table, with corner numbers and the start/finish line baked onto the outline as fixed track furniture.
+- **Pit-wall timing tower** — beside the map the board shows a live timing tower with gaps/intervals, last lap, tyres, and sector times for every car; a car in the pit lane shows `IN PIT` instead of a stale gap, and dims on the track map. Click any driver to open a per-car telemetry panel (speed, gear, throttle, brake, DRS, lap-time and gap trend sparklines) sourced from the same 10 Hz frame, with a "vs" picker for a side-by-side two-car telemetry compare that also charts throttle/brake/gear pedal traces over lap distance, so the two cars line up by track position rather than by clock time.
+- **Sector and lap-pace signal** — session-best and personal-best sector shading; click a row to set it as the reference car and every other row's sector delta switches to "how much am I losing to *them*, right now" instead of your own best. The track map carries the same idea forward as a sector-dominance heatmap — a minisector-by-minisector coloring of whichever driver was fastest through that stretch of track.
+- **Strategy timeline** — a full-race stint chart (compound + stint length per driver) baked once per session, with each pit stop's duration on the timeline, so the pit-stop story — undercuts, tyre choice, stint length — reads at a glance instead of disappearing the moment a stop happens.
 - **Weather** — track/air temperature and a rain badge in the status rail, baked from the session's real weather samples.
 - **Team-radio comms layer** — a toggleable layer that auto-plays driver↔engineer radio in sync with the replay clock, with a now-playing banner and a short replayable history. The audio streams straight from F1's public URLs at play time — nothing is committed or downloaded — so the comms audio (only) needs network access; positions and timing stay fully offline from the committed clips. See [docs/adr/0003-team-radio-streamed-not-committed.md](docs/adr/0003-team-radio-streamed-not-committed.md).
 - **Race control feed** — a timestamped, rolling log of real session messages (flags, safety car, investigations), baked from the session's actual race-control feed and replayed in sync alongside the timing tower.
@@ -26,7 +26,7 @@ The product is judged first by whether it helps you understand how the car is pe
 
 ## Quick look (no clone required)
 
-**[Live static demo →](https://natcat38.github.io/f1-race-tracker/)** — a frontend-only build that plays back one recorded clip, client-side, with no backend running. This is the fastest way to see what the project does, but it's a simplified artifact, not the real system: no live source, no cross-year comparison, and nothing here proves the polyglot pipeline actually works.
+**[Live static demo →](https://natcat38.github.io/f1-race-tracker/)** — a frontend-only build that plays back one recorded clip, client-side, with no backend running. Pause and scrub through the clip with the playback controls to inspect any moment rather than only watching it loop. This is the fastest way to see what the project does, but it's a simplified artifact, not the real system: no live source, no cross-year comparison, and nothing here proves the polyglot pipeline actually works.
 
 For that, run it for real:
 
