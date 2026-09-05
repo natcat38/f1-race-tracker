@@ -8,7 +8,10 @@ the other cross-module dedup).
 """
 import base64
 import json
+import logging
 import zlib
+
+_log = logging.getLogger(__name__)
 
 # Upper bound on a decompressed Position.z payload (#117/L-3). A single frame's worth of
 # car positions is a few KB of JSON at most; 8 MiB is generous headroom while still
@@ -65,9 +68,16 @@ def _decode_position_payload(payload) -> list:
             decompressor = zlib.decompressobj(-15)  # raw deflate (no header)
             decompressed = decompressor.decompress(raw, _MAX_DECOMPRESSED_BYTES)
             if decompressor.unconsumed_tail:
-                raise ValueError(
-                    f"Position.z payload exceeds {_MAX_DECOMPRESSED_BYTES} bytes decompressed"
+                # Oversized payload: this is a distinct, loggable condition (a
+                # zip-bomb-shaped or corrupt frame), not "not zlib" — don't let it
+                # fall through to the plain-JSON fallback below and disappear as an
+                # ordinary empty result (#117 review: silent truncation looked
+                # identical to a benign non-zlib payload).
+                _log.warning(
+                    "Position.z payload exceeds %d bytes decompressed; dropping frame",
+                    _MAX_DECOMPRESSED_BYTES,
                 )
+                return []
             decoded = json.loads(decompressed)
             return decoded.get('Position', [])
         except Exception:
