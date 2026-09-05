@@ -59,16 +59,9 @@ func run(clipPath, outPath, session string) error {
 // clip to a fresh Redis session — rather than trusting the file's own
 // (advisory, possibly-repeating) Rev values.
 func bake(src *replay.Source, session string, w *bufio.Writer) error {
-	snap := model.NewSnapshot(session, src.Mode(), src.Label())
-	snap.Track = src.Track()
-	snap.Corners = src.Corners()
-	snap.Radio = src.Radio()
-	snap.LapTrace = src.LapTrace()
-	snap.TotalLaps = src.TotalLaps()
-	snap.Stints = src.Stints()
-	snap.PitStops = src.PitStops()
-	snap.PedalTraces = src.PedalTraces()
-	snap.SectorDominance = src.SectorDominance()
+	snap := src.Baked()
+	snap.SessionKey = session
+	snap.Cars = make(map[int]model.CarState)
 
 	sb, err := ws.EncodeSnapshot(snap)
 	if err != nil {
