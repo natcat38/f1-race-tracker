@@ -234,6 +234,7 @@ Presentational components — map, timing tower, telemetry, comms, race control,
 | `Ghost.render.test.tsx` | Render tests for the overlay: both comparison scenarios, per-side team colours, and the states where there is nothing to compare. |
 | `Ghost.tsx` | The overlay route: two reference laps animated against each other on one track map, across two seasons or two drivers in the same race. |
 | `Map.interaction.test.tsx` | Interaction coverage for the track map: the animation loop and the marker updates that static rendering never exercises. |
+| `Map.render.test.tsx` | Render (renderToStaticMarkup) regression coverage for three a11y/layout bugs in the corner-number labels and the sector-dominance heatmap legend: issues #99 (fixed contrast against the heatmap), #104 (colour-only heatmap meaning), and #109 (corner labels vanishing below 700px). |
 | `Map.tsx` | The track map: cars drawn as smoothed dots on the baked track outline, with the board's selection highlighted. |
 | `Panel.tsx` | The shared panel chrome every dashboard card renders inside: title, framing and spacing. |
 | `RaceControl.tsx` | The race-control log: the most recent marshalling messages, announced politely as they arrive. |
@@ -519,4 +520,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-46 directories, 193 files listed, 0 without a declared purpose.
+46 directories, 194 files listed, 0 without a declared purpose.
