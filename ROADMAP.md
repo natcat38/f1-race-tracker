@@ -1,7 +1,7 @@
 # Roadmap — f1-race-tracker
 
 **Current stage: Review**
-**Next up:** 2026-09-06 full-repo re-review (architecture, security, code-review of #94, UI guidelines + a11y on #94's new components, testing strategy, docs/repo-review), then file survivors as issues.
+**Next up:** work the 2026-09-06 re-review issues #99–#124 (start with #99 a11y blocker, #100 pit-stop bug, #101 host check, #102 scrub snap, #103 gap-estimator gate); owner decisions on the three `ready-for-human` issues.
 
 Lifecycle: Define → Plan → Build → Verify → Review → Ship.
 Agents: read this file at session start, state the current stage and next unchecked item before any other work, and update this file (checkboxes + Current stage + Next up) before ending. Product and design decisions belong to the user — elicit them with questions, never decide for them.
