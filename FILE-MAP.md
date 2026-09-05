@@ -213,6 +213,7 @@ The app shell: entry point, root component, error boundary, static-demo bootstra
 
 | File | Purpose |
 | --- | --- |
+| `App.replayScrub.test.tsx` | Static-markup coverage for the replay scrub row (issues #107, #108): the range input must reuse the Ghost scrubber's shared dark-mode/touch-target class instead of being a bare, unclassed input, and the elapsed readout must NOT reuse the hero session-clock class (.rail-clock) — it needs its own smaller class so it doesn't visually outrank the real session clock. |
 | `App.test.tsx` | Regression coverage for the shell's data-source connection: opened once when the board is first shown, and kept alive across route changes. |
 | `App.tsx` | The React app shell: mounts the root component, wires the live WebSocket or static-replay data source into race state, and lays out the dashboard panels. |
 | `ErrorBoundary.tsx` | React error boundary that keeps one component's render-time exception from blanking the whole app. |
@@ -271,6 +272,7 @@ Hooks deriving UI-facing state (staleness, gap/lap history, smoothed positions, 
 | `useLane.ts` | React binding for the shared lane registry: one session key, one connection, however many overlay sides name it. |
 | `useReducedMotion.ts` | Subscribes to prefers-reduced-motion for the two places motion is driven from JavaScript. |
 | `useRollingHistory.ts` | The shared fold behind the lap and gap histories, including reset on session switch or replay-loop restart. |
+| `useSmoothedCars.test.ts` | Pure-function coverage for issue #102: TELEPORT_THRESHOLD must be compared in the same [0,1] normalised track-space as the car positions themselves, so a scrub-sized jump actually snaps instead of gliding across the map. |
 | `useSmoothedCars.ts` | Interpolates car positions at display refresh rate so 10 Hz frames render as continuous motion. |
 | `useStale.ts` | Tracks how long it has been since the last frame, so the UI can say when data has gone stale. |
 
@@ -517,4 +519,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-46 directories, 191 files listed, 0 without a declared purpose.
+46 directories, 193 files listed, 0 without a declared purpose.
