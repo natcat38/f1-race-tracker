@@ -526,7 +526,16 @@ for num in session.drivers:
     if out:
         stints[inum] = out
 
-    windows, stops = build_pit_data(drv)
+    pit_laps = [
+        (
+            None if pd.isna(lap['LapNumber']) else int(lap['LapNumber']),
+            None if pd.isna(lap['PitInTime']) else lap['PitInTime'].total_seconds(),
+            None if pd.isna(lap['PitOutTime']) else lap['PitOutTime'].total_seconds(),
+            None if pd.isna(lap['LapStartTime']) else lap['LapStartTime'].total_seconds(),
+        )
+        for _, lap in drv.iterrows()
+    ]
+    windows, stops = build_pit_data(pit_laps)
     pit_windows[inum] = windows
     if stops:
         pit_stops[inum] = stops
