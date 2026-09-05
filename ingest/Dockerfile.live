@@ -1,6 +1,6 @@
 # Container image for the true-live SignalR ingest path (ingest/live.py).
 
-FROM python:3.11-slim@sha256:9534e5a8e315485d4061ed659af0fd78a284c015f9b73661b41d6bab25604534
+FROM python:3.14-slim@sha256:cad9a2c871761c413caa6fdd6441c783451e740a48aaeba60ae62a8b53525ef6
 WORKDIR /app
 COPY ingest/requirements-live.txt ./
 RUN pip install --no-cache-dir -r requirements-live.txt
