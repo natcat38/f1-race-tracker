@@ -30,6 +30,8 @@ Repo root: module definition, container build, compose stack, and the top-level 
 | `CONTEXT.md` | The project glossary: the shared vocabulary every layer, issue and ADR is expected to use. |
 | `Dockerfile` | Multi-stage image for the single Go binary: builds the React SPA, embeds it, and ships the gateway/replay server. |
 | `FILE-MAP.md` | Where every directory and source file lives and why — the layout half of the repo's memory system, generated from the DIRS table and each file's own header comment. |
+| `FILE-MAP.md` | Where every directory and source file lives and why — the layout half of the repo's memory system, generated from the DIRS table and each file's own header comment. |
+| `FILE-MAP.md` | Where every directory and source file lives and why — the layout half of the repo's memory system, generated from the DIRS table and each file's own header comment. |
 | `README.md` | What this project is, what it looks like, and how to run it. |
 | `ROADMAP.md` | **Current stage: Review** |
 | `SECURITY.md` | Security posture and vulnerability-reporting policy for this self-hosted app. |
@@ -234,6 +236,7 @@ Presentational components — map, timing tower, telemetry, comms, race control,
 | `Ghost.render.test.tsx` | Render tests for the overlay: both comparison scenarios, per-side team colours, and the states where there is nothing to compare. |
 | `Ghost.tsx` | The overlay route: two reference laps animated against each other on one track map, across two seasons or two drivers in the same race. |
 | `Map.interaction.test.tsx` | Interaction coverage for the track map: the animation loop and the marker updates that static rendering never exercises. |
+| `Map.render.test.tsx` | Render (renderToStaticMarkup) regression coverage for three a11y/layout bugs in the corner-number labels and the sector-dominance heatmap legend: issues #99 (fixed contrast against the heatmap), #104 (colour-only heatmap meaning), and #109 (corner labels vanishing below 700px). |
 | `Map.tsx` | The track map: cars drawn as smoothed dots on the baked track outline, with the board's selection highlighted. |
 | `Panel.tsx` | The shared panel chrome every dashboard card renders inside: title, framing and spacing. |
 | `RaceControl.tsx` | The race-control log: the most recent marshalling messages, announced politely as they arrive. |
@@ -519,4 +522,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-46 directories, 193 files listed, 0 without a declared purpose.
+46 directories, 196 files listed, 0 without a declared purpose.
