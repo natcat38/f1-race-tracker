@@ -485,12 +485,12 @@ Portable cross-session agent memory: one fact per file, indexed by memory/MEMORY
 | File | Purpose |
 | --- | --- |
 | `MEMORY.md` | Index of the repo's portable agent memory: one line per memory file, plus the convention for adding one. |
-| `code-review-level.md` | "Default /code-review effort is `high --fix`; `max` only when the user explicitly asks for it" |
+| `code-review-level.md` | "Default /code-review effort (high --fix, max only when explicitly asked) is now in global ~/.claude/CLAUDE.md — this file keeps only the project-specific history" |
 | `f1-build-gotchas.md` | F1 tracker build/verify gotchas — vite wipes web/dist/.gitkeep; bench artifacts are canonical; no cgo locally so go test -race only works in CI; live SignalR feed needs F1TV auth; running the static demo locally needs a bake plus a temporary web/.env.local |
-| `f1-tracker-direction.md` | "F1 Race Tracker: Phases 1-5 shipped, WS5 merged, signalrcore blocker resolved; 2026-08-28 improvement survey in reviews/{backlog-still-open,tech-debt-scan,peer-comparison}.md" |
+| `f1-tracker-direction.md` | "F1 Race Tracker current state (2026-09-06): Phases 1-5 + WS5 (F1TV live beta) shipped, PR #94 peer-comparison features merged, ROADMAP.md landing via open PR #96, stage Review" |
 | `no-direct-pushes.md` | Feedback memory: never push directly to main, even for chores — always go through a PR. |
 | `plain-english-preference.md` | "User prefers plain-English, low-jargon explanations of technical options" |
-| `subagent-model-hook.md` | "Subagent model hook defaults to sonnet only when Agent call omits model; explicit model now wins" |
+| `subagent-model-hook.md` | "Subagent model-tiering rule (sonnet default, explicit model wins) is now in global ~/.claude/CLAUDE.md — this file keeps only the hook mechanics and history" |
 | `token-economy.md` | "Token-economy rules are GLOBAL now (~/.claude/CLAUDE.md \"Subagents & Token Economy\") — this file keeps only the project-specific history" |
 
 ## Data

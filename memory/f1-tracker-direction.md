@@ -1,35 +1,47 @@
 ---
 name: f1-tracker-direction
-description: "F1 Race Tracker: Phases 1-5 shipped, WS5 merged, signalrcore blocker resolved; 2026-08-28 improvement survey in reviews/{backlog-still-open,tech-debt-scan,peer-comparison}.md"
+description: "F1 Race Tracker current state (2026-09-06): Phases 1-5 + WS5 (F1TV live beta) shipped, PR #94 peer-comparison features merged, ROADMAP.md landing via open PR #96, stage Review"
 metadata: 
   node_type: memory
   type: project
   originSessionId: b1e490a6-d5ad-420a-9780-b925bd1e9764
-  modified: 2026-08-28T15:33:21.384Z
+  modified: 2026-09-06T00:00:00.000Z
 ---
 
-Update 2026-09-02: **PR #94 merged** — all 6 features from `reviews/plans/features-to-add.md` shipped in their verified slices: pedal/gear distance traces (no RPM), pit-stop durations (new `ingest/pit.py`; positions-gained and stationary time deferred), client-side static-replay pause/scrub (server-paced live-lane scrub still needs its own design pass — the real WS3 remainder), corner numbers + start/finish line (DRS zones dropped: no data source; SC marker dropped: no track-status contract field), minisector sector-dominance heatmap, README simulated-live paragraph. Code-reviewed (10 findings, 9 fixed pre-merge). NOTE: the static Pages demo needs a **re-bake** — the clip header gained corners/pitStops/pedalTraces/sectorDominance fields the old baked clip lacks. CI gotcha learned: the contract job is pandas/fastf1-free — new ingest tests touching pandas need `pytest.importorskip`.
+**Current state (2026-09-06):** Architecture unchanged since Phase 5 — Python FastF1 → Redis
+seam → Go gateway → React; no-hosting, docker-compose demo; portfolio piece. Phases 1-5
+(track map, timing tower, telemetry + two-car compare, team-radio comms, race control,
+weather, stint timeline, #compare, #ghost) and WS5 (F1TV-gated live-timing beta: `f1tv_auth`/
+`f1tv_link`, `#settings`, live TeamRadio on frames) are shipped on `main`. ADR-0001 through
+ADR-0009 all exist in `docs/adr/` (0007 F1TV auth, 0008 live radio on frames, 0009 overlay
+absorbs compare). PR #94 shipped all 6 features from `reviews/plans/features-to-add.md`
+(pedal/gear traces, pit-stop durations, static-replay pause/scrub, corner numbers +
+start/finish line, sector-dominance heatmap, README simulated-live paragraph) — that plan
+file's items are all done, don't restart from it. `ROADMAP.md` (house six-stage lifecycle,
+retro-filled) is on **open PR #96**, not yet merged to main; it records **Current stage:
+Review**, next up a 2026-09-06 full-repo re-review. Only real-race-weekend verification of
+the live F1TV stream remains outstanding from WS5.
 
-Update 2026-08-29: survey findings verified by agents and distilled into two HANDOFF DOCS — `reviews/plans/features-to-add.md` (6 ranked features: telemetry pedal/gear overlay, pit-stop analysis, WS3 playback, WS2 furniture, sector dominance, README replay-as-live paragraph) and `reviews/plans/verified-cleanup-backlog.md` (22 verified items with PR batching, plus a "verified NOT worth doing" list: keep web/.gitignore and test.ps1, no mypy, selects already labelled). Start new work from those docs, not the raw survey reports. #89 portable-memory merged; main green.
+**History (most recent first):**
+- 2026-09-06 — PR #96 opened: adds retro-filled `ROADMAP.md`; stage set to Review; full-repo re-review planned (see [[f1-repo-review-2026-09-06]]).
+- 2026-09-02 — PR #94 merged: all 6 peer-comparison features (see current-state above); static Pages demo re-baked for the new clip-header fields; CI gotcha — contract job is pandas/fastf1-free, new pandas-touching tests need `pytest.importorskip`.
+- 2026-08-29 — Survey findings distilled into `reviews/plans/features-to-add.md` (source of PR #94) and `reviews/plans/verified-cleanup-backlog.md`; PR #89 portable-memory merged.
+- 2026-08-28 — signalrcore blocker resolved (`requirements-live-nodeps.txt` pins `signalrcore==1.0.2` installed `--no-deps`, patched msgpack applied at runtime; documented in ADR-0007); WS5 merged to main.
+- 2026-08-23 — Overlay/compare fold (#83, ADR-0009), rail instrument-cluster restructure (#84), comms/gap toggles onto SegmentedControl (#85), README reshoot (#86), static-demo pacer resync fix (#87).
+- 2026-08-20 — WS5 built and F1TV link flow verified live with a free F1 account (login not tier-gated); dependency conflict between `signalrcore==0.8.8` (patched msgpack) and `1.0.2` (working websocket callbacks) identified as the one remaining blocker — resolved 2026-08-28 above.
+- 2026-08-19 — Phases 1-5 all shipped; polish-and-immersion roadmap adopted (WS1-WS6), execution model: Opus orchestrates, Sonnet subagents execute.
 
-Update 2026-08-28: the signalrcore blocker is RESOLVED — `requirements-live-nodeps.txt` pins `signalrcore==1.0.2` installed `--no-deps` (patched msgpack from requirements.txt at runtime; ADR-0007 documents it; pip-audit ignore scoped). WS5 is merged to main (f1tv_auth/f1tv_link/Settings/#settings, ADR-0007/0008 exist); only real-race-weekend verification of the live stream remains. Fresh improvement survey done (3 subagents): reports at reviews/backlog-still-open.md, reviews/tech-debt-scan.md, reviews/peer-comparison.md. Top ideas: throttle/brake/gear overlay, pit-stop analysis, WS2 track furniture, WS3 playback controls, live-parser unit tests + split live_signalr.py, clip re-bake to shrink 70MB, staticcheck/mypy in CI, 24MB clip fetch on gated static routes.
+**Durable data facts:** FastF1's `f1auth` + f1login.fastf1.dev browser extension is the only
+viable F1 login path (reuse, never rebuild; `no_auth=True` is broken in fastf1 3.8.3);
+historical team-radio mp3s are still auth-free via livetiming.formula1.com/static/; OpenF1's
+free tier is historical-only (live = paid); no public ERS/fuel data exists anywhere; whether a
+*live* session's stream is tier-gated is still untested (needs a real race weekend).
 
-Update 2026-08-23 (later): ALL approved follow-ups merged — #83 overlay fold (COMPARE gone, OVERLAY does both scenarios, ADR-0009), #84 rail instrument cluster (64px single row, 48px sticky mobile strip, SegmentedControl grammar), #85 comms/gap toggles on SegmentedControl, #86 README reshoot (board.png hero, overlay.png, og.png re-cut). Remote branches pruned. #87 fixed the static-demo "Maximum update depth" (replay pacer now resyncs after a stall). Still open: dependabot #78-80 (owner's call), M14's fuller gap-toggle-in-column-header idea (deferred), and the review backlog items the owner chose to leave (reconnect-cap done; 24 MB clip fetch on gated static routes left as is). Gotcha: agents' local `gen_file_map.py --check` sometimes passes while CI says stale — regenerate FILE-MAP in a fresh worktree right before the final commit.
-
-Update 2026-08-23: owner-approved follow-ups — MERGED: #77 FILE-MAP agent-memory system (every dir/file documented, CI coverage gate; new files need a header comment), #81 arc-length gap estimator + re-baked clips (median error 31 ms; `lapsDown`/`GAP_RESOLUTION_MS` retired), #82 reconnect cap + `#board?car=` deep links + visible title + comms resting state. IN FLIGHT: overlay fold (OVERLAY absorbs COMPARE; both scenarios: same driver/two years, same year/two drivers; plan reviews/plans/overlay-fold-compare.md) then the rail instrument-cluster restructure (plan reviews/plans/rail-instrument-cluster.md, option A approved). Left alone on purpose: dependabot PRs #78-80, static-demo "Maximum update depth" warning (pre-existing, flagged), 24 MB clip fetch on gated static routes.
-
-Update 2026-08-22: **all review-sweep PRs merged** — #71 security, #72 code fixes, #73 docs cleanup, #74 root pytest fix, #75 UI polish sweep (5 sequential Opus agents: demo gating + OG tags, a11y 19/22, token consolidation, visual scale + fitted viewBox, interaction/UX 30 findings; plus a final pass fixing the per-lap "+1 LAP" flash via `lapsDown()` and phone-card clipping). Web tests 203. Still open from the UI reports (see reviews/ui-fix-log.md "Remaining" list, local): IA restructures (rail/nav), A/B lane switch, Compare computing deltas (crosses the CONTEXT.md product line), sticky mobile nav, FILE-MAP generator decision, clip re-bake (~50 MB; record.py's gapLaps now distance-based so a re-bake would also retire the FE `lapsDown` reconciliation).
-
-State as of 2026-08-21: **full recruiter-polish review sweep done** (7 Opus agents: code-review max, security, ponytail-audit, ui-ux, design-system, frontend-design, accessibility). Three PRs opened: #71 security hardening (secrets out of Docker layers, loopback gateway, OKF perms), #72 code-review fixes (position-reconciliation bugs, 10 fixed / 3 deferred, CI green), #73 docs refresh (~10.8k lines of session residue deleted, Tech Scope fiction fixed, clip bake windows documented; the polish roadmap file was restored after the sweep wrongly deleted it). Full findings live in the repo-local untracked `reviews/` folder (ui-ux.md has 42 findings incl. 2 blockers: static-demo dead tabs, vs-compare clipping; UI work was report-only by user choice — fixes not yet applied). Top unapplied recruiter-facing fixes: gate Compare/Ghost/Settings on VITE_STATIC_DEMO in the Pages demo, OG/meta tags + repo link-back in the app, auto-select leader on first paint, team colour in the tower, viewBox fit-to-circuit.
-
-State as of 2026-08-20: **WS5 (F1TV live-timing beta) is built, and the link flow is verified for real** on branch `docs/polish-roadmap-and-f1tv-beta-plan` — ADR-0007/0008, `ingest/f1tv_auth.py` + `f1tv_link.py`, live TeamRadio on frames, `/api/f1auth`, `#settings` page. The operator linked a **free** F1 account on 2026-08-20: login is NOT tier-gated (`SubscriptionStatus: inactive`, empty `SubscribedProduct`, ~4-day token life), the websocket **accepts a free-tier token**, and the server pushed a 91KB all-topics snapshot which confirmed the TeamRadio schema `{Utc, RacingNumber, Path}`.
-
-**The one blocker left is a dependency conflict, not auth** (this is the thing to pick up next): `ingest/requirements-live.txt` pins `signalrcore==0.8.8` to keep the patched `msgpack>=1.2.1` (GHSA-6v7p-g79w-8964), but 0.8.8's websocket callbacks are incompatible with any modern websocket-client and die on connect. `signalrcore==1.0.2` works — including with the patched msgpack at runtime — but declares `msgpack==1.1.2`, so the two cannot go in one requirements file (`ResolutionImpossible`). Options and evidence are in `docs/superpowers/specs/2026-08-20-f1auth-spike-findings.md`; the pin was deliberately left unchanged because it is a security-posture call for the user. Still untested: whether a *live* session's stream is tier-gated (needs a race weekend, not a subscription).
-
-State as of 2026-08-19: Phases 1–5 are all shipped (track map, timing tower, telemetry + two-car compare, team-radio comms, race control, weather, stint timeline, #compare, #ghost with pause/scrub, static GH-Pages demo). Architecture unchanged: Python FastF1 → Redis seam → Go gateway → React; no-hosting, docker-compose demo; portfolio piece.
-
-Next direction is the **polish-and-immersion roadmap** at `docs/superpowers/plans/2026-08-19-polish-and-immersion-roadmap.md` (research-synthesized from IAmTomShaw/f1-race-replay, open-pit-wall, and the 2025–26 data landscape). Six workstreams: WS1 design tokens, WS2 track furniture (DRS zones/corners/SC), WS3 playback control + race timeline, WS4 engineer analytics, WS5 **F1TV-gated live-timing beta** (DONE 2026-08-20; scope doc §7 amended), WS6 small fixes. Execution model the user chose: an Opus session orchestrates, Sonnet subagents execute, one brainstorm→spec→plan pass per workstream.
-
-Durable data facts (also recorded in the roadmap): FastF1's `f1auth` + f1login.fastf1.dev browser extension is the only viable F1 login path (reuse, never rebuild; `no_auth=True` is broken in fastf1 3.8.3); historical team-radio mp3s are still auth-free via livetiming.formula1.com/static/; OpenF1's free tier went historical-only (live = €9.90/mo); no public ERS/fuel data exists anywhere.
-
-**How to apply:** start any new F1-tracker feature work from the roadmap, per-workstream, honoring the constraints in its §3 (ADR-0002/3/4, build gotchas in [[f1-build-gotchas]]). Prefer plain English per [[plain-english-preference]].
+**Next direction:** Follow `ROADMAP.md`'s stage list once PR #96 merges — repo is at **Review**.
+Next unchecked item there is the 2026-09-06 full-repo re-review (architecture, security,
+code-review of #94, UI guidelines + accessibility on #94's new components, testing strategy,
+docs/repo-review — see [[f1-repo-review-2026-09-06]] for where those reports live), then file
+survivors as GitHub issues. After Review closes, the roadmap's open Ship-stage items are API
+docs/Swagger and a final `/repo-review` pass; Plan-stage still lacks a written
+`docs/Design_Direction.md`. Prefer plain English per [[plain-english-preference]]; build
+gotchas in [[f1-build-gotchas]].
