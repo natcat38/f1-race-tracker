@@ -47,6 +47,24 @@ export function Map({ state, paused, selected, rival }: {
       return { d, colour: team ? (teamColour[team] ?? 'var(--track-fill)') : 'var(--track-fill)' };
     });
   }, [state.track, state.sectorDominance, driverTeam]);
+  // Sector-dominance legend (WCAG 1.4.1 Use of Color): the heatmap's whole
+  // meaning otherwise lives in which of 12 close-hued team colours a stretch of
+  // track is painted, with no text fallback. Lists only the teams actually
+  // dominating a minisector in this clip, in the order they're first seen —
+  // same idea as StintChart's tyre legend (TYRE_LEGEND), reusing .tt-legend.
+  const legendTeams = useMemo(() => {
+    if (!state.sectorDominance.length) return [];
+    const seen = new Set<string>();
+    const teams: string[] = [];
+    for (const dnum of state.sectorDominance) {
+      const team = dnum ? driverTeam[dnum] : undefined;
+      if (team && !seen.has(team)) {
+        seen.add(team);
+        teams.push(team);
+      }
+    }
+    return teams;
+  }, [state.sectorDominance, driverTeam]);
   // Start/finish tick: track[0] by convention (ingest/record.py's outline
   // starts at lap_start_t) — a short perpendicular tick using its neighbour
   // point for direction. Keyed on state.track only, so it isn't recomputed
@@ -62,9 +80,10 @@ export function Map({ state, paused, selected, rival }: {
     return { x1: cx - nx * SIZE, y1: cy - ny * SIZE, x2: cx + nx * SIZE, y2: cy + ny * SIZE };
   }, [state.track]);
   return (
-    // Fitted to the outline's own bounds rather than the full unit square: the
-    // baked outline is letterboxed inside it, and the empty margin was ~38% of
-    // the panel. Markers keep their SIZE-space coordinates — see fitViewBox.
+    <>
+    {/* Fitted to the outline's own bounds rather than the full unit square: the
+        baked outline is letterboxed inside it, and the empty margin was ~38% of
+        the panel. Markers keep their SIZE-space coordinates — see fitViewBox. */}
     <svg viewBox={fitViewBox(state.track)} className="track-svg" role="img" aria-label={anySelection ? 'Track map with live car positions; the reference car is ringed' : 'Track map with live car positions'}>
       <TrackPath d={trackPath} segments={segments} />
       {/* Start/finish: track[0] by convention (ingest/record.py's outline starts
@@ -78,14 +97,31 @@ export function Map({ state, paused, selected, rival }: {
         />
       )}
       {state.corners.map((c) => (
-        <text
-          key={`${c.number}${c.letter ?? ''}`}
-          className="map-label"
-          x={c.x * SIZE} y={c.y * SIZE}
-          fill="var(--track-label)"
-          fontSize="var(--fs-xs)"
-          textAnchor="middle"
-        >{c.number}{c.letter ?? ''}</text>
+        // map-corner-label, NOT map-label: the latter is hidden below 700px
+        // (components.css) so twenty overlapping driver-code labels don't turn
+        // into phone-width noise, but corners have no other on-screen
+        // representation, so sharing that class silently dropped them below
+        // 700px with no fallback (issue #109). A fixed --asphalt chip sits
+        // behind the number so it stays >=4.5:1 against every heatmap team
+        // colour instead of the old fixed --track-label fill, which the
+        // sector-dominance heatmap can paint almost any hue underneath
+        // (issue #99). aria-hidden: the SVG's own role="img" aria-label
+        // already speaks for it; two ambiguous text nodes inside one image
+        // buys nothing for AT users.
+        <g key={`${c.number}${c.letter ?? ''}`} aria-hidden="true">
+          <circle
+            cx={c.x * SIZE} cy={c.y * SIZE} r={7}
+            fill="var(--asphalt)"
+          />
+          <text
+            className="map-corner-label"
+            x={c.x * SIZE} y={c.y * SIZE}
+            dy="0.35em"
+            fill="var(--chalk)"
+            fontSize="var(--fs-xs)"
+            textAnchor="middle"
+          >{c.number}{c.letter ?? ''}</text>
+        </g>
       ))}
       {cars.map((c) => {
         const isSel = selected != null && c.driverNum === selected;
@@ -132,5 +168,13 @@ export function Map({ state, paused, selected, rival }: {
         );
       })}
     </svg>
+    {legendTeams.length > 0 && (
+      <div className="empty tt-legend" style={{ fontSize: 'var(--fs-sm)' }}>
+        {legendTeams.map((t) => (
+          <span key={t} style={{ color: teamColour[t] ?? 'var(--team-unknown)' }}>{t}</span>
+        ))}
+      </div>
+    )}
+    </>
   );
 }
