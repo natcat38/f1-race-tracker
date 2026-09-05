@@ -80,7 +80,13 @@ function StintChartInner({ state, selected, rival }: {
                   left: `${((p.lap - 1) / total) * 100}%`,
                   top: -2, bottom: -2,
                   width: 2,
-                  background: 'var(--amber, orange)',
+                  background: 'var(--amber)',
+                  // Dark casing so the tick holds WCAG 1.4.11 3:1 non-text contrast
+                  // against every compound colour underneath it, not just the darker
+                  // ones — amber-on-HARD measured ~1.5:1, amber-on-MEDIUM ~1.1:1
+                  // without it (#105). Mirrors the leader-lap marker's fixed-background
+                  // contrast, but via an outline since this tick sits on a variable one.
+                  boxShadow: '0 0 0 1px var(--asphalt)',
                 }}
               />
             ))}

@@ -30,6 +30,8 @@ Repo root: module definition, container build, compose stack, and the top-level 
 | `CONTEXT.md` | The project glossary: the shared vocabulary every layer, issue and ADR is expected to use. |
 | `Dockerfile` | Multi-stage image for the single Go binary: builds the React SPA, embeds it, and ships the gateway/replay server. |
 | `FILE-MAP.md` | Where every directory and source file lives and why — the layout half of the repo's memory system, generated from the DIRS table and each file's own header comment. |
+| `FILE-MAP.md` | Where every directory and source file lives and why — the layout half of the repo's memory system, generated from the DIRS table and each file's own header comment. |
+| `FILE-MAP.md` | Where every directory and source file lives and why — the layout half of the repo's memory system, generated from the DIRS table and each file's own header comment. |
 | `README.md` | What this project is, what it looks like, and how to run it. |
 | `ROADMAP.md` | **Current stage: Review** |
 | `SECURITY.md` | Security posture and vulnerability-reporting policy for this self-hosted app. |
@@ -250,6 +252,7 @@ Presentational components — map, timing tower, telemetry, comms, race control,
 | `StintChart.render.test.tsx` | Render tests for the strategy timeline's stint segments and leader marker. |
 | `StintChart.tsx` | The full-race strategy timeline: one row per car, each stint a coloured segment on a lap axis. |
 | `TelemetryPanel.interaction.test.tsx` | Interaction coverage for the telemetry panel: picking and clearing a rival from the "Compare with" select, the one interaction it actually owns. |
+| `TelemetryPanel.trace.test.tsx` | Render tests for TelemetryPanel's distance-trace SVGs (throttle/brake/gear): covers the pickThrottle/pickBrake/pickGear + toPolyline path (#121) and the derived-summary aria-label that replaces the bare "<label> over lap distance" text alternative (#106). |
 | `TelemetryPanel.tsx` | The selected car's telemetry readout: speed, gear, pedal bars and lap/gap sparklines. |
 | `TimingTower.render.test.tsx` | Render tests for the timing tower's rows, columns and empty states. |
 | `TimingTower.test.ts` | Unit tests for the timing helpers: lap/gap/sector formatting, ordering and personal bests. |
@@ -520,4 +523,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-46 directories, 194 files listed, 0 without a declared purpose.
+46 directories, 197 files listed, 0 without a declared purpose.
