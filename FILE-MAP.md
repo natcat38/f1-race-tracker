@@ -31,6 +31,7 @@ Repo root: module definition, container build, compose stack, and the top-level 
 | `Dockerfile` | Multi-stage image for the single Go binary: builds the React SPA, embeds it, and ships the gateway/replay server. |
 | `FILE-MAP.md` | Where every directory and source file lives and why — the layout half of the repo's memory system, generated from the DIRS table and each file's own header comment. |
 | `README.md` | What this project is, what it looks like, and how to run it. |
+| `ROADMAP.md` | **Current stage: Review** |
 | `SECURITY.md` | Security posture and vulnerability-reporting policy for this self-hosted app. |
 | `docker-compose.yml` | The local stack: Redis, a replay writer per compare lane, and the gateway serving the embedded SPA. |
 | `go.mod` | Go module definition and dependency set for the gateway, replay writer and command-line tools. |
@@ -514,4 +515,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-46 directories, 188 files listed, 0 without a declared purpose.
+46 directories, 189 files listed, 0 without a declared purpose.
