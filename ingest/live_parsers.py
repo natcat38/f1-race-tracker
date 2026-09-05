@@ -10,6 +10,11 @@ import base64
 import json
 import zlib
 
+# Upper bound on a decompressed Position.z payload (#117/L-3). A single frame's worth of
+# car positions is a few KB of JSON at most; 8 MiB is generous headroom while still
+# refusing a zip-bomb-shaped payload before it can exhaust memory.
+_MAX_DECOMPRESSED_BYTES = 8 * 1024 * 1024
+
 # FastF1 team name -> frontend colour map key (from web/src/components/teamColours.ts)
 TEAM_MAP = {
     'Red Bull Racing': 'Red Bull',
@@ -54,7 +59,15 @@ def _decode_position_payload(payload) -> list:
         # Try zlib-compressed base64 (fastf1._api.parse zipped=True path)
         try:
             raw = base64.b64decode(payload)
-            decompressed = zlib.decompress(raw, -15)  # raw deflate (no header)
+            # ponytail: stdlib decompressobj with max_length is simpler than a custom
+            # chunked-read loop and gives us exactly what we need — decompress up to the
+            # cap, then check for leftover input instead of trusting a declared size.
+            decompressor = zlib.decompressobj(-15)  # raw deflate (no header)
+            decompressed = decompressor.decompress(raw, _MAX_DECOMPRESSED_BYTES)
+            if decompressor.unconsumed_tail:
+                raise ValueError(
+                    f"Position.z payload exceeds {_MAX_DECOMPRESSED_BYTES} bytes decompressed"
+                )
             decoded = json.loads(decompressed)
             return decoded.get('Position', [])
         except Exception:

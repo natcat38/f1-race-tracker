@@ -420,3 +420,140 @@ func TestAuthStatusRoute(t *testing.T) {
 		t.Errorf("POST status = %d, want 405", resp.StatusCode)
 	}
 }
+
+// #101: GET /api/f1auth applies the same Host allowlist as /control/source — a
+// DNS-rebound foreign Host is rejected, loopback still works.
+func TestAuthStatusRoute_RejectsForeignHost(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mr.Close()
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer func() { _ = rdb.Close() }()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	g, err := NewGateway(ctx, bus.New(rdb), "replay", slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	g.Mount(mux, nil)
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	get := func(host string) int {
+		req, _ := http.NewRequest(http.MethodGet, srv.URL+"/api/f1auth", nil)
+		req.Host = host
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		return resp.StatusCode
+	}
+
+	if code := get("evil.com"); code != http.StatusForbidden {
+		t.Errorf("rebound-host GET status = %d, want 403", code)
+	}
+	if code := get("127.0.0.1"); code != http.StatusOK {
+		t.Errorf("loopback-host GET status = %d, want 200", code)
+	}
+}
+
+// #101: /ws applies the same Host allowlist — a DNS-rebound foreign Host never
+// reaches the hub, loopback still upgrades normally.
+func TestWsHandler_RejectsForeignHost(t *testing.T) {
+	b := testBus(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	g, err := NewGateway(ctx, b, "replay", slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	g.Mount(mux, nil)
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	get := func(host string) int {
+		req, _ := http.NewRequest(http.MethodGet, srv.URL+"/ws", nil)
+		req.Host = host
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		return resp.StatusCode
+	}
+
+	if code := get("evil.com"); code != http.StatusForbidden {
+		t.Errorf("rebound-host /ws status = %d, want 403", code)
+	}
+	// Loopback isn't rejected by the Host check; a plain GET without the WebSocket
+	// upgrade headers fails at the coder/websocket layer instead (400), which is
+	// enough to prove the Host check itself let it through.
+	if code := get("127.0.0.1"); code == http.StatusForbidden {
+		t.Errorf("loopback-host /ws status = %d, want != 403", code)
+	}
+}
+
+// #116: every mounted route sets the baseline security headers.
+func TestSecurityHeaders_SetOnEveryRoute(t *testing.T) {
+	b := testBus(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	g, err := NewGateway(ctx, b, "replay", slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	g.Mount(mux, http.NotFoundHandler())
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	for _, path := range []string{"/healthz", "/api/f1auth", "/"} {
+		resp, err := http.Get(srv.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		if got := resp.Header.Get("X-Content-Type-Options"); got != "nosniff" {
+			t.Errorf("%s: X-Content-Type-Options = %q, want nosniff", path, got)
+		}
+		if got := resp.Header.Get("X-Frame-Options"); got != "DENY" {
+			t.Errorf("%s: X-Frame-Options = %q, want DENY", path, got)
+		}
+		if got := resp.Header.Get("Referrer-Policy"); got != "no-referrer" {
+			t.Errorf("%s: Referrer-Policy = %q, want no-referrer", path, got)
+		}
+	}
+}
+
+// #116: a directory-shaped static request 404s instead of falling through to
+// http.FileServer's directory listing.
+func TestNoDirListing_RejectsDirectoryRequest(t *testing.T) {
+	b := testBus(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	g, err := NewGateway(ctx, b, "replay", slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	// A FileServer over a directory with no index.html at "/assets" would otherwise
+	// emit a listing; noDirListing must reject the directory-shaped request first.
+	g.Mount(mux, http.FileServer(http.Dir(t.TempDir())))
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/assets/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("GET /assets/ status = %d, want 404", resp.StatusCode)
+	}
+}
