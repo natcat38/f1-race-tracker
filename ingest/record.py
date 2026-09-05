@@ -45,7 +45,7 @@ from pathlib import Path
 from fastf1 import _api
 from radio import extract_radio
 from race_control import extract_race_control
-from ghost import build_lap_trace, build_pedal_trace, compute_sector_dominance
+from ghost import build_lap_trace, build_pedal_trace, compute_sector_dominance, nan_safe_int
 from resample import nearest_index, step_value, in_window_ms, reconcile_positions, UNKNOWN_POS, normalise_point
 from live_parsers import TEAM_MAP
 from geometry import (
@@ -356,9 +356,14 @@ for num in session.drivers:
             if len(cd_lap) >= 2:
                 cd_t = cd_lap['SessionTime'].dt.total_seconds().values
                 idx = np.array([nearest_index(cd_t, q) for q in sample_ts])
-                throttle_vals = cd_lap['Throttle'].values[idx].astype(int)
-                brake_vals = (cd_lap['Brake'].values[idx].astype(float) > 0).astype(int) * 100
-                gear_vals = cd_lap['nGear'].values[idx].astype(int)
+                # A dropped telemetry sample within the lap window (not backfilled by
+                # FastF1) leaves NaN here; casting straight to int (numpy's .astype(int))
+                # silently produces an implementation-defined garbage int instead of
+                # raising (#111). nan_safe_int zeroes those out first.
+                throttle_vals = nan_safe_int(cd_lap['Throttle'].values[idx].astype(float))
+                brake_raw = cd_lap['Brake'].values[idx].astype(float)
+                brake_vals = [100 if (v == v and v > 0) else 0 for v in brake_raw]
+                gear_vals = nan_safe_int(cd_lap['nGear'].values[idx].astype(float))
                 pedal_traces[inum] = build_pedal_trace(
                     sample_ts, sample_xy, _outline_xy, throttle_vals, brake_vals, gear_vals
                 )

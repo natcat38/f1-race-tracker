@@ -6,6 +6,18 @@ lap selection, and coordinate normalisation, then hands plain lists here.
 """
 
 
+def nan_safe_int(values):
+    """Cast a sequence of floats to ints, substituting 0 for NaN.
+
+    A dropped telemetry sample (a gap not backfilled by FastF1) shows up as NaN
+    in FastF1's car_data; NumPy's float->int cast on NaN doesn't raise, it
+    silently produces an implementation-defined garbage int (#111). `v != v` is
+    the NaN check that needs no numpy/math import, keeping this module free of
+    third-party deps (see module docstring).
+    """
+    return [0 if v != v else int(v) for v in values]
+
+
 def build_lap_trace(sample_ts, sample_xy, track_xy):
     """Cumulative lap time (ms from lap start) at each track-outline index.
 
@@ -104,7 +116,10 @@ def compute_sector_dominance(lap_traces, n_points, bin_size):
 
     Returns one driver number per bin — the driver with the least elapsed time
     across that bin's window — or 0 when no driver has a positive time delta
-    there (e.g. too few points, or no lap trace data at all).
+    there (e.g. too few points, or no lap trace data at all). An extra final
+    entry covers the start/finish wraparound (trace[0] back to trace[n-1]),
+    matching web/src/components/geometry.ts's trackSegmentPaths, which appends
+    the equivalent closing segment (#112).
     """
     out = []
     for start in range(0, n_points, bin_size):
@@ -117,4 +132,10 @@ def compute_sector_dominance(lap_traces, n_points, bin_size):
             if best_delta is None or delta < best_delta:
                 best_delta, best_driver = delta, dnum
         out.append(best_driver)
+    # The wraparound stretch (outline index n-1 back to 0) isn't covered by any
+    # bin above, and no lap trace carries a sample for "time to close the loop"
+    # past its own last index — there's nothing to compare there. Reuse the last
+    # bin's leader so the closing segment reads as a continuation of it rather
+    # than falling back to an unowned/neutral colour.
+    out.append(out[-1] if out else 0)
     return out
