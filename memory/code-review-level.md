@@ -1,15 +1,17 @@
 ---
 name: code-review-level
-description: "Default /code-review effort is `high --fix`; `max` only when the user explicitly asks for it"
+description: "Default /code-review effort (high --fix, max only when explicitly asked) is now in global ~/.claude/CLAUDE.md — this file keeps only the project-specific history"
 metadata: 
   node_type: memory
   type: feedback
   originSessionId: cc05e5c3-88fb-4539-b16e-504a9c67d918
-  modified: 2026-08-23T04:51:04.119Z
+  modified: 2026-09-06T00:00:00.000Z
 ---
 
-When running the `code-review` skill — whether I run it myself, delegate it to an agent, or the user asks for "a code review" — use **`high --fix`**. Do **not** use `max` unless the user explicitly says to run code-review at max.
+The rule itself (`high --fix` default, `max` only on explicit request) is now global —
+see `~/.claude/CLAUDE.md` "Subagents & Token Economy". Don't duplicate it here.
 
-**Why:** max fans out many verify/angle workers and burned through the user's session usage limit mid-run (2026-08-21), killing parent agents before they could apply fixes; `high` gives broad coverage at a fraction of the cost.
-
-**How to apply:** Skill `code-review` with args `high --fix <target>` by default. Only pass `max` when the user's message literally asks for max. Related: [[subagent-model-hook]] (explicit `model: 'opus'` passes through the hook; omitting it routes to sonnet).
+**Project-specific history behind it:** `max` fanned out many verify/angle workers and
+burned through the user's session usage limit mid-run on this repo (2026-08-21), killing
+parent agents before they could apply fixes; `high` gives broad coverage at a fraction of
+the cost. Related: [[subagent-model-hook]], [[token-economy]].

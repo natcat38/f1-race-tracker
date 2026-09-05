@@ -1,15 +1,22 @@
 ---
 name: subagent-model-hook
-description: "Subagent model hook defaults to sonnet only when Agent call omits model; explicit model now wins"
+description: "Subagent model-tiering rule (sonnet default, explicit model wins) is now in global ~/.claude/CLAUDE.md — this file keeps only the hook mechanics and history"
 metadata: 
   node_type: memory
   type: feedback
   originSessionId: 2f3518ba-8712-4d8c-bbfa-366d8631e143
-  modified: 2026-08-20T07:35:36.285Z
+  modified: 2026-09-06T00:00:00.000Z
 ---
 
-The user has a global `Agent` PreToolUse hook in `~/.claude/settings.json` ("Routing agent model…"). As of 2026-08-20 (changed at the user's request) it **defaults the model to `sonnet` only when the Agent call omits `model`** — an explicitly passed `model` (e.g. `opus`) is respected. Previously it force-overrode every dispatch to sonnet, which blocked routing a subagent to opus.
+The tiering rule itself is now global — see `~/.claude/CLAUDE.md` "Subagents & Token
+Economy" ("My global hook defaults omitted `model` to sonnet; an explicitly passed model is
+respected"). Don't duplicate it here.
 
-**Why:** the user optimizes subagents onto a cheaper model by default to cut token usage (their 5-hour rolling limit gets hit otherwise), but wants explicit model choices to win.
+**Mechanics (not in CLAUDE.md):** enforced by a global `Agent` PreToolUse hook in
+`~/.claude/settings.json` ("Routing agent model…"). Model values passed to `Agent` must be
+short aliases (`sonnet`/`opus`/`haiku`/`fable`), not full model ids. Editing settings.json
+needs the user's explicit OK (self-modification).
 
-**How to apply:** omit `model` for routine subagents (they'll get sonnet); pass `model` only when a bigger model is deliberately wanted. Model values must be short aliases (`sonnet`/`opus`/`haiku`/`fable`), not full model ids. Editing settings.json needs the user's explicit OK (self-modification). See [[f1-tracker-direction]].
+**Why (history):** as of 2026-08-20, changed at the user's request from force-overriding
+every dispatch to sonnet (which blocked routing to opus) to the current omit-defaults
+behavior. See [[f1-tracker-direction]], [[token-economy]].

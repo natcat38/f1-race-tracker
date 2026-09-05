@@ -101,6 +101,14 @@ anything about the real pipeline. A third front door alongside the README/video 
 - _Use_ "static demo" (or "the Pages demo"); never call it "replay" — that term is
   reserved for the pipeline-backed source above.
 
+The static demo alone exposes transport controls — **pause**/**resume** and
+**scrub** (jump to an arbitrary point in the baked clip) — driven by a client-side
+clock with no server round trip. The live and replay sources have no such control
+surface today: there is no seam-level way to send a writer a pause or seek request.
+
+- _Use_ "scrub" for jumping to a point in the clip; not "seek". "Pause"/"resume",
+  not "stop"/"start", since the clip's position is preserved.
+
 ## Gap
 
 A car's time behind the race **leader**. Best-effort — derived when a clip is recorded
@@ -279,8 +287,11 @@ it read-only; the settings page polls it.
 ## Pit stop
 
 One baked, dated entry for a driver's real visit to the pits — the lap it started on
-and its stationary/pit-lane duration. Derived from FastF1's `PitInTime`/`PitOutTime`
-lap columns, like the pit window below, but only when a real `PitInTime` exists —
+and its pit-lane duration (the full `PitInTime`→`PitOutTime` span, not the shorter
+garage-box "stationary time", which is a distinct measurement this project does not
+compute — no running-order-at-time helper exists to derive it yet). Derived from
+FastF1's `PitInTime`/`PitOutTime` lap columns, like the pit window below, but only
+when a real `PitInTime` exists —
 a car that starts the race from the pit lane backdates a synthetic pit-in edge purely
 to flag the pit window correctly, and that backdated edge must never produce a pit
 stop entry (a pit-lane start is not a stop).
@@ -314,7 +325,9 @@ baked today (DRS zones and a safety-car marker are deliberately out of scope —
 ponytail note beside the corner-baking code).
 
 - _Use_ "corner" for one labelled point; "track furniture" only when speaking of the
-  category as a whole.
+  category as a whole. The start/finish line is drawn as track furniture too, but is
+  not a baked field of its own — it is the track outline's own first point (`track[0]`)
+  by convention, per `ingest/record.py`.
 
 ## Sector dominance / minisector
 

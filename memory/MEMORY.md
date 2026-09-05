@@ -12,9 +12,10 @@ pointer below. Never put memory content in this index. Update stale files, delet
 ones; don't duplicate what CLAUDE.md, FILE-MAP.md, CONTEXT.md, or git history already say.
 
 - [Plain-English preference](plain-english-preference.md) — unpack jargon; lead with why it matters
-- [F1 Tracker direction](f1-tracker-direction.md) — 2026-09-02: PR #94 merged all 6 peer-comparison features; static demo re-baked with the new clip-header fields
+- [F1 Tracker direction](f1-tracker-direction.md) — 2026-09-06: Phases 1-5 + WS5 shipped, PR #94 merged, ROADMAP.md on open PR #96, stage Review
+- [F1 repo review 2026-09-06](f1-repo-review-2026-09-06.md) — 8 reports under reviews/2026-09-06/; findings to be filed as GitHub issues
 - [Token economy](token-economy.md) — rules are GLOBAL in ~/.claude/CLAUDE.md ("Subagents & Token Economy"); file keeps the why/history
-- [Code-review level](code-review-level.md) — default `code-review high --fix`; `max` only when the user explicitly asks
-- [Subagent model hook](subagent-model-hook.md) — omit `model` → hook defaults sonnet; explicit model (e.g. opus) is respected
+- [Code-review level](code-review-level.md) — rule is GLOBAL now (high --fix default); file keeps only the project-specific history
+- [Subagent model hook](subagent-model-hook.md) — tiering rule is GLOBAL now; file keeps hook mechanics + history
 - [No direct pushes](no-direct-pushes.md) — ALL commits (even chores) go through PRs; never push main directly
 - [F1 build gotchas](f1-build-gotchas.md) — vite wipes .gitkeep; bench/results.* canonical; no cgo locally, -race is CI-only; static demo needs a bake + temp web/.env.local
