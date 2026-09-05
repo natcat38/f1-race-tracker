@@ -151,6 +151,20 @@ def test_decode_position_payload_unparseable_returns_empty_list():
     assert _decode_position_payload("not json and not base64 either!!") == []
 
 
+def test_decode_position_payload_zip_bomb_capped_not_exhausted():
+    # #117: a highly compressible payload that would decompress to well beyond
+    # live_parsers._MAX_DECOMPRESSED_BYTES must be refused, not decompressed in full.
+    import live_parsers
+
+    huge = b"0" * (live_parsers._MAX_DECOMPRESSED_BYTES * 4)
+    compressor = zlib.compressobj(9, zlib.DEFLATED, -15)  # raw deflate, no header
+    compressed = compressor.compress(huge) + compressor.flush()
+    payload = base64.b64encode(compressed).decode()
+    # The oversized decompression is caught and treated like any other unparseable
+    # payload (empty list), never a multi-hundred-MB buffer in memory.
+    assert _decode_position_payload(payload) == []
+
+
 def test_team_map_matches_frontend_colour_keys():
     # Spot-check a couple of entries rather than the whole dict — the exhaustive
     # mapping is a data table, not logic worth asserting entry-by-entry here.
@@ -175,6 +189,7 @@ if __name__ == "__main__":
     test_decode_position_payload_zlib_b64_string()
     test_decode_position_payload_plain_json_string()
     test_decode_position_payload_unparseable_returns_empty_list()
+    test_decode_position_payload_zip_bomb_capped_not_exhausted()
     test_team_map_matches_frontend_colour_keys()
     print("live_parsers self-check PASSED")
     sys.exit(0)

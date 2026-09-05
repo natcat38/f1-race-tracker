@@ -206,6 +206,12 @@ func (g *Gateway) getOrCreateHub(session string) (*ws.Hub, error) {
 // wsHandler routes /ws to the active hub (M3 toggle path) or, when ?session=<key>
 // is present, to that session's registry hub.
 func (g *Gateway) wsHandler(w http.ResponseWriter, r *http.Request) {
+	// Host allowlist (L-1/#101): same DNS-rebinding gap as handleControl — an attacker
+	// domain re-resolved to loopback would otherwise reach the hub as if same-origin.
+	if !hostAllowed(r.Host, g.allowedHosts) {
+		http.Error(w, "unrecognized host", http.StatusForbidden)
+		return
+	}
 	session := r.URL.Query().Get("session")
 	if session == "" {
 		g.mu.Lock()
@@ -229,13 +235,44 @@ func (g *Gateway) wsHandler(w http.ResponseWriter, r *http.Request) {
 
 // Mount registers the gateway routes on mux. staticHandler serves the SPA (Task 9).
 func (g *Gateway) Mount(mux *http.ServeMux, staticHandler http.Handler) {
-	mux.HandleFunc("/ws", g.wsHandler)
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
-	mux.HandleFunc("/control/source", g.handleControl)
-	mux.HandleFunc("/api/f1auth", g.handleAuthStatus)
+	mux.Handle("/ws", securityHeaders(http.HandlerFunc(g.wsHandler)))
+	mux.Handle("/healthz", securityHeaders(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })))
+	mux.Handle("/control/source", securityHeaders(http.HandlerFunc(g.handleControl)))
+	mux.Handle("/api/f1auth", securityHeaders(http.HandlerFunc(g.handleAuthStatus)))
 	if staticHandler != nil {
-		mux.Handle("/", staticHandler)
+		mux.Handle("/", securityHeaders(noDirListing(staticHandler)))
 	}
+}
+
+// securityHeaders wraps every route with baseline response headers for a browser
+// rendering this app's pages (#116/L-2). No CSP: the SPA build (web/index.html,
+// vite.config.ts) has no inline scripts/styles today, but Vite's dev/preview
+// output isn't guaranteed nonce/hash-friendly across builds, and a broken CSP fails
+// silent-and-blank for a single-operator local tool — not worth the risk for a
+// loopback-only deployment. ponytail: headers only, no CSP report-only plumbing.
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Referrer-Policy", "no-referrer")
+		next.ServeHTTP(w, r)
+	})
+}
+
+// noDirListing wraps a static file handler so a directory-shaped request (no
+// index.html present) 404s instead of falling through to http.FileServer's
+// directory listing (#116/I-4). ponytail: a trailing-slash check on the request
+// path is enough here — the embedded SPA has no directories an operator should
+// browse into, so there's no need to inspect the underlying fs.FS.
+func noDirListing(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" && strings.HasSuffix(r.URL.Path, "/") {
+			http.NotFound(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // handleAuthStatus serves the Python-published F1TV auth status verbatim (ADR-0007).
@@ -244,6 +281,12 @@ func (g *Gateway) Mount(mux *http.ServeMux, staticHandler http.Handler) {
 func (g *Gateway) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	// Host allowlist (L-1/#101): the disclosed data (F1TV tier/expiry) is sensitive
+	// enough that the same DNS-rebinding guard used on /control/source applies here.
+	if !hostAllowed(r.Host, g.allowedHosts) {
+		http.Error(w, "unrecognized host", http.StatusForbidden)
 		return
 	}
 	raw, err := g.bus.GetAuthStatus(r.Context())
