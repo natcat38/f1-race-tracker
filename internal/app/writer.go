@@ -12,20 +12,12 @@ import (
 	"github.com/natcat38/f1-race-tracker/internal/model"
 )
 
-// Source is what the writer consumes (satisfied by replay.Source).
+// Source is what the writer consumes (satisfied by replay.Source). Baked returns
+// the session-constant fields (Track, Corners, Radio, ... — see replay.Source.Baked)
+// as a Snapshot; the writer stamps it with the per-invocation SessionKey, Cars and Rev.
 type Source interface {
 	Events(ctx context.Context) (<-chan model.Frame, error)
-	Track() []model.Point
-	Corners() []model.Corner
-	Radio() []model.RadioMessage
-	LapTrace() map[int][]int
-	TotalLaps() int
-	Stints() map[int][]model.Stint
-	PitStops() map[int][]model.PitStop
-	PedalTraces() map[int]model.PedalTrace
-	SectorDominance() []int
-	Label() string
-	Mode() string
+	Baked() *model.Snapshot
 }
 
 // Writer folds source frames into a snapshot and publishes snapshot+frame to Redis.
@@ -58,16 +50,9 @@ func (wr *Writer) Run(ctx context.Context, session string) error {
 	if existing != nil {
 		base = existing.Rev
 	}
-	snap := model.NewSnapshot(session, wr.src.Mode(), wr.src.Label())
-	snap.Track = wr.src.Track()
-	snap.Corners = wr.src.Corners()
-	snap.Radio = wr.src.Radio()
-	snap.LapTrace = wr.src.LapTrace()
-	snap.TotalLaps = wr.src.TotalLaps()
-	snap.Stints = wr.src.Stints()
-	snap.PitStops = wr.src.PitStops()
-	snap.PedalTraces = wr.src.PedalTraces()
-	snap.SectorDominance = wr.src.SectorDominance()
+	snap := wr.src.Baked()
+	snap.SessionKey = session
+	snap.Cars = make(map[int]model.CarState)
 	snap.Rev = base
 	rev := base
 	for {

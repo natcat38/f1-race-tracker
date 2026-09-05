@@ -62,8 +62,9 @@ func TestReplay_HeaderAndMonotonicRevAcrossLoop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if src.Label() != "Lbl" || src.Mode() != "replay" || len(src.Track()) != 1 {
-		t.Fatalf("header wrong: label=%q mode=%q track=%d", src.Label(), src.Mode(), len(src.Track()))
+	baked := src.Baked()
+	if src.Label() != "Lbl" || src.Mode() != "replay" || len(baked.Track) != 1 {
+		t.Fatalf("header wrong: label=%q mode=%q track=%d", src.Label(), src.Mode(), len(baked.Track))
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -136,7 +137,7 @@ func TestLoadParsesRadioFromHeader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	radio := src.Radio()
+	radio := src.Baked().Radio
 	if len(radio) != 1 || radio[0].DriverNum != 1 || radio[0].TimeMs != 3300500 || radio[0].Clip == "" {
 		t.Fatalf("radio not parsed: %+v", radio)
 	}
@@ -154,7 +155,7 @@ func TestLoadParsesLapTraceFromHeader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lt := src.LapTrace()
+	lt := src.Baked().LapTrace
 	// JSON object keys are strings on the wire; Go unmarshals them back to int map keys.
 	if len(lt) != 2 || len(lt[1]) != 3 || lt[1][0] != 0 || lt[1][2] != 200 || lt[16][1] != 90 {
 		t.Fatalf("lapTrace not parsed: %+v", lt)
@@ -194,7 +195,7 @@ func TestLoadParsesTotalLapsFromHeader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := src.TotalLaps(); got != 53 {
+	if got := src.Baked().TotalLaps; got != 53 {
 		t.Fatalf("totalLaps = %d, want 53", got)
 	}
 }

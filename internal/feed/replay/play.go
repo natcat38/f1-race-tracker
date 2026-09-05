@@ -103,17 +103,30 @@ func Load(path string, speed float64) (*Source, error) {
 	}, nil
 }
 
-func (s *Source) Track() []model.Point                  { return s.track }
-func (s *Source) Corners() []model.Corner               { return s.corners }
-func (s *Source) Radio() []model.RadioMessage           { return s.radio }
-func (s *Source) LapTrace() map[int][]int               { return s.lapTrace }
-func (s *Source) TotalLaps() int                        { return s.totalLaps }
-func (s *Source) Stints() map[int][]model.Stint         { return s.stints }
-func (s *Source) PitStops() map[int][]model.PitStop     { return s.pitStops }
-func (s *Source) PedalTraces() map[int]model.PedalTrace { return s.pedalTraces }
-func (s *Source) SectorDominance() []int                { return s.sectorDominance }
-func (s *Source) Label() string                         { return s.label }
-func (s *Source) Mode() string                          { return "replay" }
+func (s *Source) Label() string { return s.label }
+func (s *Source) Mode() string  { return "replay" }
+
+// Baked returns the session-constant fields recorded in the clip header — Track,
+// Corners, Radio, LapTrace, TotalLaps, Stints, PitStops, PedalTraces,
+// SectorDominance, Mode and Label — as a Snapshot ready for a caller to stamp with
+// its own SessionKey, Cars and Rev (all per-invocation, not per-clip). Adding a new
+// baked field only touches clipHeader, the Source struct, and this method — writer.go
+// and bake-static no longer need a matching getter or assignment line.
+func (s *Source) Baked() *model.Snapshot {
+	return &model.Snapshot{
+		Mode:            model.ModeReplay,
+		Label:           s.label,
+		Track:           s.track,
+		Corners:         s.corners,
+		Radio:           s.radio,
+		LapTrace:        s.lapTrace,
+		TotalLaps:       s.totalLaps,
+		Stints:          s.stints,
+		PitStops:        s.pitStops,
+		PedalTraces:     s.pedalTraces,
+		SectorDominance: s.sectorDominance,
+	}
+}
 
 // Frames returns every frame in the clip, in file order, with each frame's Rev
 // exactly as recorded in the file (advisory — a caller publishing to a fresh
