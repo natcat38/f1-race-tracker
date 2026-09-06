@@ -239,7 +239,6 @@ def main():
     # ---------------------------------------------------------------------------
 
     print("\nCollecting position data for normalisation bounds...")
-    all_x, all_y = [], []
 
     # Find leader (driver with most laps or race winner)
     leader_laps = None
@@ -639,7 +638,6 @@ def main():
 
     # Build common time grid in seconds from session start
     t_grid_s = np.arange(WINDOW_START_S, WINDOW_END_S, dt_s)
-    t_grid_td = pd.to_timedelta(t_grid_s, unit='s')
 
     driver_frames = {}  # driver_num -> {'x': np.array, 'y': np.array, 'status': list}
 
@@ -819,7 +817,6 @@ def main():
         for i, t_s in enumerate(t_grid_s):
             rev = i + 1
             time_ms = int(round(t_s * 1000))
-            t_td = pd.Timedelta(seconds=t_s)
 
             cars = []
             for dnum in sorted(driver_frames.keys()):
