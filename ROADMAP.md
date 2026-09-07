@@ -43,7 +43,7 @@ Exit: no known broken flows. Skills: run, webapp-testing, diagnose.
 
 - [x] `/code-review high --fix` on the accumulated work. (#72, #94 pre-merge)
 - [ ] `/simplify` pass.
-- [x] UI: web-design-guidelines audit. (#93; #94's new components not yet covered — this session)
+- [x] UI: web-design-guidelines audit. (#93; full 3-page design-critique + WCAG AA re-audit 2026-09-08, fixes merged in #145 — reports in `reviews/2026-09-08/`)
 
 Exit: findings addressed or explicitly waived. Skills: code-review, simplify, web-design-guidelines.
 
