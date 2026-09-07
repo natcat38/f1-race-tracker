@@ -63,7 +63,6 @@ export function SegmentedControl({
             onClick={() => onPick(o.key)}
             disabled={disabled}
             className={value === o.key ? 'btn btn-active' : 'btn'}
-            title={o.caveat}
           >
             {pending === o.key ? 'Switching…' : o.label}
             {/* Was title-only, so unreachable on touch and to anyone who never

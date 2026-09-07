@@ -414,7 +414,7 @@ export default function App() {
             <div style={{ position: 'relative', display: 'inline-block' }}>
               <Map state={state} paused={frozen || replayPaused} selected={selected} rival={effectiveRival} />
               <div className="chip chip-reconnect" style={{
-                position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
+                position: 'absolute', top: 'var(--sp-3)', left: '50%', transform: 'translateX(-50%)',
               }}>
                 {status === 'offline' ? (
                   <OfflineReconnect message="⚠ Connection lost" onReconnect={reconnect} />

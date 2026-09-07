@@ -167,7 +167,7 @@
   min-width: 0;
 }
 
-.rail-state .chip:not(:has(.chip-action)) {
+.rail-state .chip:not(:has(.chip-action)):not(.chip-reconnect):not(.chip-warm) {
   display: block;
   max-width: 22ch;
   overflow: hidden;
@@ -581,7 +581,7 @@ select.btn {
 }
 
 .btn:disabled {
-  cursor: wait;
+  cursor: not-allowed;
   opacity: 0.6;
 }
 
@@ -1174,7 +1174,8 @@ select.btn {
   .btn,
   .btn-icon,
   .overlay-select,
-  .tt-clear {
+  .tt-clear,
+  .cmd-copy {
     min-height: 44px;
   }
 
@@ -1286,6 +1287,7 @@ select.btn {
    you picked, useless if you are being shown the board. */
 .telemetry-role {
   font-size: var(--fs-sm);
+  font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--slate);
@@ -1485,6 +1487,36 @@ select.btn {
   outline: 1px dashed var(--slate);
   outline-offset: 2px;
   border-radius: 2px;
+}
+
+/* Stint segments carried their lap range in `title` only — invisible to
+   sighted touch/keyboard users, who have no hover. Focusable segment plus a
+   CSS-only tooltip (no JS, no extra DOM) shows the same text on hover or
+   focus; the aria-label stays the screen-reader source of truth. */
+.stint-segment {
+  cursor: default;
+}
+
+.stint-segment:hover::after,
+.stint-segment:focus-visible::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + var(--sp-1));
+  left: 0;
+  white-space: nowrap;
+  background: var(--carbon);
+  color: var(--chalk);
+  border: 1px solid var(--edge);
+  border-radius: 2px;
+  padding: var(--sp-0) var(--sp-1);
+  font-size: var(--fs-xs);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.stint-segment:focus-visible {
+  outline: 1px solid var(--chalk);
+  outline-offset: 1px;
 }
 
 /* Twenty stint bars on an unlabelled 0..53 axis: no lap numbers anywhere, and
