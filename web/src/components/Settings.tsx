@@ -41,9 +41,10 @@ function Cmd({ children }: { children: string }) {
 // A URL the reader is meant to visit, rendered as the link it is. These were
 // inert <code> spans on a page whose entire job is "go here, then run this".
 function Url({ href }: { href: string }) {
+  const display = href.replace(/^https?:\/\//, '').replace(/\/$/, '');
   return (
     <a className="demo-notice-link" href={href} target="_blank" rel="noreferrer">
-      {href}<span aria-hidden="true"> ↗</span>
+      {display}<span aria-hidden="true"> ↗</span>
       <span className="visually-hidden"> (opens in a new tab)</span>
     </a>
   );
@@ -267,7 +268,7 @@ export function Settings() {
                 the sign-in does lapse and the same operator will need them again. */}
             {auth.state === 'linked' ? (
               <details>
-                <summary>Signing in (already linked)</summary>
+                <summary style={{ fontWeight: 600 }}>Signing in (already linked)</summary>
                 <SigningInSteps />
               </details>
             ) : (

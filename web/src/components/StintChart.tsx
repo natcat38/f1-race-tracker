@@ -52,6 +52,9 @@ function StintChartInner({ state, selected, rival }: {
                 key={i}
                 title={`${s.compound} · laps ${s.startLap}-${s.endLap}`}
                 role="img"
+                tabIndex={0}
+                className="stint-segment"
+                data-tip={`${s.compound} laps ${s.startLap}–${s.endLap}`}
                 aria-label={`${c.code}: ${s.compound.toLowerCase()} tyres, laps ${s.startLap} to ${s.endLap}`}
                 style={{
                   position: 'absolute',

@@ -107,7 +107,7 @@ function SourcePicker({ label, sel, drivers, cars, onSession, onCar, hint }: {
           return <option key={n} value={code}>{code}</option>;
         })}
       </select>
-      <span className="empty">{hint}</span>
+      {hint && <span className="empty">{hint}</span>}
     </div>
   );
 }
