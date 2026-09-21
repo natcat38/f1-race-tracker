@@ -2,7 +2,7 @@
 # and ships the gateway/replay server.
 
 # Build the React SPA
-FROM node:24@sha256:be23f54a88d34e8824c741b19b91064094f92c1c97b194144bfc8b50d67258e2 AS web
+FROM node:25@sha256:78839ac448c23517f8eab2e8f7943d9b4f73979eb7f8bed2c73dbf72ff869e7b AS web
 WORKDIR /web
 COPY web/package*.json ./
 RUN npm ci
