@@ -1,7 +1,7 @@
 # Roadmap — f1-race-tracker
 
 **Current stage: Review**
-**Next up:** owner decisions on #115 (ADR-0010 accept/reject), #123 (screenshot reshoot), #124 (70 MB clips policy); #103 needs-info on the gap-estimator gate; then start the next feature cycle (WS3 server-paced scrub) from Define.
+**Next up:** owner decisions on #115 (ADR-0010 accept/reject), #124 (screenshot reshoot), #123 (70 MB clips policy); #103 needs-info on the gap-estimator gate; then start the next feature cycle (WS3 server-paced scrub) from Define.
 
 Lifecycle: Define → Plan → Build → Verify → Review → Ship.
 Agents: read this file at session start, state the current stage and next unchecked item before any other work, and update this file (checkboxes + Current stage + Next up) before ending. Product and design decisions belong to the user — elicit them with questions, never decide for them.
