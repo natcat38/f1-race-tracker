@@ -79,6 +79,7 @@ The Python side: records FastF1 sessions to JSONL clips and runs the true-live S
 | `test_pit.py` | Unit tests for the pure pit-window / pit-stop derivation in ingest/pit.py. |
 | `test_race_control.py` | Self-check for ingest/race_control.extract_race_control (no fastf1/network needed). |
 | `test_radio.py` | Self-check for ingest/radio.extract_radio (no fastf1/network needed). |
+| `test_record.py` | Tests for record.py's orchestration seam: assemble_header/assemble_frame plus |
 | `test_resample.py` | Tests for the resampler's nearest-neighbour grid lookup and windowing helpers. |
 
 ### `ingest/tests`
@@ -521,4 +522,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-46 directories, 195 files listed, 0 without a declared purpose.
+46 directories, 196 files listed, 0 without a declared purpose.

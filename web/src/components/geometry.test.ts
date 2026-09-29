@@ -1,7 +1,7 @@
 // Tests that track outlines are letterboxed into the square viewBox without distortion.
 
 import { describe, it, expect } from 'vitest';
-import { SIZE, fitViewBox, trackPathD } from './geometry';
+import { SIZE, fitViewBox, trackPathD, trackSegmentPaths } from './geometry';
 
 // A portrait outline shaped like the real thing: Monza's baked outline measures
 // roughly 348 × 600 inside the 600 unit square, letterboxed left and right.
@@ -23,6 +23,18 @@ describe('trackPathD', () => {
 
   it('is empty before the outline arrives, so TrackPath can bail out', () => {
     expect(trackPathD([])).toBe('');
+  });
+});
+
+describe('trackSegmentPaths', () => {
+  it('closes the start/finish wraparound like trackPathD does with its Z (#112)', () => {
+    const track = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }];
+    const paths = trackSegmentPaths(track, 2);
+    const last = paths[paths.length - 1];
+    // The closing segment must run from the outline's last point (index 3:
+    // {0, 1}) back to its first ({0, 0}) — the exact stretch the plain path's
+    // ' Z' draws that the heatmap segments previously skipped.
+    expect(last).toBe(`M ${0 * SIZE},${1 * SIZE} L ${0 * SIZE},${0 * SIZE}`);
   });
 });
 

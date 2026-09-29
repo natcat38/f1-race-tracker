@@ -4,7 +4,7 @@ Collectable by pytest (`pytest ingest`) AND runnable directly
 (`python ingest/test_ghost.py`) for the CI contract job.
 """
 import sys
-from ghost import build_lap_trace, build_pedal_trace, compute_sector_dominance
+from ghost import build_lap_trace, build_pedal_trace, compute_sector_dominance, nan_safe_int
 
 
 def test_build_lap_trace_basic():
@@ -90,11 +90,30 @@ def test_compute_sector_dominance_picks_fastest_per_bin():
         2: [0, 2000, 2500, 2600],
     }
     out = compute_sector_dominance(lap_traces, n_points=4, bin_size=2)
-    assert out == [1, 2], out
+    # [1, 2] for the two real bins, plus one extra wraparound entry (#112).
+    assert out == [1, 2, 2], out
 
 
 def test_compute_sector_dominance_no_data_is_zero():
-    assert compute_sector_dominance({}, n_points=4, bin_size=2) == [0, 0]
+    assert compute_sector_dominance({}, n_points=4, bin_size=2) == [0, 0, 0]
+
+
+def test_compute_sector_dominance_wraparound_matches_frontend_segment_count():
+    # geometry.ts's trackSegmentPaths appends one closing segment (track[n-1] ->
+    # track[0]) on top of its ceil(n_points/bin_size) binned segments; this
+    # array must carry a matching extra entry so segment i still lines up with
+    # sectorDominance[i] on both sides of the contract (#112).
+    lap_traces = {1: [0, 1000, 1500, 3500]}
+    out = compute_sector_dominance(lap_traces, n_points=4, bin_size=2)
+    assert len(out) == 3  # 2 binned entries + 1 wraparound entry
+    assert out[-1] == out[-2]  # wraparound reuses the last bin's leader
+
+
+def test_nan_safe_int_zeroes_a_telemetry_gap():
+    # A dropped car_data sample surfaces as NaN (#111); nan_safe_int must not let
+    # NumPy's undefined float->int NaN cast (a garbage large-negative int) through.
+    nan = float("nan")
+    assert nan_safe_int([10.0, nan, 90.0]) == [10, 0, 90]
 
 
 def test_compute_sector_dominance_skips_non_positive_deltas():
@@ -114,6 +133,8 @@ if __name__ == "__main__":
     test_build_pedal_trace_carries_unvisited_index_forward()
     test_compute_sector_dominance_picks_fastest_per_bin()
     test_compute_sector_dominance_no_data_is_zero()
+    test_compute_sector_dominance_wraparound_matches_frontend_segment_count()
     test_compute_sector_dominance_skips_non_positive_deltas()
+    test_nan_safe_int_zeroes_a_telemetry_gap()
     print("ghost.build_lap_trace / build_pedal_trace / compute_sector_dominance self-check PASSED")
     sys.exit(0)

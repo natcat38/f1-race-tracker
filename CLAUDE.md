@@ -24,3 +24,22 @@ Default label vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `read
   and the files it lists. It is deliberately in the repo, NOT in `.claude/`, so it
   survives machine changes and works for any agent — write new memories here, never
   into a tool-specific memory directory.
+
+## Landing PRs (learned 2026-09-06)
+
+- Branch protection enforces linear history: land PRs one at a time — rebase onto
+  `origin/main`, regenerate `FILE-MAP.md`, force-push-with-lease, wait for CI, then
+  squash-merge. Never expect several open PRs to merge back-to-back without re-running CI.
+- After every rebase, regenerate `FILE-MAP.md` before pushing. A FILE-MAP conflict is
+  always resolved by regenerating, never by hand-merging.
+- After a worktree-isolated agent finishes, `git worktree remove --force` its worktree
+  and delete its branch before touching that PR branch from the main tree (a checkout
+  of a branch held by a worktree fails, and a `set -e` script dies silently).
+- Brief every fix agent to start with `git fetch origin && git checkout -B <branch>
+  origin/main`; launch agents that touch the same file only after the earlier PR on
+  that file has merged.
+- Any `ingest/` change must pass `ruff check .` run from `ingest/` — CI runs it in the
+  Python job and it flags things (e.g. dead locals inside `main()`) pytest never sees.
+- Digest-pinned Docker images make Dependabot open major-version PRs next; before
+  merging a minor pip bump, check the package's Requires-Python against the CI
+  interpreter (Python 3.11).

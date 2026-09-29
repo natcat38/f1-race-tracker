@@ -37,6 +37,14 @@ export function trackSegmentPaths(track: Pt[], binSize: number = MINISECTOR_SIZE
     const pts = track.slice(start, end + 1);
     paths.push('M ' + pts.map((p) => `${p.x * SIZE},${p.y * SIZE}`).join(' L '));
   }
+  // The plain (non-heatmap) path closes the loop with an explicit ' Z' back to
+  // track[0]; the binned segments above stop at track[n-1], so the short
+  // start/finish stretch was never drawn by any stroke (#112). Append one more
+  // closing segment — matching compute_sector_dominance's extra wrap bin, so
+  // this array's length still lines up 1:1 with sectorDominance.
+  const last = track[n - 1];
+  const first = track[0];
+  paths.push(`M ${last.x * SIZE},${last.y * SIZE} L ${first.x * SIZE},${first.y * SIZE}`);
   return paths;
 }
 
