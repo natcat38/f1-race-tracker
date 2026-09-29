@@ -42,4 +42,4 @@ Default label vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `read
   Python job and it flags things (e.g. dead locals inside `main()`) pytest never sees.
 - Digest-pinned Docker images make Dependabot open major-version PRs next; before
   merging a minor pip bump, check the package's Requires-Python against the CI
-  interpreter (Python 3.11).
+  interpreter (Python 3.14).
