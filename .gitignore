@@ -46,3 +46,6 @@ secrets/
 
 # Claude Code local session state (memory lives in /memory, which IS committed).
 .claude/
+
+# Claude Code subagent worktrees
+.claude/worktrees/
