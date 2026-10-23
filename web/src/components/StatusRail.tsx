@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import type { RaceState } from '../state/race';
 import type { ConnStatus } from '../realtime/socket';
-import { StatusBadge } from './StatusBadge';
+import { StatusBadge, RestingLaneLine } from './StatusBadge';
 import { fmtClock, leaderLapOf } from './timingHelpers';
 import { REPO_URL } from '../staticDemo';
 
@@ -103,6 +103,14 @@ export function StatusRail({
           </h1>
           {state?.label && <span className="rail-session">{state.label}</span>}
           {note && <span className="rail-note">{note}</span>}
+          {state && (
+            <RestingLaneLine
+              status={status ?? 'connecting'}
+              state={state}
+              staleSec={staleSec}
+              laneNamedElsewhere={laneNamedElsewhere}
+            />
+          )}
         </div>
 
         {/* Conditions live in the block rather than beside the clock so the phone
@@ -181,6 +189,15 @@ export function StatusRail({
             )}
             {stateChips}
           </div>
+        )}
+
+        {/* Overlay and Settings carry no clock, lap or state chip, so on a phone the
+            sticky strip was a 48px box with nothing in it but two tabs. The route
+            name fills it. aria-hidden: the <h1> above already says this, and a
+            second announcement of the same words is noise. Hidden on desktop,
+            where the h1 is in view. */}
+        {!hasInstruments && (
+          <span className="rail-strip-title" aria-hidden="true">{ROUTE_TITLES[active]}</span>
         )}
 
         <span className="rail-cluster rail-spacer" aria-hidden="true" />

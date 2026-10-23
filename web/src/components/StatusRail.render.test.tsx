@@ -179,3 +179,23 @@ describe('control grammar', () => {
     expect(html).not.toContain('role="radiogroup"');
   });
 });
+
+describe('StatusRail phone strip (F1-UX-10)', () => {
+  test('a route with no instruments puts its title in the strip, hidden from assistive tech', () => {
+    // Overlay and Settings left a 48px box with only the tabs in it.
+    const html = renderToStaticMarkup(<StatusRail active="ghost" />);
+    expect(html).toContain('<span class="rail-strip-title" aria-hidden="true">Lap delta overlay</span>');
+  });
+
+  test('the board, which has the clock and lap, does not repeat its title', () => {
+    const html = renderToStaticMarkup(<StatusRail active="board" state={leaderOnLap(12)} />);
+    expect(html).not.toContain('rail-strip-title');
+  });
+
+  test('the full lane line sits in the scroll-away block, ahead of the strip', () => {
+    const state = { ...leaderOnLap(12), rev: 5, mode: 'replay' };
+    const html = renderToStaticMarkup(<StatusRail active="board" state={state} status="live" />);
+    expect(html.indexOf('rail-lane')).toBeGreaterThan(-1);
+    expect(html.indexOf('rail-lane')).toBeLessThan(html.indexOf('rail-strip'));
+  });
+});

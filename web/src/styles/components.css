@@ -284,6 +284,20 @@
   color: var(--slate);
 }
 
+/* The route name in the phone strip (see StatusRail). Off until the strip exists. */
+.rail-strip-title {
+  display: none;
+}
+
+/* The resting chip's words, repeated in the scroll-away block on a phone, where the
+   sticky strip can only afford the glyph. Off everywhere the chip has room. */
+.rail-lane {
+  display: none;
+  font-family: var(--data);
+  font-size: var(--fs-sm);
+  color: var(--slate);
+}
+
 .rail-brand-sep {
   color: var(--edge);
   font-weight: 400;
@@ -1072,7 +1086,10 @@ select.btn {
   appearance: none;
   -webkit-appearance: none;
   background: transparent;
-  height: 20px;
+  /* 24px is the WCAG 2.2 target-size floor on a mouse; it was 20. Only the hit
+     box grows - the visible track stays 4px and the thumb 14px. The coarse
+     block at the end of this file takes it to 44px. */
+  height: 24px;
   cursor: pointer;
 }
 
@@ -1173,11 +1190,12 @@ select.btn {
 @media (pointer: coarse) {
   .btn,
   .btn-icon,
-  .overlay-select,
-  .tt-clear,
-  .cmd-copy {
+  .overlay-select {
     min-height: 44px;
   }
+  /* .tt-clear and .cmd-copy are raised in the coarse block at the end of the
+     file: their base rules (min-height: 24px) sit below this one, and at equal
+     specificity the later rule wins, so listing them here left both at 24px. */
 
   /* Rows measured 23px — one pixel under the floor, and the app's primary
      interaction, in a twenty-deep stack, on a phone. */
@@ -1215,6 +1233,10 @@ select.btn {
      only leftover from the H-4 sweep. They stay link-weight; only the box grows. */
   .rail-repo {
     min-height: 44px;
+    /* Below 1360px the exits are bare glyphs, 28px wide. The width is the other
+       half of the 44px target; centred so the glyph does not drift left. */
+    min-width: 44px;
+    justify-content: center;
   }
 }
 
@@ -1813,6 +1835,20 @@ select.btn {
   .rail-strip .rail-metric-label {
     display: none;
   }
+
+  .rail-strip-title {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--display);
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--chalk);
+  }
 }
 
 @media (max-width: 500px) {
@@ -1837,6 +1873,37 @@ select.btn {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  /* The resting chip ("REPLAY . LOOPING CLIP") is the one that lost its words: cut
+     to 8ch it read "REPLAY", and with the lap readout showing the strip has about
+     40px to spare, so no wrap or truncation can carry a sentence. The strip keeps
+     the glyph (the status dot) and the words move to the scroll-away block, where
+     .rail-lane repeats them in full. The text stays in the DOM, visually hidden,
+     so the polite announcement is unchanged. */
+  /* Without its words the filled pill reads as a Play button sitting next to the
+     real tabs, so the glyph drops the fill and stands as a plain indicator. The
+     live chip keeps its red label colour; the replay one goes to slate. */
+  .rail-strip .chip-resting {
+    padding-inline: var(--sp-1);
+    background: none;
+  }
+
+  .rail-strip .chip-replay.chip-resting {
+    color: var(--slate);
+  }
+
+  .rail-strip .chip-resting .chip-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .rail-lane {
+    display: block;
+  }
 }
 
 /* The overlay's scrubber shared a wrapped flex line with the picker, the readout
@@ -1846,5 +1913,26 @@ select.btn {
   .ghost-controls input[type="range"] {
     flex: 1 0 100%;
     min-width: 0;
+  }
+}
+
+/* Touch targets that lost the cascade. These are the last coarse-pointer rules in
+   the file on purpose: .tt-clear (min-height: 24px) and .cmd-copy (24px) are
+   declared far below the first (pointer: coarse) block, and at equal specificity
+   a later rule wins, so on a phone "Clear reference car", "Copy link" and the
+   Settings copy buttons measured 24px against the 44px the block intends. */
+@media (pointer: coarse) {
+  .tt-clear,
+  .cmd-copy {
+    min-height: 44px;
+  }
+
+  /* A standalone link on its own line, not a link inside a sentence, so it gets a
+     real box: it measured 14px tall. Inline links in prose are exempt from the
+     target-size floor (WCAG 2.5.8) and keep their line height. */
+  .tt-overlay-link .demo-notice-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
   }
 }

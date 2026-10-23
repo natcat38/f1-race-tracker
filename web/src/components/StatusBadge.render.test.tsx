@@ -2,7 +2,7 @@
 
 import { describe, test, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { StatusBadge } from './StatusBadge';
+import { StatusBadge, RestingLaneLine } from './StatusBadge';
 import { emptyState } from '../state/race';
 
 describe('StatusBadge', () => {
@@ -42,5 +42,41 @@ describe('StatusBadge', () => {
     const html = renderToStaticMarkup(<StatusBadge status="live" state={state} />);
     expect(html).toContain('visually-hidden');
     expect(html).toContain('real live ingestion not yet verified');
+  });
+
+  test('the healthy chip keeps every word in the DOM, with the glyph in its own span', () => {
+    // The phone strip hides .chip-text and keeps .chip-glyph (F1-UX-10); the words
+    // must stay in the announced text, byte for byte.
+    const state = { ...emptyState(), rev: 5, mode: 'replay' };
+    const html = renderToStaticMarkup(<StatusBadge status="live" state={state} />);
+    expect(html).toContain('<span class="chip-glyph">▶</span>');
+    expect(html).toContain('<span class="chip-text">REPLAY · LOOPING CLIP</span>');
+    expect(html.replace(/<[^>]+>/g, '')).toBe('▶ REPLAY · LOOPING CLIP');
+  });
+});
+
+describe('RestingLaneLine', () => {
+  const healthy = { ...emptyState(), rev: 5, mode: 'replay' };
+
+  test('repeats the healthy chip in full, hidden from assistive tech', () => {
+    const html = renderToStaticMarkup(<RestingLaneLine status="live" state={healthy} />);
+    expect(html).toContain('aria-hidden="true"');
+    expect(html).toContain('▶ REPLAY · LOOPING CLIP');
+    const live = renderToStaticMarkup(
+      <RestingLaneLine status="live" state={{ ...healthy, mode: 'live' }} />,
+    );
+    expect(live).toContain('● LIVE LANE · RECORDED CLIP');
+  });
+
+  test.each([
+    ['offline', { status: 'offline' as const }],
+    ['failed', { status: 'failed' as const }],
+    ['reconnecting', { status: 'reconnecting' as const }],
+    ['stale', { status: 'live' as const, staleSec: 9 }],
+    ['warming up', { status: 'live' as const, state: emptyState() }],
+    ['lane named elsewhere', { status: 'live' as const, laneNamedElsewhere: true }],
+  ])('says nothing while the strip chip is an exception: %s', (_name, extra) => {
+    const html = renderToStaticMarkup(<RestingLaneLine state={healthy} {...extra} />);
+    expect(html).toBe('');
   });
 });
