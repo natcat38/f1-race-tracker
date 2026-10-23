@@ -19,6 +19,15 @@ const GAP_UNIT_OPTIONS = [
   { key: 'seconds', label: 'Seconds' },
 ] as const;
 
+// The phone card's Best lap and sector line (S1 to S3) are opt-in: four of a card's
+// ten fields matter only for the car being studied, and with every field on, each
+// card was 127 to 147px, 3 screens for twenty drivers. The control exists only in
+// the card layout.
+const SECTOR_OPTIONS = [
+  { key: 'hide', label: 'Hide' },
+  { key: 'show', label: 'Show' },
+] as const;
+
 // The header row, in order. A list rather than ten literals because the phone
 // layout reads the same names back out of each cell's data-label.
 const COLUMNS = ['#', 'Driver', 'Gap', 'Int', 'Last', 'Best', 'Tyre', 'S1', 'S2', 'S3'] as const;
@@ -40,6 +49,7 @@ export function TimingTower({
   onSelect: (driverNum: number | null) => void;
 }) {
   const [secondsMode, setSecondsMode] = useState(false);
+  const [showSectors, setShowSectors] = useState(false);
   const [pb, setPb] = useState<Bests>({});
   const pbRef = useRef<Bests>({});
   const sessionRef = useRef(state.session);
@@ -209,13 +219,25 @@ export function TimingTower({
       onPointerEnter={(e) => { if (e.pointerType === 'mouse') setHeldOrder(live.map((c) => c.driverNum)); }}
       onPointerLeave={(e) => { if (e.pointerType === 'mouse') setHeldOrder(null); }}
     >
+    {/* Card layout only (display: none otherwise, in components.css). Inside the
+        scroll container because it is the container query that knows whether the
+        tower has become cards; a viewport width cannot say. */}
+    <div className="tt-sectors-toggle">
+      <SegmentedControl
+        scope="Detail"
+        ariaLabel="Best lap and sector times on each card"
+        options={SECTOR_OPTIONS}
+        value={showSectors ? 'show' : 'hide'}
+        onPick={(key) => setShowSectors(key === 'show')}
+      />
+    </div>
     {/* Explicit roles that duplicate what <table> already implies. They are
         redundant on the desktop layout and load-bearing on the phone one: below
         ~560px the container query turns every row into a card, and changing a
         table element's `display` is exactly what makes a browser drop its
         implicit table/row/cell roles. Naming them keeps the semantics agent 2
         restored from being undone by a layout rule. */}
-    <table className="tt-table" role="table">
+    <table className={showSectors ? 'tt-table tt-sectors-on' : 'tt-table'} role="table">
       <thead>
         <tr role="row">
           {COLUMNS.map((c) => (

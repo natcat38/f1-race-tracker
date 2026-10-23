@@ -6,37 +6,13 @@ import { Panel } from './Panel';
 import { StatusRail } from './StatusRail';
 import { Route } from './Route';
 import { parseAuthStatus, relativeExpiry, type AuthStatus } from '../state/f1auth';
-import { StaticDemoNotice } from './StaticDemoNotice';
-import { CopyButton } from './CopyButton';
+import { HowItRuns } from './HowItRuns';
+import { Cmd } from './Cmd';
 import { REPO_URL, STACK_LINE, STATIC_DEMO } from '../staticDemo';
 
 const POLL_MS = 5000;
 
 const LINK_CMD = 'python ingest/f1tv_link.py';
-
-// The one control a setup page owes its reader, and the one it did not have: the
-// three commands here are meant to be run somewhere else, and selecting mono text
-// out of a wrapped paragraph by hand is the whole friction. The copy button (and
-// its success/failure live-region feedback, ui-ux item 9b) is CopyButton — shared
-// now with the board's and overlay's "Copy link" buttons (ui-ux item 6) instead of
-// a second copy of the same logic.
-// children: string (not ReactNode) is load-bearing — it is what lets the
-// aria-label below interpolate the command text directly. Widening this to
-// ReactNode would make `Copy: ${children}` render "[object Object]" at every
-// call site (ui-ux item 9c) with no compile-time warning.
-function Cmd({ children }: { children: string }) {
-  return (
-    <span className="cmd">
-      <code>{children}</code>
-      <CopyButton
-        getText={() => children}
-        label="copy"
-        className="btn cmd-copy"
-        ariaLabel={`Copy: ${children}`}
-      />
-    </span>
-  );
-}
 
 // A URL the reader is meant to visit, rendered as the link it is. These were
 // inert <code> spans on a page whose entire job is "go here, then run this".
@@ -178,28 +154,10 @@ export function Settings() {
   const expiresIn = relativeExpiry(auth.expiresUtc);
   const noSubscription = auth.state === 'linked' && auth.tier !== 'active';
 
-  // The static build has no ingest process to link an account with, and no
-  // /api/f1auth to ask — so it says so plainly instead of reporting the
-  // "UNAVAILABLE" chip that an unreachable gateway would otherwise produce.
-  if (STATIC_DEMO) {
-    return (
-      <Route
-        title="F1TV account link (not in this demo)"
-        rail={<StatusRail active="settings" note="Not available in the static demo" />}
-      >
-        <StaticDemoNotice
-          label="F1TV Link — beta"
-          what="This page links a Formula 1 account to the ingest service, so the
-                tracker can pull a live session's timing feed instead of a recorded
-                one. Signing in runs as a host command on your own machine — nothing
-                about it can work from a static page."
-        />
-        {/* No <About /> here: StaticDemoNotice already carries the stack line
-            and the repo link, and saying both twice on one screen reads as a
-            template rather than as writing. */}
-      </Route>
-    );
-  }
+  // The static build has no ingest process to link an account with and no
+  // /api/f1auth to ask, so the F1TV page would be a dead end there. It gets the
+  // "How this runs" page instead (see HowItRuns).
+  if (STATIC_DEMO) return <HowItRuns />;
 
   return (
     <Route

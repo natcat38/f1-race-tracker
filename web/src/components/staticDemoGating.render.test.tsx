@@ -40,6 +40,40 @@ describe('static-demo gating of the gateway-backed routes', () => {
     expect(html).toContain('OVERLAY');
   });
 
+  // F1-UX-7: the gear used to open an F1TV link page that said "not available" and
+  // sat in the header of every route. The static build answers a different question
+  // there: what is behind the demo and how to run it.
+  test('Settings on the static build is the "How this runs" page, not an F1TV dead end', async () => {
+    const html = await renderWithFlag('true', 'Settings');
+    expect(html).toContain('How this runs');
+    expect(html).toContain('Python ingest');
+    expect(html).toContain('1,000 concurrent WebSocket viewers');
+    expect(html).toContain('git clone https://github.com/natcat38/f1-race-tracker');
+    expect(html).toContain('cd f1-race-tracker');
+    expect(html).toContain('docker compose up');
+    expect(html).not.toContain('NEEDS THE FULL STACK');
+    expect(html).not.toContain('F1TV Link — beta');
+  });
+
+  test('the settings link carries a name, a tooltip and an info mark on the static build', async () => {
+    vi.resetModules();
+    vi.stubEnv('VITE_STATIC_DEMO', 'true');
+    const { StatusRail } = await import('./StatusRail');
+    const html = renderToStaticMarkup(<StatusRail active="board" />);
+    expect(html).toContain('title="How this runs"');
+    expect(html).toContain('>How this runs<');
+    expect(html).not.toContain('⚙');
+  });
+
+  test('the settings link keeps the gear and the F1TV name on the full build', async () => {
+    vi.resetModules();
+    vi.stubEnv('VITE_STATIC_DEMO', '');
+    const { StatusRail } = await import('./StatusRail');
+    const html = renderToStaticMarkup(<StatusRail active="board" />);
+    expect(html).toContain('title="F1TV link"');
+    expect(html).toContain('⚙');
+  });
+
   test('Settings renders the real view when the flag is unset', async () => {
     const html = await renderWithFlag('', 'Settings');
     expect(html).not.toContain('docker compose up &&');
