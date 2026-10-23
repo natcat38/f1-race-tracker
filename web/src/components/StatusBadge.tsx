@@ -25,6 +25,28 @@ interface Props {
 
 const STALE_THRESHOLD_SEC = 4;
 
+// The healthy chip's words, kept in one place because the phone shows them twice:
+// the sticky strip has room for the glyph only, and StatusRail repeats the full
+// line in the scroll-away block (RestingLaneLine below).
+const RESTING = {
+  live: { glyph: '●', text: 'LIVE LANE · RECORDED CLIP' },
+  replay: { glyph: '▶', text: 'REPLAY · LOOPING CLIP' },
+} as const;
+
+// Which healthy chip a lane shows, or null when an exception chip (offline, failed,
+// reconnecting, warming, stale) or nothing at all takes the slot. Mirrors the order
+// Chip checks them in, and exists so the phone's block line can never say "REPLAY"
+// while the strip chip is saying "Connection lost".
+function restingKind(
+  { status, state, staleSec, laneNamedElsewhere }: Props,
+): keyof typeof RESTING | null {
+  if (status === 'offline' || status === 'failed' || status === 'reconnecting') return null;
+  if (isWarmingUp(state)) return null;
+  if ((staleSec ?? 0) >= STALE_THRESHOLD_SEC) return null;
+  if (laneNamedElsewhere) return null;
+  return state.mode === 'live' ? 'live' : 'replay';
+}
+
 const LIVE_CAVEAT =
   'Demo lane streaming a second replay clip — real live ingestion not yet verified';
 
@@ -76,8 +98,9 @@ function Chip({ status, state, staleSec, onReconnect, laneNamedElsewhere }: Prop
       // "LIVE (DEMO)" put the qualifier in a parenthesis and the truth in a
       // tooltip. The lane is a second recorded clip; the badge now says so on
       // screen, where a touch user can read it.
-      <span className="chip chip-live" title={LIVE_CAVEAT}>
-        ● LIVE LANE · RECORDED CLIP
+      <span className="chip chip-live chip-resting" title={LIVE_CAVEAT}>
+        <span className="chip-glyph">{RESTING.live.glyph}</span>{' '}
+        <span className="chip-text">{RESTING.live.text}</span>
         {/* The caveat used to live only in that title attribute — invisible to
             touch, and to any keyboard user who never hovers. It is now part of the
             chip's own text (aria-describedby would be unreliable on a role-less
@@ -91,7 +114,27 @@ function Chip({ status, state, staleSec, onReconnect, laneNamedElsewhere }: Prop
   // minutes, and a race clock that suddenly runs backwards reads as a bug unless
   // the reader was told to expect it. The transient wrap notice on the board
   // (App.tsx) is the other half of the same story.
-  return <span className="chip chip-replay">▶ REPLAY · LOOPING CLIP</span>;
+  return (
+    <span className="chip chip-replay chip-resting">
+      <span className="chip-glyph">{RESTING.replay.glyph}</span>{' '}
+      <span className="chip-text">{RESTING.replay.text}</span>
+    </span>
+  );
+}
+
+// The full words of the healthy chip, for the phone's scroll-away block, where it is
+// visible text rather than an announcement: aria-hidden, because the polite region
+// in the strip already says it and a second reading is noise. Null whenever the
+// strip chip is an exception or absent. CSS shows it only where the strip has
+// shrunk its own chip to the glyph.
+export function RestingLaneLine(props: Props) {
+  const kind = restingKind(props);
+  if (!kind) return null;
+  return (
+    <span className="rail-lane" aria-hidden="true">
+      {RESTING[kind].glyph} {RESTING[kind].text}
+    </span>
+  );
 }
 
 // The polite live region lives here rather than around the badge at each call

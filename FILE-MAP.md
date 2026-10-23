@@ -314,6 +314,10 @@ Race state: wire message types, the applyMessage reducer, and the comms/ghost/au
 
 Global CSS: design tokens and component styles.
 
+| File | Purpose |
+| --- | --- |
+| `touchTargets.css.test.ts` | Cascade guard for the touch-target floor (F1-UX-8, F1-UX-6, F1-UX-12): a (pointer: coarse) rule only wins if it comes after the base rule it overrides, and for .tt-clear and .cmd-copy it did not - both stayed 24px on a phone. |
+
 ## Tooling
 
 _Scripts, benchmarks, CI workflows — how the repo tests, measures and ships itself._
@@ -522,4 +526,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-46 directories, 196 files listed, 0 without a declared purpose.
+46 directories, 197 files listed, 0 without a declared purpose.
