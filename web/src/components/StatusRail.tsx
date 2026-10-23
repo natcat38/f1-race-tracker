@@ -7,7 +7,7 @@ import { useReducedMotion } from '../hooks/useReducedMotion';
 import type { ConnStatus } from '../realtime/socket';
 import { StatusBadge, RestingLaneLine } from './StatusBadge';
 import { fmtClock, leaderLapOf } from './timingHelpers';
-import { REPO_URL } from '../staticDemo';
+import { REPO_URL, STATIC_DEMO } from '../staticDemo';
 
 // Two primary tabs, plus two permanent affordances below. COMPARE was folded into
 // OVERLAY (ADR-0009) — it showed two maps side by side and computed nothing, which
@@ -32,8 +32,28 @@ const TABS = [
 const ROUTE_TITLES = {
   board: 'Race board',
   ghost: 'Lap delta overlay',
-  settings: 'F1TV link',
+  settings: STATIC_DEMO ? 'How this runs' : 'F1TV link',
 } as const;
+
+// The #settings link. On the full build it is the F1TV account link, and keeps the
+// gear it has always had. On the static demo that page cannot work (no gateway, no
+// ingest), so the same slot opens "How this runs" and carries an info mark and its
+// own words: a bare gear that opened a "not available" page was a dead end, and a
+// bare glyph under a 1360px rail told nobody what it was (F1-UX-6, F1-UX-7).
+const SETTINGS_LINK = STATIC_DEMO
+  ? { name: 'How this runs', text: 'How this runs' }
+  : { name: 'F1TV link', text: 'F1TV Link' };
+
+// Drawn, like the transport icons: a circled "i", 16px, currentColor.
+function InfoIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="7.25" y="7" width="1.5" height="4.5" rx="0.5" fill="currentColor" />
+      <circle cx="8" cy="5" r="0.95" fill="currentColor" />
+    </svg>
+  );
+}
 
 /**
  * The transport verb the phone's sticky strip carries: Pause/Play for the static
@@ -300,12 +320,15 @@ export function StatusRail({
 
         <div className="rail-cluster rail-exits">
           <a
-            className={active === 'settings' ? 'rail-repo rail-repo-active' : 'rail-repo'}
+            className={active === 'settings' ? 'rail-repo rail-repo-settings rail-repo-active' : 'rail-repo rail-repo-settings'}
             href="#settings"
+            title={SETTINGS_LINK.name}
             aria-current={active === 'settings' ? 'page' : undefined}
           >
-            <span className="rail-repo-glyph" aria-hidden="true">⚙</span>
-            <span className="rail-repo-text">F1TV<span className="rail-repo-long"> Link</span></span>
+            <span className="rail-repo-glyph" aria-hidden="true">
+              {STATIC_DEMO ? <InfoIcon /> : '⚙'}
+            </span>
+            <span className="rail-repo-text">{SETTINGS_LINK.text}</span>
           </a>
           {/* Deliberately outside <nav>: this is a way out of the app, not a fifth
               view. It is the only path from any route back to the project, which

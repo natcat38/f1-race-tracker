@@ -203,7 +203,8 @@ describe('TimingTower gap-units control', () => {
     expect(html).toContain('aria-label="Gap units for lapped cars"');
     expect(html).toContain('class="rail-scope"');
     expect(html).toContain('Gaps');
-    expect(html.match(/role="radio"/g)).toHaveLength(2);
+    // Two groups now: the gap units, and the phone card's Detail switch (below).
+    expect(html.match(/role="radio"/g)).toHaveLength(4);
     expect(html).not.toContain('Gaps in seconds');
   });
 
@@ -215,6 +216,21 @@ describe('TimingTower gap-units control', () => {
     const secondsButton = html.slice(html.lastIndexOf('<button', html.indexOf('>Seconds<')));
     expect(lapsButton.split('>')[0]).toContain('aria-checked="true"');
     expect(secondsButton.split('>')[0]).toContain('aria-checked="false"');
+  });
+});
+
+describe('TimingTower phone card detail switch (F1-UX-3)', () => {
+  test('Best and the sectors are off by default and the switch names what it governs', () => {
+    const html = renderToStaticMarkup(
+      <TimingTower state={field()} selected={null} onSelect={() => {}} />,
+    );
+    // The card layout hides Best and S1-S3 unless the table carries this class.
+    expect(html).toContain('class="tt-table"');
+    expect(html).not.toContain('tt-sectors-on');
+    expect(html).toContain('aria-label="Best lap and sector times on each card"');
+    expect(html).toContain('>Detail<');
+    const hide = html.slice(html.lastIndexOf('<button', html.indexOf('>Hide<')));
+    expect(hide.split('>')[0]).toContain('aria-checked="true"');
   });
 });
 

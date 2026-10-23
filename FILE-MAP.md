@@ -230,11 +230,13 @@ Presentational components — map, timing tower, telemetry, comms, race control,
 
 | File | Purpose |
 | --- | --- |
+| `Cmd.tsx` | A shell command shown as code with a copy button beside it. |
 | `Comms.render.test.tsx` | Render tests for the Comms panel's radio on/off control. |
 | `Comms.tsx` | The team-radio layer: a now-playing banner over a short replayable history. |
 | `CopyButton.tsx` | Shared "copy to clipboard" control: the success/failure live-region feedback pattern that used to live only in Settings.tsx's Cmd (ui-ux item 9b), now reused by the board's and overlay's "Copy link" buttons (ui-ux item 6) instead of a second copy of the same catch/live-region logic. |
 | `Ghost.render.test.tsx` | Render tests for the overlay: both comparison scenarios, per-side team colours, and the states where there is nothing to compare. |
 | `Ghost.tsx` | The overlay route: two reference laps animated against each other on one track map, across two seasons or two drivers in the same race. |
+| `HowItRuns.tsx` | The static demo's "How this runs" page: what the full system is and how to start it. |
 | `Map.interaction.test.tsx` | Interaction coverage for the track map: the animation loop and the marker updates that static rendering never exercises. |
 | `Map.render.test.tsx` | Render (renderToStaticMarkup) regression coverage for three a11y/layout bugs in the corner-number labels and the sector-dominance heatmap legend: issues #99 (fixed contrast against the heatmap), #104 (colour-only heatmap meaning), and #109 (corner labels vanishing below 700px). |
 | `Map.tsx` | The track map: cars drawn as smoothed dots on the baked track outline, with the board's selection highlighted. |
@@ -244,7 +246,6 @@ Presentational components — map, timing tower, telemetry, comms, race control,
 | `SegmentedControl.tsx` | The rail's one control grammar for a choice between persistent states: a labelled radiogroup of .btn segments with roving tabindex. |
 | `Settings.tsx` | The settings page: F1 TV link status and the operator instructions for establishing it. |
 | `SourceToggle.tsx` | The replay/live lane switch, including the caveat text that keeps the live lane honest. |
-| `StaticDemoNotice.tsx` | The placeholder gateway-backed views render on the static GitHub Pages build, where no gateway exists. |
 | `StatusBadge.render.test.tsx` | Render tests for the connection/staleness badge, including the live-lane caveat. |
 | `StatusBadge.tsx` | The connection/staleness badge: what the socket is doing and how old the data is. |
 | `StatusRail.phone.test.tsx` | The phone's sticky strip (F1-UX-2, F1-UX-4, F1-UX-5): the transport verb and the section chips are rendered only where the phone breakpoint matches, the verb names the action it will take, and a chip scrolls to its panel and opens it when it is a collapsed <details>. |
@@ -529,4 +530,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-46 directories, 200 files listed, 0 without a declared purpose.
+46 directories, 201 files listed, 0 without a declared purpose.
