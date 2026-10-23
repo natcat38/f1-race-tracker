@@ -45,6 +45,7 @@ Exit: no known broken flows. Skills: run, webapp-testing, diagnose.
 - [ ] `/simplify` pass.
 - [x] UI: web-design-guidelines audit. (#93; full 3-page design-critique + WCAG AA re-audit 2026-09-08, fixes merged in #145 — reports in `reviews/2026-09-08/`)
 - [x] UX polish, batch 1 "touch and cascade fixes": every touch target 44px on touch, 24px scrubber on desktop, phone strip no longer clips the REPLAY chip. (F1-UX-8, F1-UX-12, F1-UX-10, and the `min-width` part of F1-UX-6 from the 2026-10-23 UX audit; the rest of that audit is open or waiting on owner decisions D1-D3.)
+- [x] UX polish, batch 2 "phone header and navigation": Pause and the section chips stay in the sticky phone strip, the map panel starts at 178 px instead of 307 px, and the strip comes first in the tab order. (F1-UX-2, F1-UX-5, F1-UX-9, F1-UX-4; F1-UX-3, F1-UX-7 and F1-UX-1 follow in later PRs.)
 
 Exit: findings addressed or explicitly waived. Skills: code-review, simplify, web-design-guidelines.
 

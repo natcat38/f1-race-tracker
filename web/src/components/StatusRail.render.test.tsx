@@ -192,10 +192,13 @@ describe('StatusRail phone strip (F1-UX-10)', () => {
     expect(html).not.toContain('rail-strip-title');
   });
 
-  test('the full lane line sits in the scroll-away block, ahead of the strip', () => {
+  test('the strip comes first in the DOM and the full lane line sits in the block after it', () => {
+    // F1-UX-9: the strip is first on a phone screen, so it is first in the tab
+    // order too; it used to be last in the DOM and pulled up with `order: -1`.
     const state = { ...leaderOnLap(12), rev: 5, mode: 'replay' };
     const html = renderToStaticMarkup(<StatusRail active="board" state={state} status="live" />);
     expect(html.indexOf('rail-lane')).toBeGreaterThan(-1);
-    expect(html.indexOf('rail-lane')).toBeLessThan(html.indexOf('rail-strip'));
+    expect(html.indexOf('class="rail-strip"')).toBeLessThan(html.indexOf('class="rail-block"'));
+    expect(html.indexOf('class="rail-block"')).toBeLessThan(html.indexOf('rail-lane'));
   });
 });

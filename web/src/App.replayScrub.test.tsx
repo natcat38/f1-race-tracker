@@ -20,7 +20,7 @@ vi.mock('./realtime/staticReplay', () => ({
     setDuration: (d: number) => void,
   ) => {
     onStatus('connected');
-    onState({ cars: {}, rev: 1, timeMs: 0, track: [], lapTrace: {}, label: '' });
+    onState({ cars: {}, rev: 1, timeMs: 0, track: [], lapTrace: {}, label: '', messages: [] });
     setDuration(60_000); // non-zero so the scrub row renders
     return () => {};
   },
