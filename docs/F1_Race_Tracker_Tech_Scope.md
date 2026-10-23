@@ -357,6 +357,8 @@ Architecture diagram (§2.1), GIF of the map + the two-year comparison, `docker 
   `WINDOW_START_S`/`WINDOW_END_S` window happened to land on laps 1–5 for all
   three committed clips — zero pit stops, no tyre-age resets, making the
   strategy story structurally impossible to show regardless of frontend work.
+  (Later exception: the Monza 2024 default clip is baked from lap 2, so the demo
+  opens on a full timing tower; see `ingest/README.md`.)
 - **`ingest/live_signalr.py`'s field coverage was extended** (lap, gap/interval,
   last-lap, tyre/tyreAge from `TimingData`/`TimingAppData`) without changing its
   exploratory status — every new parsing assumption is still marked

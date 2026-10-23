@@ -51,7 +51,7 @@ derived from the leader's `LapStartTime` for those laps:
 
 ```bash
 .venv/Scripts/python ingest/record.py data/replays/monza-2024-race.jsonl \
-  --gp Monza --year 2024 --start-lap 13 --end-lap 17
+  --gp Monza --year 2024 --start-lap 2 --end-lap 6
 ```
 
 Inspect `session.laps[~session.laps['PitInTime'].isna()]` first to find a
@@ -81,10 +81,20 @@ window is what makes tyre stints, pit-lane status, and the strategy chart show
 anything at all, and a default-window re-bake silently lands on laps 1–5, which have
 no pit stops in them.
 
+The Monza 2024 clip is the exception, and deliberately so: it is the first thing a
+visitor to the static demo sees, so its window starts at lap 2 to open on a full
+timing tower. Gap and interval need the leader's history at each car's distance
+inside the window, so a window opens with empty gaps for as long as the field is
+spread out. On lap 1 that was every row until about 2:20 of the loop (19 of 20 rows
+read `NO DATA`); starting after the first lap, when the field is still bunched, it
+is about 8 seconds. The trade is that laps 2–6 hold no planned pit stops (the first
+is on lap 14), so this clip does not exercise the pit-stop story; the strategy chart
+still carries the whole race, because it is baked outside the window.
+
 ```bash
-# Monza 2024 — the default replay lane (laps 13–17)
+# Monza 2024 — the default replay lane and the static demo (laps 2–6)
 .venv/Scripts/python ingest/record.py data/replays/monza-2024-race.jsonl \
-  --gp Monza --year 2024 --start-lap 13 --end-lap 17
+  --gp Monza --year 2024 --start-lap 2 --end-lap 6
 
 # Monza 2023 — the other half of the cross-year compare pair (laps 19–23)
 .venv/Scripts/python ingest/record.py data/replays/monza-2023-race.jsonl \
@@ -132,11 +142,11 @@ loops), at every in-window crossing of every driver on all three clips:
 
 | clip | `gapMs` median \|err\| | `gapMs` p95 | `intMs` median \|err\| | `intMs` p95 |
 |---|---|---|---|---|
-| monza-2024 (n=82 / 40) | **31 ms** | 91 ms | **46 ms** | 98 ms |
+| monza-2024 (n=94 / 44) | **44 ms** | 141 ms | **36 ms** | 127 ms |
 | monza-2023 (n=81 / 34) | **38 ms** | 110 ms | **18 ms** | 97 ms |
 | silverstone-2024 (n=52 / 24) | **32 ms** | 94 ms | **28 ms** | 111 ms |
 
-Bias is within ±25 ms on every clip. For comparison, the previous outline-index
+Bias is within ±40 ms on every clip. For comparison, the previous outline-index
 estimator measured a `gapMs` median |error| of 620 / 330 / 11241 ms on the same
 three windows. Run the check with:
 
