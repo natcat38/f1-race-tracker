@@ -246,6 +246,7 @@ Presentational components — map, timing tower, telemetry, comms, race control,
 | `StaticDemoNotice.tsx` | The placeholder gateway-backed views render on the static GitHub Pages build, where no gateway exists. |
 | `StatusBadge.render.test.tsx` | Render tests for the connection/staleness badge, including the live-lane caveat. |
 | `StatusBadge.tsx` | The connection/staleness badge: what the socket is doing and how old the data is. |
+| `StatusRail.phone.test.tsx` | The phone's sticky strip (F1-UX-2, F1-UX-4, F1-UX-5): the transport verb and the section chips are rendered only where the phone breakpoint matches, the verb names the action it will take, and a chip scrolls to its panel and opens it when it is a collapsed <details>. |
 | `StatusRail.render.test.tsx` | Render tests for the top rail: instrument clusters, empty zones, tabs and status. |
 | `StatusRail.tsx` | The top rail as an instrument cluster: identity, instruments, state, controls. |
 | `StintChart.render.test.tsx` | Render tests for the strategy timeline's stint segments and leader marker. |
@@ -273,6 +274,7 @@ Hooks deriving UI-facing state (staleness, gap/lap history, smoothed positions, 
 | --- | --- |
 | `useComms.ts` | Drives the comms layer: queues fired radio clips into one audio element and keeps a short history. |
 | `useLane.ts` | React binding for the shared lane registry: one session key, one connection, however many overlay sides name it. |
+| `useMediaQuery.ts` | Subscribes to a CSS media query so JavaScript can render a different structure where a stylesheet cannot, and names the one phone breakpoint both share. |
 | `useReducedMotion.ts` | Subscribes to prefers-reduced-motion for the two places motion is driven from JavaScript. |
 | `useRollingHistory.ts` | The shared fold behind the lap and gap histories, including reset on session switch or replay-loop restart. |
 | `useSmoothedCars.test.ts` | Pure-function coverage for issue #102: TELEPORT_THRESHOLD must be compared in the same [0,1] normalised track-space as the car positions themselves, so a scrub-sized jump actually snaps instead of gliding across the map. |
@@ -526,4 +528,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-46 directories, 197 files listed, 0 without a declared purpose.
+46 directories, 199 files listed, 0 without a declared purpose.
