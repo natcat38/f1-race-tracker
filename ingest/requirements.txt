@@ -3,7 +3,7 @@
 fastf1==3.8.3
 # numpy>=2.5.0 requires Python>=3.12; CI and ingest/Dockerfile.live both run 3.14, so
 # numpy bumps are unblocked. Keep ci.yml, Dockerfile.live and pyproject.toml in step.
-numpy==2.5.3
+numpy==2.5.4
 # Transitive via fastf1's CacheControl / signalrcore — pinned up from the resolved
 # 1.1.2 to fix GHSA-6v7p-g79w-8964.
 msgpack>=1.2.1,<2
