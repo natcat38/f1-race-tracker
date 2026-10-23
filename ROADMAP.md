@@ -48,6 +48,7 @@ Exit: no known broken flows. Skills: run, webapp-testing, diagnose.
 - [x] UX polish, batch 2 "phone header and navigation": Pause and the section chips stay in the sticky phone strip, the map panel starts at 178 px instead of 307 px, and the strip comes first in the tab order. (F1-UX-2, F1-UX-5, F1-UX-9, F1-UX-4; F1-UX-3, F1-UX-7 and F1-UX-1 follow in later PRs.)
 - [x] UX polish, batch 3 "desktop density": one board grid, so the map column carries the map and the strategy chart, the tower sits on the right, and Telemetry sits beside a Comms-over-Race-Control stack. Desktop page 1.68 to 1.49 screens at 1440 px. (F1-UX-11)
 - [x] UX polish, batch 4 "phone tower and the gear" (owner decisions D2 option 2, D3 option 3): phone timing cards cut to two lines with Best and the sectors behind a Detail switch (tower 3.5 to 2.4 screens); the static demo's F1TV dead end is now a "How this runs" page, and the link carries a text label. (F1-UX-3, F1-UX-7, naming part of F1-UX-6)
+- [x] UX polish, batch 5 "demo clip opens on a full tower" (owner decision D1, option 3): the Monza 2024 clip is re-baked from lap 2 (laps 2-6) with the repo's own `ingest/record.py`, replacing the old file in place. 19 of 20 tower rows read NO DATA for 2:30 of every loop before; about 8 s after. Clip size 20.9 MB to 23.1 MB (+10.6%). (F1-UX-1; issue #123 on the clips policy stays open.)
 
 Exit: findings addressed or explicitly waived. Skills: code-review, simplify, web-design-guidelines.
 

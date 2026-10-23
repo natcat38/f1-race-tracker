@@ -1004,7 +1004,11 @@ def main():
             assert {'number', 'x', 'y', 'letter'} <= set(c.keys()), f"corner missing fields: {c}"
             assert 0 <= c['x'] <= 1 and 0 <= c['y'] <= 1, f"corner out of [0,1]: {c}"
         assert 'sectorDominance' in hdr, "header missing 'sectorDominance'"
-        expected_bins = math.ceil(len(hdr['track']) / MINISECTOR_SIZE) if hdr['track'] else 0
+        # One bin per MINISECTOR_SIZE outline points, plus the closing start/finish
+        # wraparound segment compute_sector_dominance appends (#133). The check still
+        # said ceil(n / size) after that change, so every fresh bake reported a header
+        # error even though the clip was right.
+        expected_bins = math.ceil(len(hdr['track']) / MINISECTOR_SIZE) + 1 if hdr['track'] else 0
         assert len(hdr['sectorDominance']) == expected_bins, \
             f"sectorDominance length {len(hdr['sectorDominance'])} != expected {expected_bins} bins"
         print(f"  Header OK: {len(hdr['track'])} track points, maxRev={hdr['maxRev']}, {len(hdr['radio'])} radio clips, totalLaps={hdr['totalLaps']}, stints for {len(hdr['stints'])} drivers, pitStops for {len(hdr['pitStops'])} drivers, pedalTraces for {len(hdr['pedalTraces'])} drivers, {len(hdr['corners'])} corners, {len(hdr['sectorDominance'])} minisectors")

@@ -38,7 +38,7 @@ docker compose up --build -d
 
 Open [http://localhost:8080](http://localhost:8080).
 
-The default view shows the Monza 2024 race clip (replay lane) — a mid-race window around laps 13–17 chosen to include real pit stops, so tyre stints, pit-lane status, and the strategy chart actually have something to show. Use the toggle at the top of the page to switch to the Silverstone 2024 clip on the "Live (demo)" lane — see [What's not done](#whats-not-done) for what "demo" means there. That clip's window (laps 25–28) sits in a real rain phase: expect the weather badge to show `RAIN` and cars to change from slicks to intermediates mid-clip.
+The default view shows the Monza 2024 race clip (replay lane) — laps 2–6, the opening laps after the start. The window starts at lap 2 on purpose: every car has already completed a lap, so the timing tower fills in within seconds instead of sitting on `NO DATA` for the first two and a half minutes of each loop (a window that opens on lap 1 does that). The strategy chart is baked for the whole race regardless of the window. Use the toggle at the top of the page to switch to the Silverstone 2024 clip on the "Live (demo)" lane — see [What's not done](#whats-not-done) for what "demo" means there. That clip's window (laps 25–28) sits in a real rain phase: expect the weather badge to show `RAIN` and cars to change from slicks to intermediates mid-clip.
 
 ### Lap-delta overlay
 
@@ -91,7 +91,7 @@ takes three separate opt-ins to reach. See
 
 The "Live (demo)" toggle is honestly labelled: it streams a second committed replay clip (Silverstone 2024) through Python to exercise the polyglot seam, not a real live-timing connection. True live ingestion (`ingest/live_signalr.py`) parses `TimingData`/`TimingAppData` for lap, gap/interval, and tyre fields alongside position. The connect-time snapshot shape was verified for real on 2026-08-20, but the *incremental* message shapes — the ones that only arrive during a running session — are all still marked `UNVERIFIED:` in the source. See [docs/runbooks/live-verification.md](docs/runbooks/live-verification.md) for the checklist to run through and close them out field-by-field the next time a live session is available.
 
-Gap/Int in the timing tower are estimates derived from track position and the leader's own pace, not official per-tick timing data (the tower says so) — validated against official line-crossing times to a median error of ~30 ms, shown to a tenth (see [ingest/README.md](ingest/README.md)). There's no per-rival two-car map overlay, and the stint chart shows the full baked plan rather than only what's happened so far in the replay window (noted in its own footnote).
+Gap/Int in the timing tower are estimates derived from track position and the leader's own pace, not official per-tick timing data (the tower says so) — validated against official line-crossing times to a median error under 50 ms, shown to a tenth (see [ingest/README.md](ingest/README.md)). There's no per-rival two-car map overlay, and the stint chart shows the full baked plan rather than only what's happened so far in the replay window (noted in its own footnote).
 
 ## Architecture — two lanes, one seam
 
