@@ -214,6 +214,7 @@ The app shell: entry point, root component, error boundary, static-demo bootstra
 
 | File | Purpose |
 | --- | --- |
+| `App.board.test.tsx` | The board's DOM contract (F1-UX-11): all six panels sit in one `.board` grid, in the order the phone stacks them and Tab visits them, with Comms and Race Control sharing one `.board-stack` cell. |
 | `App.replayScrub.test.tsx` | Static-markup coverage for the replay scrub row (issues #107, #108): the range input must reuse the Ghost scrubber's shared dark-mode/touch-target class instead of being a bare, unclassed input, and the elapsed readout must NOT reuse the hero session-clock class (.rail-clock) — it needs its own smaller class so it doesn't visually outrank the real session clock. |
 | `App.test.tsx` | Regression coverage for the shell's data-source connection: opened once when the board is first shown, and kept alive across route changes. |
 | `App.tsx` | The React app shell: mounts the root component, wires the live WebSocket or static-replay data source into race state, and lays out the dashboard panels. |
@@ -528,4 +529,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-46 directories, 199 files listed, 0 without a declared purpose.
+46 directories, 200 files listed, 0 without a declared purpose.

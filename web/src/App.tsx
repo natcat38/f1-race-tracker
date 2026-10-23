@@ -453,10 +453,14 @@ export default function App() {
         />
       }
     >
-      <div className="board-top">
+      {/* One grid for all six panels, in reading order. The desktop template
+          (components.css, .board) places them by area, so the DOM order, which is
+          also the phone's stacking and tab order, never has to bend to the layout. */}
+      <div className="board">
         <Panel
           label="Track"
           id="track"
+          className="board-track"
           actions={phone && replayReady ? <div className="panel-scrub">{replayScrubber}</div> : undefined}
         >
           {(status === 'reconnecting' || status === 'offline') && !showSkeleton && (
@@ -483,16 +487,17 @@ export default function App() {
             />
           )}
         </Panel>
-        <Panel label="Timing" id="timing">
+        <Panel label="Timing" id="timing" className="board-timing">
           <TimingTower state={state} selected={selected} onSelect={setSelected} />
         </Panel>
-      </div>
 
-      <div className="board-bottom">
         {/* Two telemetry cards do not fit one quarter of the strip — the second
             was cut mid-word at every viewport. With a rival picked the panel takes
             two columns; below that width the cards stack (see .telemetry-cards). */}
-        <Panel label="Telemetry" className={effectiveRival != null ? 'panel-wide' : undefined}>
+        <Panel
+          label="Telemetry"
+          className={effectiveRival != null ? 'board-telemetry panel-wide' : 'board-telemetry'}
+        >
           <TelemetryPanel
             state={state}
             lapHistory={lapHistory}
@@ -502,24 +507,29 @@ export default function App() {
             onRivalChange={setRival}
           />
         </Panel>
-        <Panel label="Strategy" id="strategy">
+        <Panel label="Strategy" id="strategy" className="board-strategy">
           <StintChart state={state} selected={selected} rival={effectiveRival} />
         </Panel>
-        <Panel label="Comms" id="comms" collapsed={phone}>
-          <Comms state={state} />
-        </Panel>
-        <Panel
-          label="Race Control"
-          id="race-control"
-          collapsed={phone}
-          summary={isWarmingUp(state) ? undefined : (
-            // Polite status, because a closed panel's log is not announced: the
-            // count still changes in the reader's ear when a message arrives.
-            <span role="status" aria-live="polite">{messageCount(state.messages.length)}</span>
-          )}
-        >
-          <RaceControl state={state} selected={selected} />
-        </Panel>
+        {/* Comms and Race Control are short: three lines each. They share one grid
+            cell so they stack with a normal gap instead of being pulled apart by the
+            height of Telemetry beside them. */}
+        <div className="board-stack">
+          <Panel label="Comms" id="comms" collapsed={phone}>
+            <Comms state={state} />
+          </Panel>
+          <Panel
+            label="Race Control"
+            id="race-control"
+              collapsed={phone}
+            summary={isWarmingUp(state) ? undefined : (
+              // Polite status, because a closed panel's log is not announced: the
+              // count still changes in the reader's ear when a message arrives.
+              <span role="status" aria-live="polite">{messageCount(state.messages.length)}</span>
+            )}
+          >
+            <RaceControl state={state} selected={selected} />
+          </Panel>
+        </div>
       </div>
     </Route>
   );
