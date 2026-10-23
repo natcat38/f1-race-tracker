@@ -877,60 +877,107 @@ select.btn {
    size there is. 460px still draws a perfectly legible circuit and hands the
    tower ~707px, which is every column except Best. Above ~1400px the tower gets
    the rest of the row and Best returns on its own. */
-/* The map column sizes to the map now, instead of to a 460px guess. With the
+/* The board: six panels in one grid, placed by area.
+
+   The page used to be two stacked grids, and each stretched its panels to the
+   tallest in the row. The 20-row tower (about 800px) set the first row, so the map
+   panel carried ~290px of empty carbon under its legend; the 20-row strategy chart
+   set the second, so Telemetry, Comms and Race Control were stretched to match,
+   Comms and Race Control holding three lines each. Now the map column holds the
+   map and the strategy chart, the right-hand column holds the tower, and Telemetry
+   sits beside a Comms-over-Race-Control stack beneath it. Panels take their own
+   height (align-items: start); the 1fr row absorbs whatever the tower needs, so
+   nothing is stretched to fill.
+
+   The map column sizes to the map, as it did before: fit-content, capped at 30rem
+   so the strategy chart (which has no width of its own) cannot widen it. With the
    viewBox fitted to the circuit, a portrait outline like Monza is ~257px wide at
-   the map's 420px height — the old fixed column left 200px of empty panel beside
-   it AND took that width off the tower, which is what pushed Best behind a
-   scrollbar at 1280px. `auto` hands the difference straight to the timing table,
-   so the tower gets wider on exactly the circuits where the map needs less. */
-.board-top {
+   the map's 420px height, and `auto` hands the difference straight to the tower. */
+.board {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: fit-content(30rem) minmax(0, 1.3fr) minmax(0, 0.8fr);
+  grid-template-rows: min-content minmax(0, 1fr) auto;
+  grid-template-areas:
+    "track    timing    timing"
+    "strategy timing    timing"
+    "strategy telemetry stack";
+  align-items: start;
   gap: var(--sp-6);
 }
 
-/* Four EQUAL columns for four panels with wildly unequal content: Strategy wants
-   twenty rows, Telemetry wants ~440px for the comparison it exists to draw, and
-   Comms and Race Control routinely render three lines into 440px of emptiness.
-   The grid was symmetric; the information never was. */
-.board-bottom {
+.board-track { grid-area: track; }
+.board-timing { grid-area: timing; }
+.board-telemetry { grid-area: telemetry; }
+.board-strategy {
+  grid-area: strategy;
+  /* No intrinsic width: the chart fills the map column but must not widen it. */
+  contain: inline-size;
+}
+.board-stack {
+  grid-area: stack;
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.2fr) minmax(0, 0.75fr) minmax(0, 0.75fr);
   gap: var(--sp-6);
+  min-width: 0;
 }
 
-/* Telemetry with a rival picked: two cards do not fit a quarter of the strip at
-   any viewport, which is why the second was clipped mid-word. It takes two
-   columns instead — and the cards stack inside it below that. */
-.panel-wide {
-  grid-column: span 2;
+/* Telemetry with a rival picked: two cards do not fit the narrow column, which is
+   why the second was clipped mid-word. It takes the width of both the lower right
+   columns instead (and the cards stack inside it below that), and the Comms and
+   Race Control stack drops to a row of its own, side by side. */
+.board:has(.panel-wide) {
+  grid-template-rows: min-content minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "track    timing    timing"
+    "strategy timing    timing"
+    "strategy telemetry telemetry"
+    "stack    stack     stack";
+}
+
+.board:has(.panel-wide) .board-stack {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 /* One breakpoint used to take the board from 2/4 columns straight to 1, so every
    tablet and small laptop between 700 and 1100px got the full phone stack: track,
    then a twenty-row tower, then four full-width panels. A two-up tier is the
-   missing step. */
+   missing step. Rows stretch here (as the old bottom grid did), so a pair of
+   panels shares a height. The stack dissolves, so Comms and Race Control are
+   ordinary cells again and auto-place into the rows below the named ones. */
 @media (max-width: 1100px) {
-  .board-top {
-    grid-template-columns: 1fr;
-  }
-
-  .board-bottom {
+  .board,
+  .board:has(.panel-wide) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: none;
+    grid-template-areas:
+      "track     track"
+      "timing    timing"
+      "telemetry strategy";
+    align-items: stretch;
   }
 
-  .panel-wide {
-    grid-column: span 2;
+  .board:has(.panel-wide) {
+    grid-template-areas:
+      "track     track"
+      "timing    timing"
+      "telemetry telemetry"
+      "strategy  .";
+  }
+
+  .board-stack,
+  .board:has(.panel-wide) .board-stack {
+    display: contents;
   }
 }
 
 @media (max-width: 700px) {
-  .board-bottom {
-    grid-template-columns: 1fr;
+  .board,
+  .board:has(.panel-wide) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: none;
   }
 
-  .panel-wide {
-    grid-column: auto;
+  .board .panel {
+    grid-area: auto;
   }
 }
 
@@ -1055,16 +1102,16 @@ select.btn {
     animation: panel-in 240ms ease-out both;
   }
 
-  .page-intro .board-top .panel:nth-child(2),
-  .page-intro .board-bottom .panel:nth-child(2) {
+  .page-intro .board-timing,
+  .page-intro .board-strategy {
     animation-delay: 60ms;
   }
 
-  .page-intro .board-bottom .panel:nth-child(3) {
+  .page-intro .board-stack .panel:first-child {
     animation-delay: 120ms;
   }
 
-  .page-intro .board-bottom .panel:nth-child(4) {
+  .page-intro .board-stack .panel:last-child {
     animation-delay: 180ms;
   }
 
