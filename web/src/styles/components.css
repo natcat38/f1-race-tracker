@@ -1764,17 +1764,23 @@ select.btn {
     display: contents;
   }
 
+  /* The strip is first in the DOM (StatusRail), so it is first on screen with no
+     `order` and Tab visits it in the order the eye does. It wraps into up to
+     three lines inside one sticky box: the 48px working row (clock, state glyph,
+     Pause, tabs), a 2px replay-position line, and the section chips. On Overlay
+     and Settings only the first line exists and the strip stays 48px. */
   .rail-strip {
     display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
     align-items: center;
-    gap: var(--sp-3);
-    order: -1;
+    column-gap: var(--sp-1);
+    row-gap: 0;
     position: sticky;
     /* Above the panels, below the skip link (z-index 10) — the skip link is
        pinned over this exact corner and must never end up behind it. */
     top: 0;
     z-index: 5;
-    min-height: 48px;
     /* env() resolves to 0 without viewport-fit=cover in index.html's viewport
        meta, which is why that attribute is not optional here. */
     padding: env(safe-area-inset-top) max(var(--sp-3), env(safe-area-inset-right))
@@ -1784,16 +1790,101 @@ select.btn {
     border-radius: var(--radius);
   }
 
-  .rail-block {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: var(--sp-3);
+  /* DOM order is visual order on a phone, so the desktop `order` values (which
+     interleave the strip's clusters with the block's) are reset here. */
+  .rail-strip > .rail-cluster {
     order: 0;
-    padding: var(--sp-2) var(--sp-3);
+    min-height: 48px;
+  }
+
+  /* The block is a two-column grid: the identity stack on the left, the two exit
+     icons on the right of its first line. Conditions ride the session line (see
+     StatusRail) and the transport lives in the strip and the Track plate, so the
+     block is only as tall as three short lines. */
+  .rail-block {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--sp-2);
+    row-gap: 0;
+    order: 0;
+    padding: var(--sp-1) var(--sp-3);
     background: var(--carbon);
     border: 1px solid var(--edge);
     border-radius: var(--radius);
+  }
+
+  .rail-identity {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    align-items: baseline;
+    column-gap: var(--sp-2);
+    row-gap: 0;
+    min-width: 0;
+  }
+
+  /* One line, cut with an ellipsis rather than wrapped: inline spans (not the
+     desktop flex row) so text-overflow can reach the route name. */
+  .rail-brand {
+    display: block;
+    flex: 1 0 100%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .rail-brand-sep {
+    margin-inline: var(--sp-2);
+  }
+
+  .rail-session {
+    letter-spacing: 0.04em;
+  }
+
+  .rail-wx {
+    letter-spacing: 0;
+    font-family: var(--data);
+    font-size: var(--fs-sm);
+    color: var(--slate);
+    white-space: nowrap;
+  }
+
+  .rail-lane {
+    flex: 1 0 100%;
+  }
+
+  .rail-exits {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .rail-controls {
+    grid-column: 1 / -1;
+  }
+
+  /* Phone page rhythm: the 24px gap that separates panels on desktop was 48px of
+     the first screen between the strip, the block and the map, and the 24px side
+     padding left a 316px working row at 390 for a clock, a lap, a state glyph, a
+     44px Pause and two tabs. 12px sides give the strip 340px. */
+  .page {
+    padding: var(--sp-2) var(--sp-3);
+    padding-left: max(var(--sp-3), env(safe-area-inset-left));
+    padding-right: max(var(--sp-3), env(safe-area-inset-right));
+    gap: var(--sp-2);
+  }
+
+  /* 8px keeps the strip and the block reading as one masthead; the board gets a
+     little more air under it. */
+  .route-main {
+    margin-top: var(--sp-1);
+  }
+
+  /* A jump must not land under the sticky strip: 48 working row + 2 position line
+     + 36 chip row = 86px, plus the notch inset, plus a hairline of air. */
+  .route-main,
+  .panel {
+    scroll-margin-top: calc(env(safe-area-inset-top) + 96px);
   }
 
   /* No seams on the phone: the two boxes already separate readouts from the
@@ -1806,7 +1897,7 @@ select.btn {
   }
 
   .rail-instruments {
-    gap: var(--sp-3);
+    gap: var(--sp-2);
   }
 
   /* Both wrappers are grid items of .page now, and a grid item's automatic
@@ -1848,6 +1939,143 @@ select.btn {
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--chalk);
+  }
+
+  /* Pause/Play, drawn icon only. 44x44 inside the 48px row; the border is the
+     tab's, so it reads as a sibling of BOARD and OVERLAY and not as a chip. */
+  .rail-strip-transport {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--edge);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--chalk);
+    cursor: pointer;
+  }
+
+  .rail-strip-transport:hover {
+    background: var(--hover-wash);
+    border-color: var(--slate);
+  }
+
+  /* Where the replay is, as a hairline under the working row. It is also the
+     seam between the row and the chips. Not a control: the scrubber is in the
+     Track plate. scaleX, not width, so it animates on the compositor at 60 Hz. */
+  .rail-progress {
+    flex: 1 0 100%;
+    height: 2px;
+    background: var(--edge);
+    overflow: hidden;
+  }
+
+  .rail-progress-fill {
+    display: block;
+    height: 100%;
+    background: var(--slate);
+    transform-origin: left center;
+  }
+
+  .rail-sections {
+    flex: 1 0 100%;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding-block: var(--sp-1);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .rail-sections::-webkit-scrollbar {
+    display: none;
+  }
+
+  .rail-section-chip {
+    flex: none;
+    min-height: 28px;
+    padding: 0 var(--sp-3);
+    border: 1px solid var(--edge);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--slate);
+    font-family: var(--display);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .rail-section-chip:hover {
+    background: var(--hover-wash);
+    border-color: var(--slate);
+    color: var(--chalk);
+  }
+
+  /* Comms and Race Control as <details> (Panel `collapsed`). The summary is the
+     panel plate and must look like one, minus the UA's disclosure triangle,
+     which is replaced by a drawn chevron on the right. */
+  /* flex-start, not the plate's space-between: with a summary there are three
+     items, and space-between would park the count in the middle. The title takes
+     the free space instead, which pins the count and chevron to the right. */
+  .panel-collapsible > summary {
+    list-style: none;
+    cursor: pointer;
+    min-height: 44px;
+    justify-content: flex-start;
+  }
+
+  .panel-collapsible > summary h2 {
+    margin-right: auto;
+  }
+
+  .panel-collapsible > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .panel-collapsible > summary::after {
+    content: "";
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg) translateY(-2px);
+  }
+
+  .panel-collapsible[open] > summary::after {
+    transform: rotate(-135deg);
+  }
+
+  .panel-collapsible:not([open]) > summary {
+    border-bottom: none;
+  }
+
+  .panel-summary {
+    font-family: var(--data);
+    font-size: var(--fs-sm);
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--slate);
+  }
+
+  /* The scrubber in the Track plate: takes what the title leaves. */
+  .panel-scrub {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: var(--sp-2);
+    min-width: 0;
+  }
+
+  .panel-scrub .range-dark {
+    flex: 1 1 0;
+    min-width: 0;
   }
 }
 
@@ -1903,6 +2131,34 @@ select.btn {
 
   .rail-lane {
     display: block;
+  }
+}
+
+/* The working row has to carry clock, lap, state glyph, a 44px Pause and two tabs:
+   340px of room at 390 and 270px at 320. Measured, not guessed: at 390 the tabs
+   wrapped to a second line (the whole strip grew from 48 to 96px), and at 320 the
+   clock itself was clipped. Narrower phones shed the least-watched items first. */
+@media (max-width: 420px) {
+  .rail-strip .rail-tab {
+    padding-inline: var(--sp-1);
+  }
+}
+
+/* The lap counter goes first: it is the slowest-moving number in the strip. */
+@media (max-width: 380px) {
+  .rail-strip .rail-metric + .rail-metric {
+    display: none;
+  }
+}
+
+/* The resting REPLAY / LIVE glyph goes next. Its words are repeated in full in the
+   block (.rail-lane), and an exception chip (offline, stale, reconnecting) is not
+   resting, so it still shows. */
+@media (max-width: 340px) {
+  /* The :not() chain repeats the base rule's, which forces display: block at
+     (0,5,0) on every non-exception chip; this has to outrank it. */
+  .rail-strip .rail-state .chip-resting:not(:has(.chip-action)):not(.chip-reconnect):not(.chip-warm) {
+    display: none;
   }
 }
 

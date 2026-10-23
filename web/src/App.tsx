@@ -15,9 +15,10 @@ import { Comms } from './components/Comms';
 import { RaceControl } from './components/RaceControl';
 import { Panel } from './components/Panel';
 import { Route } from './components/Route';
-import { StatusRail } from './components/StatusRail';
+import { StatusRail, type SectionLink, type StripTransport } from './components/StatusRail';
 import { leaderOf, updateLapHistory, updateGapHistory } from './components/timingHelpers';
 import { useStale } from './hooks/useStale';
+import { PHONE_QUERY, useMediaQuery } from './hooks/useMediaQuery';
 import { useRollingHistory } from './hooks/useRollingHistory';
 import { Ghost } from './components/Ghost';
 import { Settings } from './components/Settings';
@@ -28,6 +29,23 @@ import { buildHash, parseHash } from './routing';
 // How long the clip-wrapped notice stays up. Long enough to be read after the
 // clock visibly jumps, short enough not to become part of the chrome.
 const LOOP_NOTICE_MS = 8000;
+
+// The phone's section row: one chip per panel a reader would want to jump to.
+// Telemetry is left off — it sits between Timing and Strategy and follows the
+// selected car, so it is reached by selecting one. ids match the <Panel id> props.
+const SECTIONS: SectionLink[] = [
+  { id: 'track', label: 'Track' },
+  { id: 'timing', label: 'Timing' },
+  { id: 'strategy', label: 'Strategy' },
+  { id: 'comms', label: 'Comms' },
+  { id: 'race-control', label: 'Race control' },
+];
+
+// The closed Race Control panel's one-line state.
+function messageCount(n: number): string {
+  if (n === 0) return 'No incidents';
+  return n === 1 ? '1 message' : `${n} messages`;
+}
 
 // Four distinct reasons the map is missing, so the copy never contradicts what
 // the rest of the board is showing: an unrecoverable static-demo load failure,
@@ -198,6 +216,9 @@ export default function App() {
   const [replayTMs, setReplayTMs] = useState(0);
   const replayTMsRef = useRef(0);
   const replayRafRef = useRef<number | undefined>(undefined);
+  // On a phone the transport lives in the sticky strip and the scrubber in the
+  // Track panel's plate, so the scroll-away block carries neither.
+  const phone = useMediaQuery(PHONE_QUERY);
   const replayStartRef = useRef(0);
   useEffect(() => {
     if (!STATIC_DEMO || !replayDuration || replayPaused || routeName !== 'board') return;
@@ -224,6 +245,40 @@ export default function App() {
     setReplayTMs(v);
     replayRef.current?.scrub(v);
   }
+
+  // The replay is controllable only once the static clip has loaded and told us its
+  // length. Until then (and on the live lane) the verb is the render-only Freeze.
+  const replayReady = STATIC_DEMO && replayDuration > 0;
+
+  const replayScrubber = (
+    <>
+      <input
+        type="range"
+        className="range-dark"
+        min={0}
+        max={Math.max(0, replayDuration - 1)}
+        step={100}
+        value={Math.floor(replayTMs)}
+        onChange={(e) => scrubReplay(Number(e.target.value))}
+        aria-label="Replay position"
+        aria-valuetext={fmtElapsed(replayTMs)}
+        style={{ minWidth: 80, flex: '1 1 120px' }}
+      />
+      <span className="rail-scrub-clock">{fmtElapsed(replayTMs)}</span>
+    </>
+  );
+
+  // What the phone's sticky strip carries, so Pause never scrolls out of reach.
+  // The labels name the action the button will take, as the desktop button does.
+  const transport: StripTransport = replayReady
+    ? {
+        playing: !replayPaused,
+        onToggle: toggleReplayPaused,
+        pauseLabel: 'Pause replay',
+        playLabel: 'Play replay',
+        progress: replayTMs / Math.max(1, replayDuration - 1),
+      }
+    : { playing: !frozen, onToggle: toggleFrozen, pauseLabel: 'Freeze board', playLabel: 'Resume board' };
 
   // A rival only makes sense alongside a primary selection, and never as the
   // same car as the primary — derived rather than synced via effect.
@@ -335,7 +390,7 @@ export default function App() {
           // Zone D. The lane pick and the transport verb travel together now:
           // at 1440 they used to land on different rows a thousand pixels apart,
           // because the rail wrapped wherever it happened to run out of room.
-          controls={
+          controls={phone ? (STATIC_DEMO ? undefined : <SourceToggle state={state} />) : (
             <>
               {!STATIC_DEMO && <SourceToggle state={state} />}
               {/* The static demo paces itself client-side (staticReplay.ts), so unlike
@@ -343,24 +398,12 @@ export default function App() {
                   real transport controls instead of the render-only Freeze toggle below.
                   ponytail: live-lane pause/scrub deferred, needs a writer-side protocol
                   change (verify/03-06-playback-and-readme.md item 3). */}
-              {STATIC_DEMO && replayDuration > 0 ? (
+              {replayReady ? (
                 <>
                   <button type="button" className="btn rail-divided" onClick={toggleReplayPaused}>
                     {replayPaused ? '▶ Play' : '⏸ Pause'}
                   </button>
-                  <input
-                    type="range"
-                    className="range-dark"
-                    min={0}
-                    max={Math.max(0, replayDuration - 1)}
-                    step={100}
-                    value={Math.floor(replayTMs)}
-                    onChange={(e) => scrubReplay(Number(e.target.value))}
-                    aria-label="Replay position"
-                    aria-valuetext={fmtElapsed(replayTMs)}
-                    style={{ minWidth: 80, flex: '1 1 120px' }}
-                  />
-                  <span className="rail-scrub-clock">{fmtElapsed(replayTMs)}</span>
+                  {replayScrubber}
                 </>
               ) : (
                 /* Label swap rather than aria-pressed, matching the overlay's existing
@@ -372,7 +415,9 @@ export default function App() {
                 </button>
               )}
             </>
-          }
+          )}
+          transport={transport}
+          sections={SECTIONS}
           // Zone C, beside the connection chip: these are readouts of transport
           // state, not controls, and they belong in the reserved slot so the rail
           // does not change shape for eight seconds every time the clip wraps.
@@ -409,7 +454,11 @@ export default function App() {
       }
     >
       <div className="board-top">
-        <Panel label="Track">
+        <Panel
+          label="Track"
+          id="track"
+          actions={phone && replayReady ? <div className="panel-scrub">{replayScrubber}</div> : undefined}
+        >
           {(status === 'reconnecting' || status === 'offline') && !showSkeleton && (
             <div style={{ position: 'relative', display: 'inline-block' }}>
               <Map state={state} paused={frozen || replayPaused} selected={selected} rival={effectiveRival} />
@@ -434,7 +483,7 @@ export default function App() {
             />
           )}
         </Panel>
-        <Panel label="Timing">
+        <Panel label="Timing" id="timing">
           <TimingTower state={state} selected={selected} onSelect={setSelected} />
         </Panel>
       </div>
@@ -453,13 +502,22 @@ export default function App() {
             onRivalChange={setRival}
           />
         </Panel>
-        <Panel label="Strategy">
+        <Panel label="Strategy" id="strategy">
           <StintChart state={state} selected={selected} rival={effectiveRival} />
         </Panel>
-        <Panel label="Comms">
+        <Panel label="Comms" id="comms" collapsed={phone}>
           <Comms state={state} />
         </Panel>
-        <Panel label="Race Control">
+        <Panel
+          label="Race Control"
+          id="race-control"
+          collapsed={phone}
+          summary={isWarmingUp(state) ? undefined : (
+            // Polite status, because a closed panel's log is not announced: the
+            // count still changes in the reader's ear when a message arrives.
+            <span role="status" aria-live="polite">{messageCount(state.messages.length)}</span>
+          )}
+        >
           <RaceControl state={state} selected={selected} />
         </Panel>
       </div>

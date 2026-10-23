@@ -2,6 +2,8 @@
 
 import type { ReactNode } from 'react';
 import type { RaceState } from '../state/race';
+import { PHONE_QUERY, useMediaQuery } from '../hooks/useMediaQuery';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 import type { ConnStatus } from '../realtime/socket';
 import { StatusBadge, RestingLaneLine } from './StatusBadge';
 import { fmtClock, leaderLapOf } from './timingHelpers';
@@ -33,6 +35,54 @@ const ROUTE_TITLES = {
   settings: 'F1TV link',
 } as const;
 
+/**
+ * The transport verb the phone's sticky strip carries: Pause/Play for the static
+ * replay, Freeze/Resume for the live lane. `progress` (0 to 1) draws the thin
+ * position line under the strip and is omitted where there is no position.
+ */
+export interface StripTransport {
+  playing: boolean;
+  onToggle: () => void;
+  pauseLabel: string;
+  playLabel: string;
+  progress?: number;
+}
+
+/** One jump target in the phone's section row: the panel's DOM id and its chip text. */
+export interface SectionLink {
+  id: string;
+  label: string;
+}
+
+// Drawn, not a glyph: the strip button is icon-only, and the pause and play
+// characters render from whatever emoji font the phone has. 20px box, currentColor.
+function TransportIcon({ playing }: { playing: boolean }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+      {playing ? (
+        <>
+          <rect x="4.5" y="3.5" width="3.5" height="13" rx="0.75" fill="currentColor" />
+          <rect x="12" y="3.5" width="3.5" height="13" rx="0.75" fill="currentColor" />
+        </>
+      ) : (
+        <path d="M6 3.8v12.4a.6.6 0 0 0 .92.5l9.6-6.2a.6.6 0 0 0 0-1L6.92 3.3A.6.6 0 0 0 6 3.8Z" fill="currentColor" />
+      )}
+    </svg>
+  );
+}
+
+// Jump to a panel, open it if it is a collapsed <details>, and put keyboard focus
+// on its heading so the next Tab continues from there rather than from the chip.
+// Not an <a href="#id">: this app routes on the hash, and '#track' would be read
+// as an unknown route and remount the board.
+function jumpTo(id: string, reduced: boolean) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (el instanceof HTMLDetailsElement) el.open = true;
+  el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+  el.querySelector<HTMLElement>('h2')?.focus({ preventScroll: true });
+}
+
 // One instrument: a value over the 11px uppercase label that says what it is.
 // A row of bare numbers is a readout; a row of labelled numbers is a cluster,
 // and the labels are the only thing that turns one into the other.
@@ -59,7 +109,7 @@ function Metric({ label, title, children }: {
 // control, and an empty cluster there would show as a stray hairline.
 export function StatusRail({
   active, state, status, staleSec, note, onReconnect, laneNamedElsewhere,
-  controls, stateChips,
+  controls, stateChips, transport, sections,
 }: {
   active: 'board' | 'ghost' | 'settings';
   state?: RaceState;
@@ -72,7 +122,13 @@ export function StatusRail({
   controls?: ReactNode;
   /** Zone C: transient state the route owns, e.g. the board's FROZEN/loop region. */
   stateChips?: ReactNode;
+  /** Phone only: the transport verb the sticky strip carries, so it never scrolls away. */
+  transport?: StripTransport;
+  /** Phone only: the section chips under the strip. The board passes them; other routes do not. */
+  sections?: SectionLink[];
 }) {
+  const phone = useMediaQuery(PHONE_QUERY);
+  const reducedMotion = useReducedMotion();
   // The race leader's current lap, out of the session's total — the recorder bakes
   // both from FastF1's lap data (ingest/record.py's _lap_number / TOTAL_LAPS), so
   // this is exact, not a derived estimate like Gap/Int. See leaderLapOf for why it
@@ -90,73 +146,11 @@ export function StatusRail({
     // The two wrappers below are `display: contents` on desktop — they exist only
     // so the phone breakpoint can lift the strip clusters into one sticky bar
     // without duplicating a single node (a second <nav> would give two
-    // aria-current targets and two tab stops for the same link).
+    // aria-current targets and two tab stops for the same link). The strip comes
+    // first in the DOM because it is first on screen on a phone: it used to be
+    // last in the DOM and pulled to the top with `order: -1`, so Tab visited the
+    // transport and the exit links before the tabs it sits beside (WCAG 1.3.2).
     <header className="rail">
-      <div className="rail-block">
-        <div className="rail-cluster rail-identity">
-          {/* The route's <h1>. Route no longer renders one — two would break the
-              chain this comment block exists to keep straight. */}
-          <h1 className="rail-brand">
-            F1 Race Tracker
-            <span className="rail-brand-sep" aria-hidden="true">·</span>
-            <span className="rail-route">{ROUTE_TITLES[active]}</span>
-          </h1>
-          {state?.label && <span className="rail-session">{state.label}</span>}
-          {note && <span className="rail-note">{note}</span>}
-          {state && (
-            <RestingLaneLine
-              status={status ?? 'connecting'}
-              state={state}
-              staleSec={staleSec}
-              laneNamedElsewhere={laneNamedElsewhere}
-            />
-          )}
-        </div>
-
-        {/* Conditions live in the block rather than beside the clock so the phone
-            breakpoint can leave them behind: the sticky 48px strip carries only
-            what is watched continuously (clock, lap, an exception, the tabs),
-            and track temperature is read once. On desktop `order` puts this
-            cell back where it belongs — the last instrument in the cluster. */}
-        {weather && (
-          <div className="rail-cluster rail-conditions">
-            <Metric label="Track / Air" title="Baked from session weather data">
-              <span className="rail-lap">
-                {weather.trackTempC.toFixed(0)}° / {weather.airTempC.toFixed(0)}°
-                {weather.rainfall && <span style={{ color: 'var(--rain)' }}> · RAIN</span>}
-              </span>
-            </Metric>
-          </div>
-        )}
-
-        {controls && <div className="rail-cluster rail-controls">{controls}</div>}
-
-        <div className="rail-cluster rail-exits">
-          <a
-            className={active === 'settings' ? 'rail-repo rail-repo-active' : 'rail-repo'}
-            href="#settings"
-            aria-current={active === 'settings' ? 'page' : undefined}
-          >
-            <span className="rail-repo-glyph" aria-hidden="true">⚙</span>
-            <span className="rail-repo-text">F1TV<span className="rail-repo-long"> Link</span></span>
-          </a>
-          {/* Deliberately outside <nav>: this is a way out of the app, not a fifth
-              view. It is the only path from any route back to the project, which
-              for a portfolio piece is the whole point of the artefact. */}
-          <a
-            className="rail-repo"
-            href={REPO_URL}
-            target="_blank"
-            rel="noreferrer"
-            title="Project source on GitHub"
-          >
-            <span className="rail-repo-glyph" aria-hidden="true">↗</span>
-            <span className="rail-repo-text">GitHub<span aria-hidden="true"> ↗</span></span>
-            <span className="visually-hidden"> (opens in a new tab)</span>
-          </a>
-        </div>
-      </div>
-
       <div className="rail-strip">
         {hasInstruments && (
           <div className="rail-cluster rail-instruments">
@@ -202,6 +196,21 @@ export function StatusRail({
 
         <span className="rail-cluster rail-spacer" aria-hidden="true" />
 
+        {/* Phone only, and rendered rather than hidden: a node that CSS hides is
+            still a second "Replay position"/"Pause" for tests and tooling, and the
+            strip is the only place on a phone that cannot scroll away. The verb
+            names the action it will take, as the desktop button does. */}
+        {phone && transport && (
+          <button
+            type="button"
+            className="rail-strip-transport"
+            onClick={transport.onToggle}
+            aria-label={transport.playing ? transport.pauseLabel : transport.playLabel}
+          >
+            <TransportIcon playing={transport.playing} />
+          </button>
+        )}
+
         <nav className="rail-cluster rail-tabs" aria-label="Views">
           {TABS.map((t) => (
             <a
@@ -215,6 +224,104 @@ export function StatusRail({
             </a>
           ))}
         </nav>
+
+        {phone && transport?.progress != null && (
+          <span className="rail-progress" aria-hidden="true">
+            <span
+              className="rail-progress-fill"
+              style={{ transform: `scaleX(${Math.min(1, Math.max(0, transport.progress))})` }}
+            />
+          </span>
+        )}
+
+        {phone && sections && sections.length > 0 && (
+          <nav className="rail-sections" aria-label="Jump to section">
+            {sections.map((sec) => (
+              <button
+                key={sec.id}
+                type="button"
+                className="rail-section-chip"
+                onClick={() => jumpTo(sec.id, reducedMotion)}
+              >
+                {sec.label}
+              </button>
+            ))}
+          </nav>
+        )}
+      </div>
+
+      <div className="rail-block">
+        <div className="rail-cluster rail-identity">
+          {/* The route's <h1>. Route no longer renders one — two would break the
+              chain this comment block exists to keep straight. */}
+          <h1 className="rail-brand">
+            F1 Race Tracker
+            <span className="rail-brand-sep" aria-hidden="true">·</span>
+            <span className="rail-route">{ROUTE_TITLES[active]}</span>
+          </h1>
+          {state?.label && <span className="rail-session">{state.label}</span>}
+          {/* The phone's block has no room for a cluster of its own, so conditions
+              ride the session line there; on wider screens the .rail-conditions
+              cluster below carries them. One or the other is rendered, never both. */}
+          {phone && weather && (
+            <span className="rail-wx">
+              {weather.trackTempC.toFixed(0)}° / {weather.airTempC.toFixed(0)}°
+              {weather.rainfall && <span style={{ color: 'var(--rain)' }}> · RAIN</span>}
+            </span>
+          )}
+          {note && <span className="rail-note">{note}</span>}
+          {state && (
+            <RestingLaneLine
+              status={status ?? 'connecting'}
+              state={state}
+              staleSec={staleSec}
+              laneNamedElsewhere={laneNamedElsewhere}
+            />
+          )}
+        </div>
+
+        {/* Conditions live in the block rather than beside the clock so the phone
+            breakpoint can leave them behind: the sticky 48px strip carries only
+            what is watched continuously (clock, lap, an exception, the tabs),
+            and track temperature is read once. On desktop `order` puts this
+            cell back where it belongs — the last instrument in the cluster. */}
+        {!phone && weather && (
+          <div className="rail-cluster rail-conditions">
+            <Metric label="Track / Air" title="Baked from session weather data">
+              <span className="rail-lap">
+                {weather.trackTempC.toFixed(0)}° / {weather.airTempC.toFixed(0)}°
+                {weather.rainfall && <span style={{ color: 'var(--rain)' }}> · RAIN</span>}
+              </span>
+            </Metric>
+          </div>
+        )}
+
+        {controls && <div className="rail-cluster rail-controls">{controls}</div>}
+
+        <div className="rail-cluster rail-exits">
+          <a
+            className={active === 'settings' ? 'rail-repo rail-repo-active' : 'rail-repo'}
+            href="#settings"
+            aria-current={active === 'settings' ? 'page' : undefined}
+          >
+            <span className="rail-repo-glyph" aria-hidden="true">⚙</span>
+            <span className="rail-repo-text">F1TV<span className="rail-repo-long"> Link</span></span>
+          </a>
+          {/* Deliberately outside <nav>: this is a way out of the app, not a fifth
+              view. It is the only path from any route back to the project, which
+              for a portfolio piece is the whole point of the artefact. */}
+          <a
+            className="rail-repo"
+            href={REPO_URL}
+            target="_blank"
+            rel="noreferrer"
+            title="Project source on GitHub"
+          >
+            <span className="rail-repo-glyph" aria-hidden="true">↗</span>
+            <span className="rail-repo-text">GitHub<span aria-hidden="true"> ↗</span></span>
+            <span className="visually-hidden"> (opens in a new tab)</span>
+          </a>
+        </div>
       </div>
     </header>
   );
