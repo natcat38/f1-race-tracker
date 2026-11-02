@@ -21,7 +21,7 @@ Exit: user has signed off the product scope. Skills: superpowers:brainstorming, 
 
 - [x] `docs/Tech_Scope.md`: stack with versions · data model sketch · core logic/formulae with a worked example · numbered tasks in vertical slices (each ends runnable + committed) · ⚠️ gotchas · test strategy per slice. (`docs/F1_Race_Tracker_Tech_Scope.md`)
 - [x] One ADR in `docs/adr/` per non-obvious decision, written when the decision is made, not after. (ADR-0001…0009)
-- [ ] `docs/Design_Direction.md` (any project with a UI): ground it in the subject's own world. Tokens: 4–6 named colors, 2–3 typefaces with roles, layout concept. One signature element; restraint everywhere else. Explicit loading/empty/error states with copy. Quality floor: focus visible, contrast, reduced motion, responsive to 375px. Self-check: "what would the generic default be, and where did I deviate?" (tokens live in `web/src/styles/tokens.css`; no written direction doc yet)
+- [x] `docs/Design_Direction.md` (any project with a UI): ground it in the subject's own world. Tokens: 4–6 named colors, 2–3 typefaces with roles, layout concept. One signature element; restraint everywhere else. Explicit loading/empty/error states with copy. Quality floor: focus visible, contrast, reduced motion, responsive to 375px. Self-check: "what would the generic default be, and where did I deviate?" (`docs/Design_Direction.md`, written 2026-11-03 from the shipped app; tokens stay in `web/src/styles/tokens.css`, #124)
 
 Exit: numbered vertical slices exist and the user approves. Skills: superpowers:writing-plans, to-issues, hallmark (design direction).
 
