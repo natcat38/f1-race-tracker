@@ -6,6 +6,11 @@ host command, and the resulting token is copied into ./secrets/ for the compose
 mount. Nothing here is ever asked for or stored by this project: fastf1 owns the
 login, the cache, and the verification.
 
+Uses fastf1 3.9's `fastf1.internals.f1account` and pins its "browser" sign-in method.
+fastf1's default method ("password") would prompt for F1_USERNAME / F1_PASSWORD in
+this terminal; that is deliberately not used, so the credentials never pass through
+this project's process.
+
     python ingest/f1tv_link.py              # sign in (prints a URL to open)
     python ingest/f1tv_link.py --status     # are we signed in, and until when
     python ingest/f1tv_link.py --unlink     # forget the sign-in, here and in ./secrets
@@ -16,9 +21,14 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from f1tv_auth import auth_status, default_token_path
+from f1tv_auth import TOKEN_FILENAME, auth_status, default_token_path
 
-SECRETS_COPY = Path(__file__).resolve().parent.parent / "secrets" / "fastf1" / "f1auth.json"
+SECRETS_DIR = Path(__file__).resolve().parent.parent / "secrets" / "fastf1"
+SECRETS_COPY = SECRETS_DIR / TOKEN_FILENAME
+# fastf1 3.8 wrote a raw JWT here; nothing reads it any more, so --unlink removes it too.
+LEGACY_SECRETS_COPY = SECRETS_DIR / "f1auth.json"
+# fastf1 3.9's sign-in method that hands the login to the f1login browser extension.
+AUTH_METHOD = "browser"
 EXTENSION_URL = "https://f1login.fastf1.dev"
 ACCOUNT_URL = "https://account.formula1.com"
 SETTINGS_URL = "http://localhost:8080/#settings"
@@ -80,15 +90,22 @@ def do_link():
     print("     (FastF1's own extension - it is what hands the sign-in to this machine)")
     print()
     print("A URL will print below. Open it in the browser that has the extension.")
-    print("You will also see a line saying an active F1TV subscription is required -")
-    print("that is expected, not a rejection. A free account signs in fine.")
+    print("fastf1 reports an error if the login carries no F1 TV subscription")
+    print("token, so a free account may be refused below.")
     print()
     sys.stdout.flush()
 
     # Imported here, not at module level: only signing in needs fastf1.
-    from fastf1.internals.f1auth import get_auth_token
+    from fastf1.exceptions import F1AuthError
+    from fastf1.internals.f1account import get_token
 
-    if not get_auth_token():
+    try:
+        token = get_token(method=AUTH_METHOD)
+    except F1AuthError as exc:
+        token = None
+        print(f"\nfastf1 reported: {exc}", file=sys.stderr)
+
+    if not token:
         print("\nSign-in failed - no token was returned.", file=sys.stderr)
         print("Most likely the f1login extension is not installed, or the URL was opened",
               file=sys.stderr)
@@ -119,9 +136,10 @@ def main():
     if args.status:
         print_status(auth_status())
     elif args.unlink:
-        from fastf1.internals.f1auth import clear_auth_token
-        clear_auth_token()
+        from fastf1.internals.f1account import clear_token
+        clear_token()
         SECRETS_COPY.unlink(missing_ok=True)
+        LEGACY_SECRETS_COPY.unlink(missing_ok=True)
         print("Signed out. The cached sign-in and the docker copy are both gone.")
     else:
         do_link()
