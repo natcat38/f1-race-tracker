@@ -2,9 +2,11 @@
 
 # F1 Race Tracker
 
-![Pit-wall board — Monza 2024 replay: track map, timing tower, telemetry, strategy, comms and race control](docs/assets/board.png)
+![Pit-wall board — Monza 2024 replay on lap 3: track map with corner numbers, the start/finish line and the sector-dominance heatmap, the timing tower with sector shading, the strategy chart, and the static demo's Pause and scrub bar](docs/assets/board.png)
 
 An F1 race tracker that puts you on the pit wall — watch the cars on circuit, read the gaps, tyres, sector times and team radio like a race engineer, and dig into where a car is losing time. Built as a polyglot stack: Python ingests position data, Redis is the seam, a Go gateway fans it out over WebSocket, and a React SPA renders an interactive track map updating at 10 Hz. The design is track-map-first: car positions on circuit are the primary view.
+
+![The track map replaying Monza 2024: twenty cars round the circuit at 10 Hz over the sector-dominance heatmap](docs/assets/board-replay.gif)
 
 **One gateway sustained 1,000 concurrent WebSocket viewers at 10 Hz** — p99 fan-out latency of 48 ms, zero dropped clients, on a single laptop. See [BENCHMARKS.md](BENCHMARKS.md).
 
@@ -13,11 +15,15 @@ An F1 race tracker that puts you on the pit wall — watch the cars on circuit, 
 - **Track-map-first design** — positions on circuit are the primary view, not an afterthought table, with corner numbers and the start/finish line baked onto the outline as fixed track furniture.
 - **Pit-wall timing tower** — beside the map the board shows a live timing tower with gaps/intervals, last lap, tyres, and sector times for every car; a car in the pit lane shows `IN PIT` instead of a stale gap, and dims on the track map. Click any driver to open a per-car telemetry panel (speed, gear, throttle, brake, DRS, lap-time and gap trend sparklines) sourced from the same 10 Hz frame, with a "vs" picker for a side-by-side two-car telemetry compare that also charts throttle/brake/gear pedal traces over lap distance, so the two cars line up by track position rather than by clock time.
 - **Sector and lap-pace signal** — session-best and personal-best sector shading; click a row to set it as the reference car and every other row's sector delta switches to "how much am I losing to *them*, right now" instead of your own best. The track map carries the same idea forward as a sector-dominance heatmap — a minisector-by-minisector coloring of whichever driver was fastest through that stretch of track.
-- **Strategy timeline** — a full-race stint chart (compound + stint length per driver) baked once per session, with each pit stop's duration on the timeline, so the pit-stop story — undercuts, tyre choice, stint length — reads at a glance instead of disappearing the moment a stop happens.
+- **Strategy timeline** — a full-race stint chart (compound + stint length per driver) baked once per session, with a tick at each pit stop that carries the stop's duration (hover or screen reader), so the pit-stop story — undercuts, tyre choice, stint length — reads at a glance instead of disappearing the moment a stop happens.
 - **Weather** — track/air temperature and a rain badge in the status rail, baked from the session's real weather samples.
 - **Team-radio comms layer** — a toggleable layer that auto-plays driver↔engineer radio in sync with the replay clock, with a now-playing banner and a short replayable history. The audio streams straight from F1's public URLs at play time — nothing is committed or downloaded — so the comms audio (only) needs network access; positions and timing stay fully offline from the committed clips. See [docs/adr/0003-team-radio-streamed-not-committed.md](docs/adr/0003-team-radio-streamed-not-committed.md).
 - **Race control feed** — a timestamped, rolling log of real session messages (flags, safety car, investigations), baked from the session's actual race-control feed and replayed in sync alongside the timing tower.
 - **Lap-delta overlay** — two reference laps replayed against each other on one map, side A solid and side B a translucent ghost, with a red/green delta bar showing exactly where a lap is won or lost round the circuit. Each side is a *(session, driver)* pick, so it covers both the same driver across two seasons and two drivers in the same race.
+
+| Two-car telemetry compare with pedal traces | Strategy timeline with pit-stop ticks |
+|---|---|
+| ![Telemetry compare — PIA vs LEC: speed, gear, DRS, throttle and brake bars, and throttle/brake/gear traces over lap distance, solid for the reference car and dashed for the rival](docs/assets/telemetry-compare.png) | ![Strategy timeline — Monza 2024 stint bars for all twenty drivers in compound colours, an orange tick at each pit stop, and the marker at the replay's current lap](docs/assets/strategy.png) |
 
 The product is judged first by whether it helps you understand how the car is performing. The engineering underneath — real-time, byte-identical across two languages — is what makes that possible at scale:
 
@@ -42,7 +48,7 @@ The default view shows the Monza 2024 race clip (replay lane) — laps 2–6, th
 
 ### Lap-delta overlay
 
-![Lap-delta overlay — VER solid vs LEC ghost, Monza 2024, each driver's fastest lap](docs/assets/overlay.png)
+![Lap-delta overlay — VER solid vs LEC ghost, Monza 2024, each driver's fastest lap, with the delta bar below: VER 0.98 s ahead at this point of the lap](docs/assets/overlay.png)
 
 Open <http://localhost:8080/#ghost> for **OVERLAY** — one track map replaying two reference laps against each other, side A solid and side B a translucent ghost, under a per-corner delta bar. Each side is picked independently as a *(session, driver)* pair, so the same view does both comparisons:
 
