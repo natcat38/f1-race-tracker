@@ -70,3 +70,18 @@ verification. We write no login code and never touch a credential.
 - **Storing or relaying the token** anywhere beyond fastf1's own cache and the
   read-only mounted copy.
 - **Making live the default.** The beta path is opt-in three times over.
+
+## Update 2026-11-02: second advisory on the declared msgpack pin
+
+A new advisory, GHSA-j586-36cw-2gc2, covers msgpack below 1.2.3. It hit two places:
+
+- The real install: `ingest/requirements.txt` allowed `msgpack>=1.2.1`, so 1.2.1 and
+  1.2.2 were still installable. The floor is now `>=1.2.3`.
+- The `--no-deps` audit of `requirements-live-nodeps.txt`, which reports signalrcore
+  1.0.2's declared `msgpack==1.1.2` again. That version is still never installed, so
+  CI now ignores this second ID next to PYSEC-2026-3625, on that one step only.
+
+The live link was verified against msgpack 1.2.1 on 2026-08-20. 1.2.3 is a patch
+release, but the live socket has not been re-run against it; the next live session
+should confirm it. Existing local venvs still hold 1.2.1 until
+`pip install -r ingest/requirements.txt` is re-run.

@@ -5,5 +5,5 @@ fastf1==3.8.3
 # numpy bumps are unblocked. Keep ci.yml, Dockerfile.live and pyproject.toml in step.
 numpy==2.5.3
 # Transitive via fastf1's CacheControl / signalrcore — pinned up from the resolved
-# 1.1.2 to fix GHSA-6v7p-g79w-8964.
-msgpack>=1.2.1,<2
+# 1.1.2 to fix GHSA-6v7p-g79w-8964, then to 1.2.3 for GHSA-j586-36cw-2gc2.
+msgpack>=1.2.3,<2
