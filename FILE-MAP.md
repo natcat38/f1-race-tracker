@@ -421,6 +421,7 @@ Architecture Decision Records — why the system is shaped the way it is. Read t
 | `0008-live-radio-rides-frames.md` | ADR-0008: live team radio rides frames, while replay radio stays fixed in the snapshot. |
 | `0009-overlay-absorbs-compare.md` | ADR-0009: the ghost overlay absorbs the side-by-side COMPARE view and addresses each side as a (session, driver) pair. |
 | `0010-track-furniture-and-pit-pedal-data-extend-existing-patterns.md` | ADR-0010: corners, pit stops, pedal traces, and sector dominance extend the existing contract patterns rather than introducing new ones. |
+| `0011-demo-opens-at-lap-2-phone-tower-cards-and-how-this-runs.md` | ADR-0011: the demo clip opens from lap 2, the phone timing tower uses compact cards with sectors behind a switch, and the static demo's gear opens a "How this runs" page. |
 
 ### `docs/agents`
 
@@ -530,4 +531,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-46 directories, 201 files listed, 0 without a declared purpose.
+46 directories, 202 files listed, 0 without a declared purpose.
