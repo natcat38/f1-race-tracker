@@ -402,6 +402,7 @@ Long-form documentation: product and technical scope, UX evaluations, and the su
 
 | File | Purpose |
 | --- | --- |
+| `Design_Direction.md` | The design direction for the web app: palette, type, layout, components and states, written from the app as it ships. |
 | `F1_Race_Tracker_Product_Scope.md` | Product scope: who this is for, what it shows them, and what it deliberately leaves out. |
 | `F1_Race_Tracker_Tech_Scope.md` | Technical scope: the stack, the tiers, and the code-level breakdown of how the pieces fit. |
 
@@ -532,4 +533,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-46 directories, 203 files listed, 0 without a declared purpose.
+46 directories, 204 files listed, 0 without a declared purpose.
