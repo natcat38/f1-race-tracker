@@ -28,6 +28,14 @@ Optional flags:
 
 The Docker `live` service runs this automatically using the Silverstone 2024 clip.
 
+## Why the clips are committed
+
+The three baked clips in `data/replays/` (about 70 MB together) are committed in full on
+purpose. The demo then runs fully offline from a plain clone, with no Git LFS and no fetch
+step, and the GitHub Pages build reads its clip straight from the checkout. Only team radio
+needs the network. The trade-off and its revisit point are in
+[ADR-0013](../docs/adr/0013-replay-clips-stay-committed.md).
+
 ## Bake a clip (`record.py`)
 
 ```bash
