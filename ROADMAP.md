@@ -54,7 +54,7 @@ Exit: findings addressed or explicitly waived. Skills: code-review, simplify, we
 
 ## 6 · Ship — recruiter-ready
 
-- [x] README rewrite: screenshots, architecture diagram, run-in-3-commands, "why I built this". (#86)
+- [x] README rewrite: screenshots, architecture diagram, run-in-3-commands, "why I built this". (#86; screenshots reshot 2026-11-03 against `docs/Design_Direction.md`, adding a replay GIF, the two-car telemetry compare and the strategy timeline, #124)
 - [ ] API docs/Swagger if applicable.
 - [x] Deployed demo link. (GitHub Pages static demo)
 - [ ] Final pass with /repo-review.
