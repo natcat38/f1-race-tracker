@@ -303,7 +303,7 @@ Architecture diagram (§2.1), GIF of the map + the two-year comparison, `docker 
 - **The Python side of the contract is inline** in `ingest/live.py` (and
   `ingest/record.py`) — there is no separate `ingest/model.py` or `ingest/normalise.py`
   as the plan imagined. The Go types in `internal/model/model.go` are the canonical
-  contract; the Python writer emits the byte-identical JSON shape directly. The one
+  contract; the Python writer emits the same JSON schema directly. The one
   shared Python helper that did emerge is `ingest/resample.py` (grid resampling and
   per-frame position reconciliation), used by `record.py`, `live_signalr.py`, and
   `check_live_contract.py`.
@@ -336,7 +336,7 @@ Architecture diagram (§2.1), GIF of the map + the two-year comparison, `docker 
   the web lint (`--max-warnings 0`) + build + test; the Python↔Go contract self-check
   (`ingest/check_live_contract.py`); a markdown link check over `README`/`CONTEXT`/`docs/`
   (lychee); and a `docker compose build` smoke test. `.github/workflows/okf.yml` separately
-  validates the `knowledge/` bundle. (`go test -race` is not gated yet.)
+  validates the `knowledge/` bundle. CI also runs `go test -race` and `staticcheck` on the Go side, so both are gated.
 - **Phase 5 grew the §2.2 contract** beyond what's shown there: `CarState` gained
   `Lap`; `Snapshot`/`Frame` gained `Weather`; `Snapshot` gained `Stints` (a
   per-driver, whole-race tyre-stint plan, baked once like `LapTrace` rather than
