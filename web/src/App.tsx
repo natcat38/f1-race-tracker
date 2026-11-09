@@ -163,8 +163,8 @@ export default function App() {
   const disconnectRef = useRef<() => void>(() => {});
   // Only meaningful on the static demo (STATIC_DEMO): the handle's pause/resume/
   // scrub, used by the replay transport below. Left null on the live/replay-lane
-  // WebSocket path, which has no such control surface (see verify/03-06's item 3
-  // — the live lane needs its own writer-side protocol, out of scope here).
+  // WebSocket path, which has no such control surface and never will: scrub is
+  // client-only on the static demo by decision (ADR-0014).
   const replayRef = useRef<StaticReplayHandle | null>(null);
   const [replayDuration, setReplayDuration] = useState(0);
   const [replayPaused, setReplayPaused] = useState(false);
