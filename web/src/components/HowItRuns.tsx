@@ -42,7 +42,7 @@ export function HowItRuns() {
             </li>
             <li>
               <strong>Redis</strong> is the seam between the languages. A Go replay
-              writer publishes byte-identical JSON to the same keys, so the gateway
+              writer publishes the same JSON schema to the same keys, so the gateway
               consumes either source without code changes.
             </li>
             <li>

@@ -498,22 +498,6 @@ Notes on F1 domain concepts: the event model, leaderboard rules.
 | `event-model.md` | The normalised JSON contract (CarState, Snapshot, Frame) shared identically by Python and Go. |
 | `leaderboard.md` | The running order, derived directly from car positions rather than stored separately. |
 
-### `memory`
-
-Portable cross-session agent memory: one fact per file, indexed by memory/MEMORY.md. Lives in the repo (not .claude/) so it survives machine and agent changes.
-
-| File | Purpose |
-| --- | --- |
-| `MEMORY.md` | Index of the repo's portable agent memory: one line per memory file, plus the convention for adding one. |
-| `code-review-level.md` | "Default /code-review effort (high --fix, max only when explicitly asked) is now in global ~/.claude/CLAUDE.md — this file keeps only the project-specific history" |
-| `f1-build-gotchas.md` | F1 tracker build/verify gotchas — vite wipes web/dist/.gitkeep; bench artifacts are canonical; no cgo locally so go test -race only works in CI; live SignalR feed needs F1TV auth; running the static demo locally needs a bake plus a temporary web/.env.local |
-| `f1-repo-review-2026-09-06.md` | "2026-09-06 full-repo re-review: 8 reports under reviews/2026-09-06/, ROADMAP.md added via open PR #96, findings to be filed as GitHub issues" |
-| `f1-tracker-direction.md` | "F1 Race Tracker current state (2026-09-06): Phases 1-5 + WS5 (F1TV live beta) shipped, PR #94 peer-comparison features merged, ROADMAP.md landing via open PR #96, stage Review" |
-| `no-direct-pushes.md` | Feedback memory: never push directly to main, even for chores — always go through a PR. |
-| `plain-english-preference.md` | "User prefers plain-English, low-jargon explanations of technical options" |
-| `subagent-model-hook.md` | "Subagent model-tiering rule (sonnet default, explicit model wins) is now in global ~/.claude/CLAUDE.md — this file keeps only the hook mechanics and history" |
-| `token-economy.md` | "Token-economy rules are GLOBAL now (~/.claude/CLAUDE.md \"Subagents & Token Economy\") — this file keeps only the project-specific history" |
-
 ## Data
 
 _Recorded clips and fixtures the other layers read._
@@ -536,4 +520,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-46 directories, 207 files listed, 0 without a declared purpose.
+45 directories, 198 files listed, 0 without a declared purpose.

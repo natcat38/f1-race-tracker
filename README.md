@@ -8,7 +8,7 @@ An F1 race tracker that puts you on the pit wall — watch the cars on circuit, 
 
 ![The track map replaying Monza 2024: twenty cars round the circuit at 10 Hz over the sector-dominance heatmap](docs/assets/board-replay.gif)
 
-**One gateway sustained 1,000 concurrent WebSocket viewers at 10 Hz** — p99 fan-out latency of 48 ms, zero dropped clients, on a single laptop. See [BENCHMARKS.md](BENCHMARKS.md).
+**One gateway sustained 1,000 concurrent WebSocket viewers at 10 Hz** — p99 fan-out latency of 48 ms, zero dropped clients, on a single laptop. Measured 2026-06-22 on one laptop, before the frame fields added in PR #94; not re-measured since. See [BENCHMARKS.md](BENCHMARKS.md).
 
 ### What you get on the pit wall
 
@@ -25,9 +25,9 @@ An F1 race tracker that puts you on the pit wall — watch the cars on circuit, 
 |---|---|
 | ![Telemetry compare — PIA vs LEC: speed, gear, DRS, throttle and brake bars, and throttle/brake/gear traces over lap distance, solid for the reference car and dashed for the rival](docs/assets/telemetry-compare.png) | ![Strategy timeline — Monza 2024 stint bars for all twenty drivers in compound colours, an orange tick at each pit stop, and the marker at the replay's current lap](docs/assets/strategy.png) |
 
-The product is judged first by whether it helps you understand how the car is performing. The engineering underneath — real-time, byte-identical across two languages — is what makes that possible at scale:
+The product is judged first by whether it helps you understand how the car is performing. The engineering underneath — real-time, one JSON schema across two languages — is what makes that possible at scale:
 
-- **A polyglot seam done right** — Python and Go publish byte-identical JSON to the same Redis keys; the gateway consumes either with zero code changes.
+- **A polyglot seam done right** — Python and Go publish the same JSON schema to the same Redis keys, enforced by contract tests (the bytes can differ in number and string escaping, which a JSON parser does not see); the gateway consumes either with zero code changes.
 - **Live WebSocket fan-out at scale** — one in-memory hub pushes 10 Hz frames to a thousand viewers, with backpressure that sheds milliseconds rather than dropping clients.
 
 ## Quick look (no clone required)
@@ -112,7 +112,7 @@ flowchart LR
 
 Each lane writes to its own Redis keys (`snapshot:<session>` and `frames:<session>`) and never touches the other lane's keys. The gateway fans out exactly one lane at a time. Switching lanes is a live operation — no restart needed.
 
-**Redis is the polyglot seam.** Python (`ingest/live.py`) and Go publish byte-identical JSON to the same key shapes. The gateway consumes either with zero code changes. The shared contract is defined in `internal/model/model.go`.
+**Redis is the polyglot seam.** Python (`ingest/live.py`) and Go publish the same JSON schema to the same key shapes (key sets and field types are checked by contract tests; the exact bytes are not guaranteed to match). The gateway consumes either with zero code changes. The shared contract is defined in `internal/model/model.go`.
 
 **Monotonic Rev.** Both the Go writer and the Python ingester read the stored snapshot's `rev` at startup and emit strictly above it. A restart or a source swap therefore never re-emits a Rev the gateway and clients already passed (which would silently freeze the board).
 

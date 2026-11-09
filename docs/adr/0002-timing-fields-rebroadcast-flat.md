@@ -8,7 +8,7 @@ separate lower-cadence message.
 
 The slow fields — last/best lap, sectors, tyre, gap/interval — change roughly
 once a lap, so rebroadcasting them at 10 Hz is redundant. We accept that
-redundancy because it keeps the Python↔Go contract byte-identical (just more
+redundancy because it keeps the Python↔Go contract identical in schema (just more
 fields on the existing struct), needs zero gateway changes, and heals via the
 snapshot for free: `model.Apply` already does a wholesale per-car replace, so a
 reconnecting client's snapshot carries the latest timing with no extra code.
@@ -25,3 +25,11 @@ complexity.
 > Phase 5 added per-car `lap` and occasional per-frame `weather`, measuring
 > closer to ~5.7 KB for 20 cars on the current default clip. No benchmark
 > regression observed; "Option B" remains unbuilt for the same reason as above.
+
+> Note, 2026-11-09: this ADR originally said the contract stays "byte-identical".
+> That was never tested and is not true. Python's `json.dumps` and Go's
+> `encoding/json` differ in four ways: non-ASCII text (Python escapes it, Go does not),
+> `<`, `>` and `&` (Go escapes them, Python does not), whole-number floats (`1.0` vs `1`)
+> and exponent floats (`1e-05` vs `0.00001`). The two languages share one JSON
+> schema, checked by `ingest/check_live_contract.py` and `internal/model/contract_test.go`;
+> the gateway reads either because a JSON parser sees no difference.
