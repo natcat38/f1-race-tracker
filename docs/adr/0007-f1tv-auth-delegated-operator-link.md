@@ -85,3 +85,57 @@ The live link was verified against msgpack 1.2.1 on 2026-08-20. 1.2.3 is a patch
 release, but the live socket has not been re-run against it; the next live session
 should confirm it. Existing local venvs still hold 1.2.1 until
 `pip install -r ingest/requirements.txt` is re-run.
+
+## Update 2026-11-03: fastf1 3.9 moved the login to `f1account`
+
+fastf1 3.9.0 deleted `fastf1.internals.f1auth`, which the decision above built on, and
+replaced it with `fastf1.internals.f1account`. The decision itself stands: the login,
+the token store and the verification still belong to fastf1, and this project still
+never touches a credential. What changed is the surface we read and call. The bump to
+fastf1 3.9.0 (with numpy 2.5.4 and pytest 9.2.0, first proposed in the closed PR #170)
+lands together with this port.
+
+- **Token file.** fastf1 3.9 writes JSON, not a raw JWT, to `f1auth_token.json`:
+  `{"version": 1, "value": "<subscription JWT>", "expires_at": <epoch seconds>}`
+  (`TokenManager.store` in `f1account/tokens.py`). The default location is unchanged,
+  `platformdirs.user_data_dir("fastf1")`. The copy for the compose mount is now
+  `./secrets/fastf1/f1auth_token.json`, and `XDG_DATA_HOME=/secrets` resolves to it.
+  The old `f1auth.json` is no longer read; `--unlink` deletes a leftover copy.
+- **Status reader.** `ingest/f1tv_auth.py` stays stdlib-only. It parses the JSON,
+  takes the expiry from the file's `expires_at` (the value fastf1's own validity check
+  uses), and decodes the JWT claims, still without verification, for the tier and
+  product. A missing, empty, malformed, wrong-version or undecodable file reads as
+  unlinked, as before. A raw-JWT file left over from 3.8 therefore reads as unlinked,
+  which is correct: fastf1 3.9 would ignore it too.
+- **Link command.** `ingest/f1tv_link.py` now calls
+  `fastf1.internals.f1account.get_token(method="browser")` and `clear_token()`.
+  The method is pinned on purpose. fastf1 3.9 defaults to a native `"password"` sign-in
+  that reads `F1_USERNAME` / `F1_PASSWORD` or prompts for them in the terminal. That
+  would put the credentials in this project's process, which this ADR rules out. The
+  `"browser"` method is the same f1login extension flow as before.
+- **Writes at import.** The old caveat about `f1auth` touching its data dir on import
+  does not carry over: `f1account` creates the directory and file only when it stores
+  a token. Any future in-container use still needs a writable `XDG_DATA_HOME`, because
+  signing in and renewing both write.
+- **Tests.** The token parsing is unit-tested against files in the real 3.9 layout, and
+  `f1tv_link` is tested against a stubbed `f1account` (no network, no real token). One
+  scratch check also round-tripped a file through the installed `TokenManager.store`
+  into `auth_status`.
+
+**Unverified.** None of the live path was run against the F1 service. Without an F1TV
+subscription this session could not sign in, so these remain open:
+
+- Whether the browser sign-in under 3.9 completes end to end. The code reads as the
+  old flow, but it was not exercised.
+- Whether a free account still gets a token. The 2026-08-20 spike found that on 3.8.3
+  (`SubscriptionStatus: inactive`). In 3.9 `login_browser` raises `F1AuthError` when the
+  login session carries no `subscriptionToken`, so a free account may now be refused.
+  `f1tv_link.py` says so instead of promising it works.
+- Whether the live SignalR connection accepts the 3.9 token. It is the same entitlement
+  JWT, but the socket was not re-run.
+- Whether the `0600` mode fastf1 sets on the token file survives the copy into
+  `./secrets` in a way the container's `appuser` (uid 1000) can read on a Linux host.
+  Docker Desktop on Windows, the current host, ignores the mode bits.
+
+The next live session with a subscription should run `python ingest/f1tv_link.py`,
+`--status`, and a short `--live` capture, and settle each point above.
