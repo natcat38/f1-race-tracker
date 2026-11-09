@@ -426,6 +426,7 @@ Architecture Decision Records — why the system is shaped the way it is. Read t
 | `0012-open-items-sweep-2026-11-02.md` | ADR-0012: the 2026-11-02 open-items sweep: what blocked the dependency scan, and why three dependabot PRs and issue #103 were closed. |
 | `0013-replay-clips-stay-committed.md` | ADR-0013: the three baked replay clips stay committed in full, so the demo runs offline with no fetch step. |
 | `0014-scrub-stays-client-only-on-the-static-demo.md` | ADR-0014: pause and scrub stay client-only on the static demo, permanently; the live and replay lanes get no playback control. |
+| `0015-icon-only-phone-settings-exit-and-top-ten-tower.md` | ADR-0015: on a phone the settings exit is icon-only with its words in the section strip, and the timing tower opens on the top ten with a "Show all" switch. |
 
 ### `docs/agents`
 
@@ -535,4 +536,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-46 directories, 206 files listed, 0 without a declared purpose.
+46 directories, 207 files listed, 0 without a declared purpose.
