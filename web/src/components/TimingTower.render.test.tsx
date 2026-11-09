@@ -252,3 +252,32 @@ describe('TimingTower absent data', () => {
     expect(html.indexOf('LEADER')).toBeLessThan(html.indexOf('NO DATA'));
   });
 });
+
+describe('TimingTower top ten (#167)', () => {
+  const twenty = {
+    ...emptyState(),
+    rev: 1,
+    cars: Object.fromEntries(
+      Array.from({ length: 20 }, (_, i) => [100 + i, car({ driverNum: 100 + i, code: `D${String(i + 1).padStart(2, '0')}`, pos: i + 1 })]),
+    ),
+  };
+
+  test('shows ten rows and a Show all switch by default', () => {
+    const html = renderToStaticMarkup(<TimingTower state={twenty} selected={null} onSelect={() => {}} />);
+    expect(html).toContain('D10');
+    expect(html).not.toContain('D11');
+    expect(html).toContain('Show all 20');
+    expect(html).toContain('aria-expanded="false"');
+  });
+
+  test('keeps the reference car in view when it is outside the top ten', () => {
+    const html = renderToStaticMarkup(<TimingTower state={twenty} selected={113} onSelect={() => {}} />);
+    expect(html).toContain('D14');
+    expect(html).not.toContain('D11');
+  });
+
+  test('no switch when the field is ten cars or fewer', () => {
+    const html = renderToStaticMarkup(<TimingTower state={field()} selected={null} onSelect={() => {}} />);
+    expect(html).not.toContain('Show all');
+  });
+});

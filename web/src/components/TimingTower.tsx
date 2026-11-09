@@ -35,6 +35,11 @@ const COLUMNS = ['#', 'Driver', 'Gap', 'Int', 'Last', 'Best', 'Tyre', 'S1', 'S2'
 // One sentence, on both estimated columns, saying what they are and how good
 // they are. "best-effort, derived" said the first half only. The tenth is measured,
 // not claimed: see ingest/README.md's validation against official crossing times.
+// The tower opens on the top ten with a "Show all" switch (owner decision
+// 2026-11-09, #167): twenty rows made the desktop board about 1.5 screens. The
+// reference car always stays in view, so selecting P14 never hides P14.
+const TOP_ROWS = 10;
+
 const GAP_TITLE = 'Estimated from track position and the leader’s own pace, to about a tenth of a second — not official timing';
 
 export function TimingTower({
@@ -50,6 +55,7 @@ export function TimingTower({
 }) {
   const [secondsMode, setSecondsMode] = useState(false);
   const [showSectors, setShowSectors] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const [pb, setPb] = useState<Bests>({});
   const pbRef = useRef<Bests>({});
   const sessionRef = useRef(state.session);
@@ -139,6 +145,9 @@ export function TimingTower({
   if (order.length === 0) {
     return <div className="empty">No cars yet — the timing tower fills in when data arrives.</div>;
   }
+  const shown = showAll
+    ? order
+    : order.filter((c, i) => i < TOP_ROWS || c.driverNum === selected);
   const [b1, b2, b3] = bestSectors(order);
   // Smoothed and made consistent with the running order — the raw per-car
   // estimates jitter ±0.6 s between frames and can come out non-monotonic.
@@ -165,19 +174,19 @@ export function TimingTower({
   // The tower is one tab stop, not twenty: exactly one row button is reachable by
   // Tab and Arrow/Home/End move between them. Prefer wherever focus last was, then
   // the reference car, then the leader — so tabbing in lands somewhere meaningful.
-  const inOrder = (dn: number | null) => dn != null && order.some((c) => c.driverNum === dn);
+  const inOrder = (dn: number | null) => dn != null && shown.some((c) => c.driverNum === dn);
   const rovingDriver = inOrder(focusedDriver)
     ? focusedDriver
-    : inOrder(selected) ? selected : order[0].driverNum;
+    : inOrder(selected) ? selected : shown[0].driverNum;
 
   function moveFocus(from: number, to: number | 'first' | 'last') {
-    const i = order.findIndex((c) => c.driverNum === from);
+    const i = shown.findIndex((c) => c.driverNum === from);
     if (i < 0) return;
     const nextIdx =
       to === 'first' ? 0
-        : to === 'last' ? order.length - 1
-          : Math.min(order.length - 1, Math.max(0, i + to));
-    const dn = order[nextIdx].driverNum;
+        : to === 'last' ? shown.length - 1
+          : Math.min(shown.length - 1, Math.max(0, i + to));
+    const dn = shown[nextIdx].driverNum;
     setFocusedDriver(dn);
     btnRefs.current.get(dn)?.focus();
   }
@@ -247,6 +256,7 @@ export function TimingTower({
       </thead>
       <tbody>
         {order.map((c, idx) => {
+          if (!shown.includes(c)) return null;
           const g = gaps[idx] ?? {};
           // Number rows by their place in the sorted order, not the raw feed
           // pos: a duplicated pos would otherwise print the same number twice
@@ -368,6 +378,16 @@ export function TimingTower({
       </tbody>
     </table>
     </div>
+    {order.length > TOP_ROWS && (
+      <button
+        type="button"
+        className="btn tt-show-all"
+        aria-expanded={showAll}
+        onClick={() => setShowAll((v) => !v)}
+      >
+        {showAll ? `Show top ${TOP_ROWS}` : `Show all ${order.length}`}
+      </button>
+    )}
     <div className="empty tt-note">
       {/* Rounded to one decimal because that is the resolution the estimate has:
           the wire's values come out quantised to ~0.566s, so the three decimals

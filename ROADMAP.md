@@ -1,7 +1,7 @@
 # Roadmap — f1-race-tracker
 
 **Current stage: Review**
-**Next up:** accept or reject ADR-0010 (Proposed); finish Review with the `/simplify` pass, then Ship's `/repo-review`; then pick the next feature cycle from Define. (2026-11-03 owner decisions D1-D5 are done: `docs/Design_Direction.md` + README reshoot #124, clips stay committed ADR-0013 #123, scrub stays client-only ADR-0014 #115 so WS3's server-paced scrub is dropped, F1TV link ported to fastf1 3.9 in ADR-0007's 2026-11-03 update.)
+**Next up:** accept or reject ADR-0010 (Proposed); finish Review with the `/simplify` pass, then Ship's `/repo-review`; then pick the next feature cycle from Define. (2026-11-09 owner decisions #167 and #168 done: top-ten timing tower with a "Show all" switch, icon-only phone settings exit with its words in the section strip, ADR-0015; no stage change. 2026-11-03 owner decisions D1-D5 are done: `docs/Design_Direction.md` + README reshoot #124, clips stay committed ADR-0013 #123, scrub stays client-only ADR-0014 #115 so WS3's server-paced scrub is dropped, F1TV link ported to fastf1 3.9 in ADR-0007's 2026-11-03 update.)
 
 Lifecycle: Define → Plan → Build → Verify → Review → Ship.
 Agents: read this file at session start, state the current stage and next unchecked item before any other work, and update this file (checkboxes + Current stage + Next up) before ending. Product and design decisions belong to the user — elicit them with questions, never decide for them.
