@@ -6,4 +6,4 @@ fastf1==3.9.2
 numpy==2.5.4
 # Transitive via fastf1's CacheControl / signalrcore — pinned up from the resolved
 # 1.1.2 to fix GHSA-6v7p-g79w-8964, then to 1.2.3 for GHSA-j586-36cw-2gc2.
-msgpack>=1.2.3,<2
+msgpack>=1.2.4,<2
