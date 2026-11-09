@@ -21,4 +21,4 @@
 # msgpack==1.1.2 declared here, which this project never installs (requirements.txt
 # pins the patched >=1.2.3, and the main audit checks it).
 # signalrcore itself stays audited, so a future advisory against it still fails CI.
-signalrcore==1.0.2
+signalrcore==1.0.4
