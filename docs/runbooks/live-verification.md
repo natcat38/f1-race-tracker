@@ -101,7 +101,7 @@ python ingest/f1tv_link.py
 Runs in the foreground and prints a `https://f1login.fastf1.dev?port=…` URL. Open it
 in a browser with the f1login extension installed and sign in with your own F1
 account. On success the token is cached by fastf1 and copied to
-`./secrets/fastf1/f1auth.json` (git-ignored) for the compose mount.
+`./secrets/fastf1/f1auth_token.json` (git-ignored) for the compose mount.
 
 This is a **host** command. fastf1's login server binds a random port on
 `127.0.0.1` and the extension POSTs to it; Docker cannot forward a host port onto a
@@ -194,7 +194,7 @@ Still open:
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| Settings shows NOT LINKED after linking | container has no `./secrets` mount, or the copy failed | check `./secrets/fastf1/f1auth.json` exists, then `docker compose up -d --force-recreate live` |
+| Settings shows NOT LINKED after linking | container has no `./secrets` mount, or the copy failed | check `./secrets/fastf1/f1auth_token.json` exists, then `docker compose up -d --force-recreate live` |
 | Settings shows EXPIRED | the cached JWT is past `exp` | `python ingest/f1tv_link.py` again |
 | Settings shows UNAVAILABLE | gateway up but no ingest publishing status | check the `live` service logs |
 | `f1tv_link.py` prints no URL | output buffering, or the extension is missing | run it in the foreground (not through a pipe) and install the extension first |

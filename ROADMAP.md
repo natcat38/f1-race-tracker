@@ -1,7 +1,7 @@
 # Roadmap — f1-race-tracker
 
 **Current stage: Review**
-**Next up:** owner decisions on #115 (ADR-0010 accept/reject), #124 (screenshot reshoot), #123 (70 MB clips policy), and fastf1 3.9 (it breaks the F1TV link; see ADR-0012); then start the next feature cycle (WS3 server-paced scrub) from Define.
+**Next up:** accept or reject ADR-0010 (Proposed); finish Review with the `/simplify` pass, then Ship's `/repo-review`; then pick the next feature cycle from Define. (2026-11-03 owner decisions D1-D5 are done: `docs/Design_Direction.md` + README reshoot #124, clips stay committed ADR-0013 #123, scrub stays client-only ADR-0014 #115 so WS3's server-paced scrub is dropped, F1TV link ported to fastf1 3.9 in ADR-0007's 2026-11-03 update.)
 
 Lifecycle: Define → Plan → Build → Verify → Review → Ship.
 Agents: read this file at session start, state the current stage and next unchecked item before any other work, and update this file (checkboxes + Current stage + Next up) before ending. Product and design decisions belong to the user — elicit them with questions, never decide for them.
@@ -54,7 +54,7 @@ Exit: findings addressed or explicitly waived. Skills: code-review, simplify, we
 
 ## 6 · Ship — recruiter-ready
 
-- [x] README rewrite: screenshots, architecture diagram, run-in-3-commands, "why I built this". (#86)
+- [x] README rewrite: screenshots, architecture diagram, run-in-3-commands, "why I built this". (#86; screenshots reshot 2026-11-03 against `docs/Design_Direction.md`, adding a replay GIF, the two-car telemetry compare and the strategy timeline, #124)
 - [ ] API docs/Swagger if applicable.
 - [x] Deployed demo link. (GitHub Pages static demo)
 - [ ] Final pass with /repo-review.

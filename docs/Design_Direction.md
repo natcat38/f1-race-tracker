@@ -99,11 +99,11 @@ Restraint everywhere else: panels are flat boxes, and colour outside the map mea
   reads `IN PIT` in `--pit`.
 - **Telemetry panel:** speed, gear, throttle, brake, DRS, lap-time and gap sparklines. The "vs"
   picker adds a second car and pedal-trace charts over lap distance.
-- **Strategy chart:** one stint bar per driver in compound colours, with each stop's duration on
-  the timeline.
+- **Strategy chart:** one stint bar per driver in compound colours, with a tick at each stop whose
+  tooltip and accessible name carry its duration.
 - **Comms and Race Control:** rolling logs with timestamps. Comms has a now-playing banner.
 - **Playback bar (static demo only):** Pause and a scrubber. The live and replay lanes have no
-  pause or scrub.
+  pause or scrub, by decision (ADR-0014).
 - **Motion:** only the first page paints with a short staggered panel arrival (240ms + 180ms),
   inside `prefers-reduced-motion: no-preference`. Nothing else animates except chip transitions.
 
