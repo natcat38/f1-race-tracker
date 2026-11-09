@@ -266,6 +266,11 @@ export function StatusRail({
                 {sec.label}
               </button>
             ))}
+            {/* The header's settings exit is glyph-only on a phone (its label cost
+                33 px of masthead, #168), so its words live here, last in the row. */}
+            <a className="rail-section-chip" href="#settings">
+              {SETTINGS_LINK.text}
+            </a>
           </nav>
         )}
       </div>

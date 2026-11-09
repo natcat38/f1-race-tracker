@@ -853,6 +853,10 @@ select.btn {
   color: var(--good);
 }
 
+.tt-show-all {
+  margin-top: var(--sp-2);
+}
+
 .tt-note {
   font-size: var(--fs-sm);
   margin-top: var(--sp-1);
@@ -1932,20 +1936,6 @@ select.btn {
     white-space: nowrap;
   }
 
-  /* The settings link keeps its words on a phone. Under 1360px every rail exit
-     is glyph-only (its name moved out of the flow), and a lone gear or "i" with
-     no label told a reader nothing; this one is the exit that needs a name. The
-     GitHub exit stays a glyph with its own title. */
-  .rail-repo-settings .rail-repo-text {
-    position: static;
-    width: auto;
-    height: auto;
-    overflow: visible;
-    clip-path: none;
-    margin-left: var(--sp-1);
-    font-size: var(--fs-xs);
-  }
-
   .rail-session {
     letter-spacing: 0.04em;
   }
@@ -2107,7 +2097,10 @@ select.btn {
   }
 
   .rail-section-chip {
+    display: inline-flex;
+    align-items: center;
     flex: none;
+    text-decoration: none;
     min-height: 28px;
     padding: 0 var(--sp-3);
     border: 1px solid var(--edge);
