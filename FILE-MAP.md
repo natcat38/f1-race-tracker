@@ -425,6 +425,7 @@ Architecture Decision Records — why the system is shaped the way it is. Read t
 | `0011-demo-opens-at-lap-2-phone-tower-cards-and-how-this-runs.md` | ADR-0011: the demo clip opens from lap 2, the phone timing tower uses compact cards with sectors behind a switch, and the static demo's gear opens a "How this runs" page. |
 | `0012-open-items-sweep-2026-11-02.md` | ADR-0012: the 2026-11-02 open-items sweep: what blocked the dependency scan, and why three dependabot PRs and issue #103 were closed. |
 | `0013-replay-clips-stay-committed.md` | ADR-0013: the three baked replay clips stay committed in full, so the demo runs offline with no fetch step. |
+| `0014-scrub-stays-client-only-on-the-static-demo.md` | ADR-0014: pause and scrub stay client-only on the static demo, permanently; the live and replay lanes get no playback control. |
 
 ### `docs/agents`
 
@@ -534,4 +535,4 @@ The golden snapshot pinning the wire contract between Go, Python and the fronten
 
 ---
 
-46 directories, 205 files listed, 0 without a declared purpose.
+46 directories, 206 files listed, 0 without a declared purpose.

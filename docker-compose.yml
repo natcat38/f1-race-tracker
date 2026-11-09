@@ -22,7 +22,7 @@ services:
     environment:
       REDIS_URL: redis://redis:6379
       SESSION_KEY: live
-      XDG_DATA_HOME: /secrets    # F1TV token resolves to /secrets/fastf1/f1auth.json (ADR-0007)
+      XDG_DATA_HOME: /secrets    # F1TV token resolves to /secrets/fastf1/f1auth_token.json (ADR-0007)
     command: ["--replay-clip", "/data/replays/silverstone-2024-race.jsonl", "--session", "live"]
     volumes:
       - ./data:/data:ro
